@@ -23,6 +23,7 @@ import { YouTubePlayer } from '@/components/YouTubePlayer';
 import { EncouragementModal } from '@/components/EncouragementModal';
 import { SelfRatingModal } from '@/components/SelfRatingModal';
 import { CopyrightFooter } from '@/components/CopyrightFooter';
+import { VideoWatermark } from '@/components/VideoWatermark';
 import { supabase } from '@/lib/supabase';
 import { getStarsForSession, calculateStars } from '@/lib/stars';
 import { getExerciseDosage } from '@/lib/dosage';
@@ -64,7 +65,7 @@ export default function ExerciseScreen() {
   }>();
   const router = useRouter();
   const queryClient = useQueryClient();
-  const { t, patientId, language, reinforcementAudioId } = useApp();
+  const { t, patientId, patientName, language, reinforcementAudioId } = useApp();
 
   const allIds: string[] = useMemo(() => {
     if (params.allExerciseIds) {
@@ -356,13 +357,17 @@ export default function ExerciseScreen() {
               onCameraReady={() => setCameraReady(true)}
               t={t}
               language={language}
+              patientName={patientName || ''}
             />
           ) : (
             <View style={styles.videoSection}>
-              <YouTubePlayer
-                videoId={exercise.youtube_video_id}
-                height={220}
-              />
+              <View style={styles.videoPlayerWrapper}>
+                <YouTubePlayer
+                  videoId={exercise.youtube_video_id}
+                  height={220}
+                />
+                <VideoWatermark patientName={patientName || ''} height={220} />
+              </View>
               <Animated.View
                 style={[
                   styles.slpBubbleRow,
@@ -503,6 +508,7 @@ interface MirrorModeViewProps {
   onCameraReady: () => void;
   t: (key: string) => string;
   language: Language | null;
+  patientName: string;
 }
 
 function formatElapsed(seconds: number): string {
@@ -559,6 +565,7 @@ function MirrorModeViewInner({
   onCameraReady,
   t,
   language,
+  patientName,
 }: MirrorModeViewProps) {
   const cameraRef = useRef<CameraView>(null);
   const [permissionResponse, requestPermission] = useCameraPermissions();
@@ -770,6 +777,7 @@ function MirrorModeViewInner({
       {isSplit && (
         <View style={[styles.mirrorVideoSection, { height: videoHeight }]}>
           <YouTubePlayer videoId={exercise.youtube_video_id} height={videoHeight - 8} />
+          <VideoWatermark patientName={patientName} height={videoHeight - 8} />
         </View>
       )}
 
@@ -1166,6 +1174,9 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.3,
     shadowRadius: 4,
     elevation: 4,
+  },
+  videoPlayerWrapper: {
+    position: 'relative' as const,
   },
   videoSection: {
     paddingHorizontal: 16,

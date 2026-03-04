@@ -38,6 +38,14 @@ export default function CodeEntryScreen() {
         throw new Error('invalid');
       }
 
+      if (data.is_frozen) {
+        throw new Error('frozen');
+      }
+
+      if (data.is_active === false) {
+        throw new Error('inactive');
+      }
+
       return data as Patient;
     },
     onSuccess: async (patient) => {
@@ -48,6 +56,10 @@ export default function CodeEntryScreen() {
       log('Code verification error:', error);
       if (error.message === 'invalid') {
         setErrorMessage(t('invalidCode'));
+      } else if (error.message === 'frozen') {
+        setErrorMessage(t('accountFrozen'));
+      } else if (error.message === 'inactive') {
+        setErrorMessage(t('accountInactive'));
       } else {
         setErrorMessage(t('networkError'));
       }

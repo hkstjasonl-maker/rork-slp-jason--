@@ -1,0 +1,88 @@
+export type Language = 'en' | 'zh_hant' | 'zh_hans';
+
+export type FontSizeLevel = 'small' | 'medium' | 'large' | 'extraLarge';
+
+export interface Patient {
+  id: string;
+  access_code: string;
+  patient_name: string;
+  created_at: string;
+  reinforcement_audio_youtube_id?: string | null;
+  reinforcement_audio_youtube_id_zh_hant?: string | null;
+  reinforcement_audio_youtube_id_zh_hans?: string | null;
+}
+
+export interface ExerciseProgram {
+  id: string;
+  patient_id: string;
+  issue_date: string;
+  expiry_date: string;
+  remarks: string | null;
+  is_active: boolean;
+  created_at: string;
+  exercises?: Exercise[];
+}
+
+export interface Exercise {
+  id: string;
+  program_id: string;
+  title_en: string;
+  title_zh_hant: string;
+  title_zh_hans: string;
+  youtube_video_id: string;
+  duration_minutes: number;
+  dosage: string;
+  dosage_zh_hant: string | null;
+  dosage_zh_hans: string | null;
+  dosage_per_day: number | null;
+  dosage_days_per_week: number | null;
+  modifications: string | null;
+  sort_order: number;
+  category: string | null;
+  narrative_audio_youtube_id?: string | null;
+  narrative_audio_youtube_id_zh_hant?: string | null;
+  narrative_audio_youtube_id_zh_hans?: string | null;
+  created_at: string;
+}
+
+export interface ExerciseLog {
+  id: string;
+  patient_id: string;
+  exercise_id: string;
+  completed_at: string;
+  self_rating?: number | null;
+  exercises?: Pick<Exercise, 'title_en' | 'title_zh_hant' | 'title_zh_hans'>;
+}
+
+export interface AppSession {
+  id: string;
+  patient_id: string;
+  opened_at: string;
+  closed_at: string | null;
+  duration_seconds: number | null;
+}
+
+export interface ExerciseCompliance {
+  exercise_id: string;
+  title_en: string;
+  title_zh_hant: string;
+  title_zh_hans: string;
+  category: string | null;
+  dosage_per_day: number | null;
+  dosage_days_per_week: number | null;
+  total_completions: number;
+  days_with_completions: number;
+  program_days: number;
+  daily_compliance_rate: number;
+  weekly_compliance_rate: number;
+  average_self_rating: number | null;
+}
+
+export const FONT_SCALES: Record<FontSizeLevel, number> = {
+  small: 0.8,
+  medium: 1.0,
+  large: 1.25,
+  extraLarge: 1.6,
+};
+
+export const BASE_FONT_SIZE = 16;

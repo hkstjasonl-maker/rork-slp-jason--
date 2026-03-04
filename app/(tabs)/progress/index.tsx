@@ -6,6 +6,7 @@ import {
   SafeAreaView,
   ActivityIndicator,
   RefreshControl,
+  Pressable,
 } from 'react-native';
 import { useQuery } from '@tanstack/react-query';
 import { useApp } from '@/contexts/AppContext';
@@ -17,7 +18,7 @@ import { fetchExerciseCompliance } from '@/lib/analytics';
 import Colors from '@/constants/colors';
 import { ExerciseLog, ExerciseProgram, Language } from '@/types';
 import { log } from '@/lib/logger';
-import { TrendingUp, Calendar, Award, Zap, CheckCircle2, Star, Flame, Trophy, Activity, ClipboardCheck, ThumbsUp, Gauge } from 'lucide-react-native';
+import { TrendingUp, Calendar, Award, Zap, CheckCircle2, Star, Flame, Trophy, Activity, ClipboardCheck, ThumbsUp, Gauge, Info, ChevronDown, ChevronUp } from 'lucide-react-native';
 
 function getLogTitle(log: ExerciseLog, language: Language | null): string {
   const lang = language || 'en';
@@ -65,6 +66,7 @@ interface GroupedLogs {
 
 export default function ProgressScreen() {
   const { t, patientId, language } = useApp();
+  const [showHowToEarn, setShowHowToEarn] = React.useState<boolean>(false);
 
   const programQuery = useQuery({
     queryKey: ['program', patientId],
@@ -304,6 +306,82 @@ export default function ProgressScreen() {
                   <ScaledText size={13} color={Colors.textSecondary} style={styles.noStarsText}>
                     {t('noStarsYet')}
                   </ScaledText>
+                )}
+
+                <Pressable
+                  style={styles.howToEarnToggle}
+                  onPress={() => setShowHowToEarn((v) => !v)}
+                >
+                  <Info size={14} color="#B8860B" />
+                  <ScaledText size={13} weight="600" color="#B8860B">
+                    {t('howToEarnTitle')}
+                  </ScaledText>
+                  {showHowToEarn ? (
+                    <ChevronUp size={14} color="#B8860B" />
+                  ) : (
+                    <ChevronDown size={14} color="#B8860B" />
+                  )}
+                </Pressable>
+
+                {showHowToEarn && (
+                  <View style={styles.howToEarnContent}>
+                    <View style={styles.howToEarnSection}>
+                      <View style={styles.howToEarnSectionHeader}>
+                        <Star size={15} color="#FFB800" fill="#FFB800" />
+                        <ScaledText size={13} weight="bold" color={Colors.textPrimary}>
+                          {t('starRewards')}
+                        </ScaledText>
+                      </View>
+                      <View style={styles.howToEarnRule}>
+                        <View style={[styles.howToEarnBadge, { backgroundColor: '#E8F5E9' }]}>
+                          <ScaledText size={11} weight="bold" color="#2E7D32">{t('stars3')}</ScaledText>
+                        </View>
+                        <ScaledText size={12} color={Colors.textSecondary}>{t('starRuleAll')}</ScaledText>
+                      </View>
+                      <View style={styles.howToEarnRule}>
+                        <View style={[styles.howToEarnBadge, { backgroundColor: '#FFF8E1' }]}>
+                          <ScaledText size={11} weight="bold" color="#F57F17">{t('stars1')}</ScaledText>
+                        </View>
+                        <ScaledText size={12} color={Colors.textSecondary}>{t('starRuleHalf')}</ScaledText>
+                      </View>
+                      <View style={styles.howToEarnRule}>
+                        <View style={[styles.howToEarnBadge, { backgroundColor: '#F5F5F5' }]}>
+                          <ScaledText size={11} weight="bold" color="#9E9E9E">{t('stars0')}</ScaledText>
+                        </View>
+                        <ScaledText size={12} color={Colors.textSecondary}>{t('starRuleNone')}</ScaledText>
+                      </View>
+                    </View>
+
+                    <View style={styles.howToEarnDivider} />
+
+                    <View style={styles.howToEarnSection}>
+                      <View style={styles.howToEarnSectionHeader}>
+                        <Flame size={15} color="#FF6B35" />
+                        <ScaledText size={13} weight="bold" color={Colors.textPrimary}>
+                          {t('streakBonus')}
+                        </ScaledText>
+                      </View>
+                      <ScaledText size={12} color={Colors.textSecondary} style={styles.howToEarnDesc}>
+                        {t('streakRuleDesc')}
+                      </ScaledText>
+                      <View style={styles.howToEarnRule}>
+                        <View style={[styles.howToEarnBadge, { backgroundColor: '#FFF3E0' }]}>
+                          <ScaledText size={11} weight="bold" color="#E65100">+1</ScaledText>
+                        </View>
+                        <ScaledText size={12} color={Colors.textSecondary}>
+                          {t('streakRule3')} (+1 {t('bonusStar')})
+                        </ScaledText>
+                      </View>
+                      <View style={styles.howToEarnRule}>
+                        <View style={[styles.howToEarnBadge, { backgroundColor: '#FBE9E7' }]}>
+                          <ScaledText size={11} weight="bold" color="#BF360C">+2</ScaledText>
+                        </View>
+                        <ScaledText size={12} color={Colors.textSecondary}>
+                          {t('streakRule7')} (+2 {t('bonusStars')})
+                        </ScaledText>
+                      </View>
+                    </View>
+                  </View>
                 )}
               </View>
 
@@ -636,6 +714,54 @@ const styles = StyleSheet.create({
   noStarsText: {
     marginTop: 10,
     textAlign: 'center',
+  },
+  howToEarnToggle: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    marginTop: 14,
+    paddingTop: 12,
+    borderTopWidth: 1,
+    borderTopColor: '#FFE082',
+  },
+  howToEarnContent: {
+    marginTop: 12,
+    backgroundColor: '#FFFEF9',
+    borderRadius: 12,
+    padding: 14,
+    borderWidth: 1,
+    borderColor: '#FFF0B3',
+  },
+  howToEarnSection: {
+    gap: 8,
+  },
+  howToEarnSectionHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    marginBottom: 2,
+  },
+  howToEarnRule: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    paddingLeft: 4,
+  },
+  howToEarnBadge: {
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 8,
+    minWidth: 52,
+    alignItems: 'center',
+  },
+  howToEarnDivider: {
+    height: 1,
+    backgroundColor: '#FFF0B3',
+    marginVertical: 12,
+  },
+  howToEarnDesc: {
+    paddingLeft: 4,
+    marginBottom: 4,
   },
   statsRow: {
     flexDirection: 'row',

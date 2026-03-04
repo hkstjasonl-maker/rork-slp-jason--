@@ -1,6 +1,6 @@
 {
   "expo": {
-    "name": "SLP Jason 言語治療師黎頌謙",
+    "name": "SLP Jason Lai 言語治療師黎頡謙",
     "slug": "slp-jason",
     "version": "1.0.0",
     "orientation": "portrait",
@@ -14,8 +14,8 @@
       "backgroundColor": "#ffffff"
     },
     "ios": {
-      "supportsTablet": false,
-      "bundleIdentifier": "app.rork.slp-jason",
+      "supportsTablet": true,
+      "bundleIdentifier": "app.rork.slp-jason-lai",
       "buildNumber": "1",
       "infoPlist": {
         "NSCameraUsageDescription": "This app uses the camera so you can watch yourself while practicing exercises",

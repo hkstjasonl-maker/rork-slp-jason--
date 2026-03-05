@@ -102,74 +102,9 @@ PersistentCameraInner.displayName = 'PersistentCamera';
 const PersistentCamera = memo(PersistentCameraInner, () => true);
 
 function SplitVideoLayerInner({ vimeoId, youtubeId }: { vimeoId: string | null; youtubeId: string | null }) {
-  const [videoUrl, setVideoUrl] = useState<string | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [fetchFailed, setFetchFailed] = useState(false);
-
-  useEffect(() => {
-    if (!vimeoId) {
-      setLoading(false);
-      return;
-    }
-
-    let cancelled = false;
-    setLoading(true);
-    setFetchFailed(false);
-    setVideoUrl(null);
-
-    fetch(`https://player.vimeo.com/video/${vimeoId}/config`)
-      .then(r => r.json())
-      .then(config => {
-        if (cancelled) return;
-        const progressive = config?.request?.files?.progressive || [];
-        const sorted = progressive
-          .filter((f: { type?: string }) => !f.type || f.type === 'video/mp4')
-          .sort((a: { height: number }, b: { height: number }) => b.height - a.height);
-        const quality = sorted.find((f: { height: number }) => f.height <= 480) || sorted[0];
-        if (quality?.url) {
-          log('[SplitVideoLayer] Using progressive URL, height:', quality.height);
-          setVideoUrl(quality.url);
-          setLoading(false);
-          return;
-        }
-        const hls = config?.request?.files?.hls?.cdns || {};
-        const cdnKeys = Object.keys(hls);
-        if (cdnKeys.length > 0) {
-          const cdn = hls[cdnKeys[0]];
-          const hlsUrl = cdn?.url || cdn?.avc_url;
-          if (hlsUrl) {
-            log('[SplitVideoLayer] Using HLS URL');
-            setVideoUrl(hlsUrl);
-            setLoading(false);
-            return;
-          }
-        }
-        log('[SplitVideoLayer] No native URL found, marking failed');
-        setFetchFailed(true);
-        setLoading(false);
-      })
-      .catch((err) => {
-        if (!cancelled) {
-          log('[SplitVideoLayer] Fetch error:', err);
-          setFetchFailed(true);
-          setLoading(false);
-        }
-      });
-
-    return () => { cancelled = true; };
-  }, [vimeoId]);
-
-  if (loading) {
-    return (
-      <View style={splitVideoStyles.loading}>
-        <ActivityIndicator size="large" color={Colors.primary} />
-      </View>
-    );
-  }
-
-  if (videoUrl) {
+  if (vimeoId) {
     if (Platform.OS === 'web') {
-      const embedUrl = `https://player.vimeo.com/video/${vimeoId}?autoplay=0&quality=360p`;
+      const embedUrl = `https://player.vimeo.com/video/${vimeoId}?autoplay=0&quality=360p&dnt=1`;
       return (
         <View style={splitVideoStyles.container}>
           {/* @ts-ignore - iframe is valid on web */}
@@ -183,44 +118,20 @@ function SplitVideoLayerInner({ vimeoId, youtubeId }: { vimeoId: string | null; 
       );
     }
 
-    return (
-      <Video
-        source={{ uri: videoUrl }}
-        style={splitVideoStyles.container}
-        resizeMode={ResizeMode.CONTAIN}
-        useNativeControls={true}
-        shouldPlay={false}
-        isMuted={false}
-      />
-    );
-  }
-
-  if (fetchFailed && vimeoId && Platform.OS === 'web') {
-    const embedUrl = `https://player.vimeo.com/video/${vimeoId}?autoplay=0&quality=360p`;
-    return (
-      <View style={splitVideoStyles.container}>
-        {/* @ts-ignore */}
-        <iframe
-          src={embedUrl}
-          style={{ width: '100%', height: '100%', border: 'none' }}
-          allow="autoplay; fullscreen; picture-in-picture; encrypted-media"
-          allowFullScreen
-        />
-      </View>
-    );
-  }
-
-  if (fetchFailed && vimeoId && Platform.OS !== 'web') {
     const WebView = require('react-native-webview').WebView;
+    const videoHtml = `<!DOCTYPE html><html><head><meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1"><style>*{margin:0;padding:0;}body{background:#000;display:flex;align-items:center;justify-content:center;height:100vh;overflow:hidden;}iframe{width:100%;height:100%;border:none;}</style></head><body><iframe src="https://player.vimeo.com/video/${vimeoId}?autoplay=0&quality=360p&dnt=1&transparent=0" allow="autoplay; fullscreen" allowfullscreen></iframe></body></html>`;
+
     return (
       <WebView
-        source={{ uri: `https://player.vimeo.com/video/${vimeoId}?autoplay=0&quality=360p` }}
-        allowsInlineMediaPlayback={true}
-        mediaPlaybackRequiresUserAction={false}
+        source={{ html: videoHtml }}
         style={splitVideoStyles.container}
+        allowsInlineMediaPlayback={true}
+        mediaPlaybackRequiresUserAction={true}
         javaScriptEnabled={true}
         scrollEnabled={false}
         bounces={false}
+        androidLayerType="software"
+        androidHardwareAccelerationDisabled={true}
       />
     );
   }

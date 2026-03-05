@@ -124,7 +124,7 @@ export default function ExerciseScreen() {
       log('[ExerciseDebug] Fetching exercise:', activeExerciseId);
       const { data, error } = await supabase
         .from('exercises')
-        .select('*, exercise_library(*)')
+        .select('*')
         .eq('id', activeExerciseId)
         .single();
 
@@ -136,11 +136,29 @@ export default function ExerciseScreen() {
       log('[ExerciseDebug] exercise.vimeo_video_id:', data?.vimeo_video_id);
       log('[ExerciseDebug] exercise.youtube_video_id:', data?.youtube_video_id);
       log('[ExerciseDebug] exercise.exercise_library_id:', data?.exercise_library_id);
-      log('[ExerciseDebug] exercise.exercise_library:', JSON.stringify(data?.exercise_library));
-      if (data?.exercise_library) {
-        log('[ExerciseDebug] library.vimeo_video_id:', data.exercise_library.vimeo_video_id);
-        log('[ExerciseDebug] library.youtube_video_id:', data.exercise_library.youtube_video_id);
+
+      if (!data.vimeo_video_id && data.exercise_library_id) {
+        log('[ExerciseDebug] No vimeo_video_id on exercise, looking up from exercise_library');
+        const { data: libData, error: libError } = await supabase
+          .from('exercise_library')
+          .select('vimeo_video_id, youtube_video_id')
+          .eq('id', data.exercise_library_id)
+          .single();
+
+        if (!libError && libData) {
+          log('[ExerciseDebug] Library lookup result:', JSON.stringify(libData));
+          data.exercise_library = libData as ExerciseLibrary;
+          if (libData.vimeo_video_id && !data.vimeo_video_id) {
+            data.vimeo_video_id = libData.vimeo_video_id;
+          }
+          if (libData.youtube_video_id && !data.youtube_video_id) {
+            data.youtube_video_id = libData.youtube_video_id;
+          }
+        } else {
+          log('[ExerciseDebug] Library lookup error:', JSON.stringify(libError));
+        }
       }
+
       return data as Exercise;
     },
     enabled: !!activeExerciseId,
@@ -151,7 +169,7 @@ export default function ExerciseScreen() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from('exercise_programs')
-        .select('*, exercises(*, exercise_library(id, vimeo_video_id, youtube_video_id))')
+        .select('*, exercises(*)')
         .eq('patient_id', patientId!)
         .eq('is_active', true)
         .order('created_at', { ascending: false })

@@ -7,9 +7,10 @@ interface VimeoPlayerProps {
   videoId: string;
   height: number;
   onEnd?: () => void;
+  lowQuality?: boolean;
 }
 
-function getVimeoEmbedUrl(videoId: string): string {
+function getVimeoEmbedUrl(videoId: string, lowQuality?: boolean): string {
   const params = new URLSearchParams({
     h: '',
     badge: '0',
@@ -21,11 +22,14 @@ function getVimeoEmbedUrl(videoId: string): string {
     playsinline: '1',
     dnt: '1',
   });
+  if (lowQuality) {
+    params.set('quality', '360p');
+  }
   return `https://player.vimeo.com/video/${videoId}?${params.toString()}`;
 }
 
-function getVimeoHTML(videoId: string): string {
-  const embedUrl = getVimeoEmbedUrl(videoId);
+function getVimeoHTML(videoId: string, lowQuality?: boolean): string {
+  const embedUrl = getVimeoEmbedUrl(videoId, lowQuality);
   return `
 <!DOCTYPE html>
 <html>
@@ -58,7 +62,7 @@ function getVimeoHTML(videoId: string): string {
 </html>`;
 }
 
-function VimeoPlayerInner({ videoId, height, onEnd }: VimeoPlayerProps) {
+function VimeoPlayerInner({ videoId, height, onEnd, lowQuality }: VimeoPlayerProps) {
   const webViewRef = useRef(null);
 
   const handleMessage = useCallback((event: { nativeEvent: { data: string } }) => {
@@ -88,7 +92,7 @@ function VimeoPlayerInner({ videoId, height, onEnd }: VimeoPlayerProps) {
       <View style={[styles.container, { height }]}>
         {/* @ts-ignore - iframe is valid on web */}
         <iframe
-          src={getVimeoEmbedUrl(videoId)}
+          src={getVimeoEmbedUrl(videoId, lowQuality)}
           style={{
             width: '100%',
             height: '100%',
@@ -106,7 +110,7 @@ function VimeoPlayerInner({ videoId, height, onEnd }: VimeoPlayerProps) {
     <View style={[styles.container, { height }]}>
       <WebView
         ref={webViewRef}
-        source={{ html: getVimeoHTML(videoId) }}
+        source={{ html: getVimeoHTML(videoId, lowQuality) }}
         style={styles.webview}
         allowsInlineMediaPlayback
         mediaPlaybackRequiresUserAction={false}

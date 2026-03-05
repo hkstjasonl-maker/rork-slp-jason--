@@ -354,25 +354,27 @@ export default function ExerciseScreen() {
           <View style={styles.headerSpacer} />
         </View>
 
-        <ScrollView
-          style={styles.scrollView}
-          contentContainerStyle={styles.scrollContent}
-          showsVerticalScrollIndicator={false}
-        >
-          {mirrorOpen ? (
-            <MirrorModeView
-              exercise={exercise}
-              mirrorViewMode={mirrorViewMode}
-              cameraReady={cameraReady}
-              mirrorFade={mirrorFade}
-              onClose={handleCloseMirror}
-              onToggleView={handleToggleMirrorView}
-              onCameraReady={() => setCameraReady(true)}
-              t={t}
-              language={language}
-              patientName={patientName || ''}
-            />
-          ) : (
+        {mirrorOpen && (
+          <MirrorModeView
+            exercise={exercise}
+            mirrorViewMode={mirrorViewMode}
+            cameraReady={cameraReady}
+            mirrorFade={mirrorFade}
+            onClose={handleCloseMirror}
+            onToggleView={handleToggleMirrorView}
+            onCameraReady={() => setCameraReady(true)}
+            t={t}
+            language={language}
+            patientName={patientName || ''}
+          />
+        )}
+
+        {!mirrorOpen && (
+          <ScrollView
+            style={styles.scrollView}
+            contentContainerStyle={styles.scrollContent}
+            showsVerticalScrollIndicator={false}
+          >
             <View style={styles.videoSection}>
               <View style={styles.videoPlayerWrapper}>
                 <ExerciseVideoPlayer exercise={exercise} height={220} />
@@ -393,7 +395,6 @@ export default function ExerciseScreen() {
                 </View>
               </Animated.View>
             </View>
-          )}
 
           <View style={styles.titleSection}>
             <ScaledText size={22} weight="bold" color={Colors.textPrimary}>
@@ -423,7 +424,7 @@ export default function ExerciseScreen() {
             </View>
           </View>
 
-          {!mirrorOpen && (() => {
+          {(() => {
             const audioUrl = getAudioInstructionUrl(exercise, language);
             return audioUrl ? (
               <AudioInstructionPlayer
@@ -434,21 +435,19 @@ export default function ExerciseScreen() {
             ) : null;
           })()}
 
-          {!mirrorOpen && (
-            <TouchableOpacity
-              style={styles.mirrorButton}
-              onPress={handleOpenMirror}
-              activeOpacity={0.8}
-              testID="open-mirror-button"
-              accessibilityLabel={t('openMirror')}
-              accessibilityRole="button"
-            >
-              <Camera size={20} color={Colors.white} />
-              <ScaledText size={15} weight="600" color={Colors.white}>
-                {t('openMirror')}
-              </ScaledText>
-            </TouchableOpacity>
-          )}
+          <TouchableOpacity
+            style={styles.mirrorButton}
+            onPress={handleOpenMirror}
+            activeOpacity={0.8}
+            testID="open-mirror-button"
+            accessibilityLabel={t('openMirror')}
+            accessibilityRole="button"
+          >
+            <Camera size={20} color={Colors.white} />
+            <ScaledText size={15} weight="600" color={Colors.white}>
+              {t('openMirror')}
+            </ScaledText>
+          </TouchableOpacity>
 
           {exercise.modifications && (
             <View style={styles.modificationsCard}>
@@ -497,6 +496,7 @@ export default function ExerciseScreen() {
 
           <CopyrightFooter />
         </ScrollView>
+        )}
 
         <EncouragementModal
           visible={showEncouragement}
@@ -547,12 +547,12 @@ function getYouTubeId(exercise: Exercise): string | null {
   return exercise.youtube_video_id || null;
 }
 
-function ExerciseVideoPlayer({ exercise, height }: { exercise: Exercise; height: number }) {
+function ExerciseVideoPlayer({ exercise, height, lowQuality }: { exercise: Exercise; height: number; lowQuality?: boolean }) {
   const vimeoId = getVimeoId(exercise);
   const youtubeId = getYouTubeId(exercise);
 
   if (vimeoId) {
-    return <VimeoPlayer videoId={vimeoId} height={height} />;
+    return <VimeoPlayer videoId={vimeoId} height={height} lowQuality={lowQuality} />;
   }
   if (youtubeId) {
     return <YouTubePlayer videoId={youtubeId} height={height} />;
@@ -824,18 +824,21 @@ function MirrorModeViewInner({
     <Animated.View style={[styles.mirrorContainer, { opacity: mirrorFade }]}>
       {isSplit && (
         <View style={[styles.mirrorVideoSection, { height: videoHeight }]}>
-          <ExerciseVideoPlayer exercise={exercise} height={videoHeight - 8} />
+          <ExerciseVideoPlayer exercise={exercise} height={videoHeight - 8} lowQuality />
           <VideoWatermark patientName={patientName} height={videoHeight - 8} />
         </View>
       )}
 
       <View style={[styles.mirrorCameraSection, { height: cameraHeight }]}>
         <CameraView
+          key="camera-mirror"
           ref={cameraRef}
           style={styles.cameraPreview}
           facing="front"
           mirror={true}
           mode="video"
+          active={true}
+          videoStabilizationMode="off"
           onCameraReady={onCameraReady}
         />
         {!cameraReady && (
@@ -1019,8 +1022,9 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.primaryDark,
   },
   mirrorContainer: {
+    flex: 1,
     paddingHorizontal: 16,
-    marginBottom: 12,
+    paddingBottom: 12,
   },
   mirrorVideoSection: {
     borderRadius: 12,

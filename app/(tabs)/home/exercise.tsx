@@ -32,7 +32,7 @@ import { getExerciseDosage } from '@/lib/dosage';
 import Colors from '@/constants/colors';
 import { JASON_CARTOON } from '@/constants/images';
 import { Exercise, ExerciseLog, Language } from '@/types';
-import { WebView } from 'react-native-webview';
+
 import { log } from '@/lib/logger';
 import { CameraView, useCameraPermissions, useMicrophonePermissions } from 'expo-camera';
 
@@ -579,6 +579,7 @@ function HiddenNarrativeAudio({ videoId }: { videoId: string }) {
     );
   }
 
+  const WebView = require('react-native-webview').WebView;
   const html = `
 <!DOCTYPE html>
 <html><head><meta name="viewport" content="width=device-width,initial-scale=1.0">

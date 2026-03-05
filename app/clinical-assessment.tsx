@@ -1,0 +1,1505 @@
+import React, { useState, useMemo, useCallback, useRef } from 'react';
+import {
+  View,
+  ScrollView,
+  StyleSheet,
+  TouchableOpacity,
+  ActivityIndicator,
+  Animated,
+  Alert,
+  SafeAreaView,
+} from 'react-native';
+import { useLocalSearchParams, router } from 'expo-router';
+import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { useApp } from '@/contexts/AppContext';
+import { ScaledText } from '@/components/ScaledText';
+import { supabase } from '@/lib/supabase';
+import Colors from '@/constants/colors';
+import { Language } from '@/types';
+import { ASSESSMENT_TOOLS, AssessmentTool, ScaleLabel } from '@/constants/assessments';
+import { ArrowLeft, CheckCircle2, Info, ChevronDown, ChevronUp } from 'lucide-react-native';
+import { log } from '@/lib/logger';
+
+function txt(en: string, zh: string, language: Language | null): string {
+  if (language === 'zh_hant' || language === 'zh_hans') return zh;
+  return en;
+}
+
+function getScaleLabel(labels: Record<string, ScaleLabel>, value: string, language: Language | null): string {
+  const label = labels[value];
+  if (!label) return value;
+  return language === 'zh_hant' || language === 'zh_hans' ? label.zh : label.en;
+}
+
+interface ScoreResult {
+  total_score: number | null;
+  subscale_scores: Record<string, number | string>;
+  severity_rating?: number;
+  max_score?: number;
+}
+
+function calculateScores(tool: AssessmentTool, answers: Record<string, number | string>): ScoreResult {
+  const result: ScoreResult = { total_score: null, subscale_scores: {} };
+
+  switch (tool.scoring_method) {
+    case 'summation': {
+      let total = 0;
+      const items = tool.items || [];
+      for (const item of items) {
+        total += (answers[String(item.item_number)] as number) ?? 0;
+      }
+      result.total_score = total;
+      result.max_score = tool.total_max ?? 0;
+      if (tool.subscales) {
+        for (const [key, sub] of Object.entries(tool.subscales)) {
+          let subTotal = 0;
+          for (const itemNum of sub.items) {
+            subTotal += (answers[String(itemNum)] as number) ?? 0;
+          }
+          result.subscale_scores[key] = subTotal;
+        }
+      }
+      break;
+    }
+    case 'dhi': {
+      let total = 0;
+      const items = tool.items || [];
+      for (const item of items) {
+        total += (answers[String(item.item_number)] as number) ?? 0;
+      }
+      result.total_score = total;
+      result.max_score = 100;
+      if (tool.subscales) {
+        for (const [key, sub] of Object.entries(tool.subscales)) {
+          let subTotal = 0;
+          for (const itemNum of sub.items) {
+            subTotal += (answers[String(itemNum)] as number) ?? 0;
+          }
+          result.subscale_scores[key] = subTotal;
+        }
+      }
+      if (answers['severity'] !== undefined) {
+        result.severity_rating = answers['severity'] as number;
+      }
+      break;
+    }
+    case 'sus_formula': {
+      let adjustedSum = 0;
+      const items = tool.items || [];
+      for (const item of items) {
+        const val = (answers[String(item.item_number)] as number) ?? 3;
+        if (item.tone === 'positive') {
+          adjustedSum += val - 1;
+        } else {
+          adjustedSum += 5 - val;
+        }
+      }
+      result.total_score = Math.round(adjustedSum * 2.5 * 10) / 10;
+      result.max_score = 100;
+      break;
+    }
+    case 'domain_scoring': {
+      const domains = tool.domains || [];
+      let allDomainScoresSum = 0;
+      let domainCount = 0;
+      for (const domain of domains) {
+        const numItems = domain.items.length;
+        let sum = 0;
+        for (const item of domain.items) {
+          sum += (answers[String(item.item_number)] as number) ?? 1;
+        }
+        const domainScore = Math.round(((sum - numItems) / (4 * numItems)) * 100 * 10) / 10;
+        result.subscale_scores[domain.domain_id] = domainScore;
+        allDomainScoresSum += domainScore;
+        domainCount++;
+      }
+      result.total_score = domainCount > 0 ? Math.round((allDomainScoresSum / domainCount) * 10) / 10 : 0;
+      result.max_score = 100;
+      break;
+    }
+    case 'single_level': {
+      result.total_score = (answers['level'] as number) ?? null;
+      result.max_score = 7;
+      break;
+    }
+    case 'coast_scoring': {
+      let total = 0;
+      const domains = tool.domains || [];
+      for (const domain of domains) {
+        let domainTotal = 0;
+        for (const item of domain.items) {
+          domainTotal += (answers[String(item.item_number)] as number) ?? 0;
+        }
+        result.subscale_scores[domain.domain_id] = domainTotal;
+        total += domainTotal;
+      }
+      result.total_score = total;
+      result.max_score = 80;
+      break;
+    }
+    case 'fda2_rating': {
+      const sections = tool.fda2_sections || [];
+      for (const section of sections) {
+        const sectionAnswers: Record<string, string> = {};
+        for (const item of section.items) {
+          const val = answers[item.item_id];
+          if (val !== undefined) {
+            sectionAnswers[item.item_id] = val as string;
+          }
+        }
+        result.subscale_scores[`section_${section.section_number}`] = JSON.stringify(sectionAnswers);
+      }
+      result.total_score = null;
+      break;
+    }
+    case 'dtoms_rating': {
+      const dims = tool.dtoms_dimensions || [];
+      for (const dim of dims) {
+        const val = answers[dim.dimension_id];
+        if (val !== undefined) {
+          result.subscale_scores[dim.dimension_id] = val as number;
+        }
+      }
+      result.total_score = null;
+      break;
+    }
+  }
+
+  return result;
+}
+
+function getTotalItemCount(tool: AssessmentTool): number {
+  if (tool.scoring_method === 'single_level') return 1;
+  if (tool.scoring_method === 'fda2_rating') {
+    return (tool.fda2_sections || []).reduce((sum, s) => sum + s.items.length, 0);
+  }
+  if (tool.scoring_method === 'dtoms_rating') {
+    return (tool.dtoms_dimensions || []).length;
+  }
+  if (tool.domains) {
+    return tool.domains.reduce((sum, d) => sum + d.items.length, 0) + (tool.severity_question ? 1 : 0);
+  }
+  return (tool.items?.length ?? 0) + (tool.severity_question ? 1 : 0);
+}
+
+function getAnsweredCount(tool: AssessmentTool, answers: Record<string, number | string>): number {
+  if (tool.scoring_method === 'single_level') {
+    return answers['level'] !== undefined ? 1 : 0;
+  }
+  return Object.keys(answers).length;
+}
+
+export default function ClinicalAssessmentScreen() {
+  const { assessmentId, submissionId } = useLocalSearchParams<{ assessmentId: string; submissionId: string }>();
+  const { t, language, patientId } = useApp();
+  const queryClient = useQueryClient();
+  const [answers, setAnswers] = useState<Record<string, number | string>>({});
+  const [showCompletion, setShowCompletion] = useState<boolean>(false);
+  const [scoreResult, setScoreResult] = useState<ScoreResult | null>(null);
+  const scrollRef = useRef<ScrollView>(null);
+  const fadeAnim = useRef(new Animated.Value(0)).current;
+  const scaleAnim = useRef(new Animated.Value(0.8)).current;
+
+  const tool = useMemo(() => assessmentId ? ASSESSMENT_TOOLS[assessmentId] : null, [assessmentId]);
+
+  const totalItems = useMemo(() => tool ? getTotalItemCount(tool) : 0, [tool]);
+  const answeredCount = useMemo(() => tool ? getAnsweredCount(tool, answers) : 0, [tool, answers]);
+  const allAnswered = answeredCount >= totalItems && totalItems > 0;
+  const progressPercent = totalItems > 0 ? answeredCount / totalItems : 0;
+
+  const submitMutation = useMutation({
+    mutationFn: async () => {
+      if (!tool || !patientId) throw new Error('Missing data');
+      const scores = calculateScores(tool, answers);
+      log('[ClinicalAssessment] Submitting. Scores:', scores);
+
+      const langCode = language === 'zh_hant' || language === 'zh_hans' ? 'zh' : 'en';
+
+      if (submissionId) {
+        const { error } = await supabase
+          .from('assessment_submissions')
+          .update({
+            responses: answers,
+            subscale_scores: scores.subscale_scores,
+            total_score: scores.total_score,
+            severity_rating: scores.severity_rating ?? null,
+            language: langCode,
+            status: 'completed',
+            completed_at: new Date().toISOString(),
+            updated_at: new Date().toISOString(),
+          })
+          .eq('id', submissionId);
+
+        if (error) {
+          log('[ClinicalAssessment] Update error:', error);
+          throw error;
+        }
+      } else {
+        const { error } = await supabase
+          .from('assessment_submissions')
+          .insert({
+            patient_id: patientId,
+            assessment_id: assessmentId,
+            language: langCode,
+            responses: answers,
+            subscale_scores: scores.subscale_scores,
+            total_score: scores.total_score,
+            severity_rating: scores.severity_rating ?? null,
+            status: 'completed',
+            completed_at: new Date().toISOString(),
+          });
+
+        if (error) {
+          log('[ClinicalAssessment] Insert error:', error);
+          throw error;
+        }
+      }
+
+      return scores;
+    },
+    onSuccess: (scores) => {
+      log('[ClinicalAssessment] Success:', scores);
+      setScoreResult(scores);
+      setShowCompletion(true);
+      Animated.parallel([
+        Animated.timing(fadeAnim, { toValue: 1, duration: 500, useNativeDriver: true }),
+        Animated.spring(scaleAnim, { toValue: 1, friction: 6, useNativeDriver: true }),
+      ]).start();
+      queryClient.invalidateQueries({ queryKey: ['clinical_assessments'] });
+      queryClient.invalidateQueries({ queryKey: ['assessments'] });
+    },
+    onError: (error) => {
+      log('[ClinicalAssessment] Submit error:', error);
+      Alert.alert('Error', 'Failed to submit assessment. Please try again.');
+    },
+  });
+
+  const handleAnswer = useCallback((key: string, value: number | string) => {
+    log('[ClinicalAssessment] Answer:', key, '=', value);
+    setAnswers((prev) => ({ ...prev, [key]: value }));
+  }, []);
+
+  const { mutate: submitMutate, isPending: isSubmitting } = submitMutation;
+
+  const handleSubmit = useCallback(() => {
+    if (!allAnswered) {
+      Alert.alert('', t('pleaseAnswerAll'));
+      return;
+    }
+    submitMutate();
+  }, [allAnswered, submitMutate, t]);
+
+  const handleDone = useCallback(() => {
+    router.back();
+  }, []);
+
+  if (!tool) {
+    return (
+      <View style={styles.root}>
+        <SafeAreaView style={styles.container}>
+          <View style={styles.loadingContainer}>
+            <ScaledText size={16} color={Colors.textSecondary}>Assessment not found</ScaledText>
+          </View>
+        </SafeAreaView>
+      </View>
+    );
+  }
+
+  if (showCompletion && scoreResult) {
+    return (
+      <CompletionScreen
+        tool={tool}
+        scoreResult={scoreResult}
+        answers={answers}
+        language={language}
+        fadeAnim={fadeAnim}
+        scaleAnim={scaleAnim}
+        onDone={handleDone}
+        t={t}
+      />
+    );
+  }
+
+  const toolName = txt(tool.name_en, tool.name_zh, language);
+
+  return (
+    <View style={styles.root}>
+      <SafeAreaView style={styles.container}>
+        <View style={styles.header}>
+          <TouchableOpacity onPress={() => router.back()} style={styles.backButton} testID="back-button">
+            <ArrowLeft size={24} color={Colors.textPrimary} />
+          </TouchableOpacity>
+          <View style={styles.headerTitleArea}>
+            <ScaledText size={16} weight="bold" color={Colors.textPrimary} numberOfLines={1}>
+              {toolName}
+            </ScaledText>
+            <ScaledText size={12} color={Colors.textSecondary}>
+              {answeredCount} {t('questionOf')} {totalItems}
+            </ScaledText>
+          </View>
+          <View style={styles.typeBadge}>
+            <ScaledText size={10} weight="600" color={tool.type === 'clinician_rated' ? '#B8860B' : Colors.primary}>
+              {tool.type === 'clinician_rated' ? t('clinicianRated') : t('selfReport')}
+            </ScaledText>
+          </View>
+        </View>
+
+        <View style={styles.progressBarContainer}>
+          <View style={styles.progressBarBg}>
+            <Animated.View style={[styles.progressBarFill, { width: `${Math.round(progressPercent * 100)}%` }]} />
+          </View>
+        </View>
+
+        <ScrollView
+          ref={scrollRef}
+          style={styles.scrollView}
+          contentContainerStyle={styles.scrollContent}
+          showsVerticalScrollIndicator={false}
+        >
+          <AssessmentBody
+            tool={tool}
+            answers={answers}
+            language={language}
+            onAnswer={handleAnswer}
+            t={t}
+          />
+
+          <View style={styles.submitArea}>
+            <TouchableOpacity
+              style={[styles.submitButton, !allAnswered && styles.submitButtonDisabled]}
+              onPress={handleSubmit}
+              disabled={!allAnswered || isSubmitting}
+              activeOpacity={0.8}
+              testID="submit-assessment-button"
+            >
+              {isSubmitting ? (
+                <ActivityIndicator color={Colors.white} />
+              ) : (
+                <ScaledText size={17} weight="bold" color={Colors.white}>
+                  {t('submitAssessment')}
+                </ScaledText>
+              )}
+            </TouchableOpacity>
+            {!allAnswered && (
+              <ScaledText size={12} color={Colors.textSecondary} style={styles.hintText}>
+                {t('pleaseAnswerAll')}
+              </ScaledText>
+            )}
+          </View>
+        </ScrollView>
+      </SafeAreaView>
+    </View>
+  );
+}
+
+interface AssessmentBodyProps {
+  tool: AssessmentTool;
+  answers: Record<string, number | string>;
+  language: Language | null;
+  onAnswer: (key: string, value: number | string) => void;
+  t: (key: string) => string;
+}
+
+const AssessmentBody = React.memo(function AssessmentBody({ tool, answers, language, onAnswer, t }: AssessmentBodyProps) {
+  switch (tool.scoring_method) {
+    case 'summation':
+    case 'sus_formula':
+      return <ScaleItems tool={tool} answers={answers} language={language} onAnswer={onAnswer} />;
+    case 'dhi':
+      return <DHIItems tool={tool} answers={answers} language={language} onAnswer={onAnswer} t={t} />;
+    case 'single_level':
+      return <FOISItems tool={tool} answers={answers} language={language} onAnswer={onAnswer} />;
+    case 'domain_scoring':
+      return <DomainItems tool={tool} answers={answers} language={language} onAnswer={onAnswer} />;
+    case 'coast_scoring':
+      return <COASTItems tool={tool} answers={answers} language={language} onAnswer={onAnswer} />;
+    case 'fda2_rating':
+      return <FDA2Items tool={tool} answers={answers} language={language} onAnswer={onAnswer} />;
+    case 'dtoms_rating':
+      return <DToMsItems tool={tool} answers={answers} language={language} onAnswer={onAnswer} />;
+    default:
+      return null;
+  }
+});
+
+interface ItemProps {
+  tool: AssessmentTool;
+  answers: Record<string, number | string>;
+  language: Language | null;
+  onAnswer: (key: string, value: number | string) => void;
+  t?: (key: string) => string;
+}
+
+function ScaleItems({ tool, answers, language, onAnswer }: ItemProps) {
+  const items = tool.items || [];
+  const min = tool.scale_min ?? 0;
+  const max = tool.scale_max ?? 4;
+  const labels = tool.scale_labels;
+
+  return (
+    <View>
+      {items.map((item, index) => {
+        const key = String(item.item_number);
+        const isAnswered = answers[key] !== undefined;
+        const itemText = txt(item.text_en, item.text_zh, language);
+
+        return (
+          <View key={key} style={[styles.questionCard, isAnswered && styles.questionCardAnswered]}>
+            <View style={styles.questionHeader}>
+              <View style={styles.questionNumberBadge}>
+                <ScaledText size={12} weight="bold" color={Colors.white}>{index + 1}</ScaledText>
+              </View>
+              <ScaledText size={15} weight="600" color={Colors.textPrimary} style={styles.questionText}>
+                {itemText}
+              </ScaledText>
+            </View>
+            <View style={styles.scaleButtonsRow}>
+              {Array.from({ length: max - min + 1 }, (_, i) => min + i).map((val) => {
+                const isSelected = answers[key] === val;
+                const label = labels ? getScaleLabel(labels, String(val), language) : '';
+                return (
+                  <TouchableOpacity
+                    key={val}
+                    style={[styles.scaleButton, isSelected && styles.scaleButtonSelected]}
+                    onPress={() => onAnswer(key, val)}
+                    activeOpacity={0.7}
+                    testID={`scale-${key}-${val}`}
+                  >
+                    <ScaledText size={15} weight={isSelected ? 'bold' : 'normal'} color={isSelected ? Colors.white : Colors.textPrimary}>
+                      {val}
+                    </ScaledText>
+                    {label ? (
+                      <ScaledText size={9} color={isSelected ? 'rgba(255,255,255,0.85)' : Colors.textSecondary} numberOfLines={2} style={styles.scaleButtonLabel}>
+                        {label}
+                      </ScaledText>
+                    ) : null}
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
+          </View>
+        );
+      })}
+    </View>
+  );
+}
+
+function DHIItems({ tool, answers, language, onAnswer, t }: ItemProps) {
+  const items = tool.items || [];
+  const dhiValues = [0, 2, 4] as const;
+  const labels = tool.scale_labels;
+
+  return (
+    <View>
+      {items.map((item, index) => {
+        const key = String(item.item_number);
+        const isAnswered = answers[key] !== undefined;
+        const itemText = txt(item.text_en, item.text_zh, language);
+        const subscaleLabel = item.subscale ? ` (${item.subscale})` : '';
+
+        return (
+          <View key={key} style={[styles.questionCard, isAnswered && styles.questionCardAnswered]}>
+            <View style={styles.questionHeader}>
+              <View style={styles.questionNumberBadge}>
+                <ScaledText size={12} weight="bold" color={Colors.white}>{index + 1}</ScaledText>
+              </View>
+              <View style={{ flex: 1 }}>
+                <ScaledText size={15} weight="600" color={Colors.textPrimary} style={styles.questionText}>
+                  {itemText}
+                </ScaledText>
+                <ScaledText size={10} color={Colors.textSecondary}>{subscaleLabel}</ScaledText>
+              </View>
+            </View>
+            <View style={styles.dhiRow}>
+              {dhiValues.map((val) => {
+                const isSelected = answers[key] === val;
+                const label = labels ? getScaleLabel(labels, String(val), language) : '';
+                return (
+                  <TouchableOpacity
+                    key={val}
+                    style={[styles.dhiButton, isSelected && styles.dhiButtonSelected]}
+                    onPress={() => onAnswer(key, val)}
+                    activeOpacity={0.7}
+                  >
+                    <ScaledText size={14} weight={isSelected ? 'bold' : 'normal'} color={isSelected ? Colors.white : Colors.textPrimary}>
+                      {label}
+                    </ScaledText>
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
+          </View>
+        );
+      })}
+
+      {tool.severity_question && (
+        <View style={[styles.questionCard, answers['severity'] !== undefined && styles.questionCardAnswered]}>
+          <View style={styles.questionHeader}>
+            <View style={[styles.questionNumberBadge, { backgroundColor: Colors.secondary }]}>
+              <ScaledText size={10} weight="bold" color={Colors.white}>★</ScaledText>
+            </View>
+            <ScaledText size={15} weight="600" color={Colors.textPrimary} style={styles.questionText}>
+              {txt(tool.severity_question.text_en, tool.severity_question.text_zh, language)}
+            </ScaledText>
+          </View>
+          <View style={styles.scaleButtonsRow}>
+            {Array.from({ length: tool.severity_question.scale_max - tool.severity_question.scale_min + 1 }, (_, i) => tool.severity_question!.scale_min + i).map((val) => {
+              const isSelected = answers['severity'] === val;
+              return (
+                <TouchableOpacity
+                  key={val}
+                  style={[styles.scaleButton, isSelected && styles.scaleButtonSelected]}
+                  onPress={() => onAnswer('severity', val)}
+                  activeOpacity={0.7}
+                >
+                  <ScaledText size={15} weight={isSelected ? 'bold' : 'normal'} color={isSelected ? Colors.white : Colors.textPrimary}>
+                    {val}
+                  </ScaledText>
+                </TouchableOpacity>
+              );
+            })}
+          </View>
+        </View>
+      )}
+    </View>
+  );
+}
+
+function FOISItems({ tool, answers, language, onAnswer }: ItemProps) {
+  const items = tool.fois_items || [];
+  const selectedLevel = answers['level'] as number | undefined;
+
+  return (
+    <View>
+      {items.map((item) => {
+        const isSelected = selectedLevel === item.level;
+        const category = txt(item.category_en, item.category_zh, language);
+        const text = txt(item.text_en, item.text_zh, language);
+
+        return (
+          <TouchableOpacity
+            key={item.level}
+            style={[styles.foisCard, isSelected && styles.foisCardSelected]}
+            onPress={() => onAnswer('level', item.level)}
+            activeOpacity={0.7}
+            testID={`fois-level-${item.level}`}
+          >
+            <View style={styles.foisHeader}>
+              <View style={[styles.foisLevelBadge, isSelected && styles.foisLevelBadgeSelected]}>
+                <ScaledText size={16} weight="bold" color={isSelected ? Colors.white : Colors.primary}>
+                  {item.level}
+                </ScaledText>
+              </View>
+              <View style={styles.foisContent}>
+                <ScaledText size={10} weight="600" color={isSelected ? Colors.primary : Colors.textSecondary} style={styles.foisCategory}>
+                  {category}
+                </ScaledText>
+                <ScaledText size={14} weight={isSelected ? '600' : 'normal'} color={Colors.textPrimary}>
+                  {text}
+                </ScaledText>
+              </View>
+            </View>
+            <View style={[styles.foisRadio, isSelected && styles.foisRadioSelected]}>
+              {isSelected && <View style={styles.foisRadioInner} />}
+            </View>
+          </TouchableOpacity>
+        );
+      })}
+    </View>
+  );
+}
+
+function DomainItems({ tool, answers, language, onAnswer }: ItemProps) {
+  const domains = tool.domains || [];
+  const min = tool.scale_min ?? 1;
+  const max = tool.scale_max ?? 5;
+  return (
+    <View>
+      {domains.map((domain) => {
+        const domainName = txt(domain.name_en, domain.name_zh, language);
+        const domainLabels = domain.scale_labels;
+
+        return (
+          <View key={domain.domain_id}>
+            <View style={styles.domainHeader}>
+              <View style={styles.domainHeaderLine} />
+              <ScaledText size={14} weight="bold" color={Colors.primary} style={styles.domainHeaderText}>
+                {domainName}
+              </ScaledText>
+              <View style={styles.domainHeaderLine} />
+            </View>
+
+            {domain.items.map((item) => {
+              const key = String(item.item_number);
+              const isAnswered = answers[key] !== undefined;
+              const itemText = txt(item.text_en, item.text_zh, language);
+              const itemLabels = item.scale_labels || domainLabels;
+
+              return (
+                <View key={key} style={[styles.questionCard, isAnswered && styles.questionCardAnswered]}>
+                  <View style={styles.questionHeader}>
+                    <View style={styles.questionNumberBadge}>
+                      <ScaledText size={11} weight="bold" color={Colors.white}>{item.item_number}</ScaledText>
+                    </View>
+                    <ScaledText size={14} weight="600" color={Colors.textPrimary} style={styles.questionText}>
+                      {itemText}
+                    </ScaledText>
+                  </View>
+                  <View style={styles.scaleButtonsRow}>
+                    {Array.from({ length: max - min + 1 }, (_, i) => min + i).map((val) => {
+                      const isSelected = answers[key] === val;
+                      const label = itemLabels ? getScaleLabel(itemLabels, String(val), language) : '';
+                      return (
+                        <TouchableOpacity
+                          key={val}
+                          style={[styles.scaleButton, isSelected && styles.scaleButtonSelected]}
+                          onPress={() => onAnswer(key, val)}
+                          activeOpacity={0.7}
+                        >
+                          <ScaledText size={14} weight={isSelected ? 'bold' : 'normal'} color={isSelected ? Colors.white : Colors.textPrimary}>
+                            {val}
+                          </ScaledText>
+                          {label ? (
+                            <ScaledText size={8} color={isSelected ? 'rgba(255,255,255,0.85)' : Colors.textSecondary} numberOfLines={2} style={styles.scaleButtonLabel}>
+                              {label}
+                            </ScaledText>
+                          ) : null}
+                        </TouchableOpacity>
+                      );
+                    })}
+                  </View>
+                </View>
+              );
+            })}
+          </View>
+        );
+      })}
+    </View>
+  );
+}
+
+function COASTItems({ tool, answers, language, onAnswer }: ItemProps) {
+  const domains = tool.domains || [];
+
+  return (
+    <View>
+      {domains.map((domain) => {
+        const domainName = txt(domain.name_en, domain.name_zh, language);
+
+        return (
+          <View key={domain.domain_id}>
+            <View style={styles.domainHeader}>
+              <View style={styles.domainHeaderLine} />
+              <ScaledText size={14} weight="bold" color={Colors.primary} style={styles.domainHeaderText}>
+                {domainName}
+              </ScaledText>
+              <View style={styles.domainHeaderLine} />
+            </View>
+
+            {domain.items.map((item) => {
+              const key = String(item.item_number);
+              const isAnswered = answers[key] !== undefined;
+              const itemText = txt(item.text_en, item.text_zh, language);
+              const itemLabels = item.scale_labels;
+
+              return (
+                <View key={key} style={[styles.questionCard, isAnswered && styles.questionCardAnswered]}>
+                  <View style={styles.questionHeader}>
+                    <View style={styles.questionNumberBadge}>
+                      <ScaledText size={11} weight="bold" color={Colors.white}>{item.item_number}</ScaledText>
+                    </View>
+                    <ScaledText size={14} weight="600" color={Colors.textPrimary} style={styles.questionText}>
+                      {itemText}
+                    </ScaledText>
+                  </View>
+                  {itemLabels ? (
+                    <View style={styles.coastChoices}>
+                      {Object.entries(itemLabels).map(([val, label]) => {
+                        const numVal = Number(val);
+                        const isSelected = answers[key] === numVal;
+                        const labelText = language === 'zh_hant' || language === 'zh_hans' ? label.zh : label.en;
+                        return (
+                          <TouchableOpacity
+                            key={val}
+                            style={[styles.coastChoice, isSelected && styles.coastChoiceSelected]}
+                            onPress={() => onAnswer(key, numVal)}
+                            activeOpacity={0.7}
+                          >
+                            <View style={[styles.coastChoiceNumber, isSelected && styles.coastChoiceNumberSelected]}>
+                              <ScaledText size={13} weight="bold" color={isSelected ? Colors.white : Colors.textSecondary}>
+                                {val}
+                              </ScaledText>
+                            </View>
+                            <ScaledText size={13} color={isSelected ? Colors.primary : Colors.textPrimary} weight={isSelected ? '600' : 'normal'} style={{ flex: 1 }}>
+                              {labelText}
+                            </ScaledText>
+                          </TouchableOpacity>
+                        );
+                      })}
+                    </View>
+                  ) : (
+                    <View style={styles.scaleButtonsRow}>
+                      {[0, 1, 2, 3, 4].map((val) => {
+                        const isSelected = answers[key] === val;
+                        return (
+                          <TouchableOpacity
+                            key={val}
+                            style={[styles.scaleButton, isSelected && styles.scaleButtonSelected]}
+                            onPress={() => onAnswer(key, val)}
+                            activeOpacity={0.7}
+                          >
+                            <ScaledText size={14} weight={isSelected ? 'bold' : 'normal'} color={isSelected ? Colors.white : Colors.textPrimary}>
+                              {val}
+                            </ScaledText>
+                          </TouchableOpacity>
+                        );
+                      })}
+                    </View>
+                  )}
+                </View>
+              );
+            })}
+          </View>
+        );
+      })}
+    </View>
+  );
+}
+
+function FDA2Items({ tool, answers, language, onAnswer }: ItemProps) {
+  const sections = tool.fda2_sections || [];
+  const scale = tool.fda2_scale || {};
+  const ratingKeys = ['a', 'b', 'c', 'd', 'e'] as const;
+
+  return (
+    <View>
+      {sections.map((section) => {
+        const sectionName = txt(section.name_en, section.name_zh, language);
+
+        return (
+          <View key={section.section_number}>
+            <View style={styles.domainHeader}>
+              <View style={styles.domainHeaderLine} />
+              <ScaledText size={14} weight="bold" color={Colors.primary} style={styles.domainHeaderText}>
+                {section.section_number}. {sectionName}
+              </ScaledText>
+              <View style={styles.domainHeaderLine} />
+            </View>
+
+            {section.items.map((item) => {
+              const isAnswered = answers[item.item_id] !== undefined;
+              const itemText = txt(item.text_en, item.text_zh, language);
+
+              return (
+                <View key={item.item_id} style={[styles.questionCard, isAnswered && styles.questionCardAnswered]}>
+                  <View style={styles.questionHeader}>
+                    <View style={styles.questionNumberBadge}>
+                      <ScaledText size={10} weight="bold" color={Colors.white}>{item.item_id}</ScaledText>
+                    </View>
+                    <ScaledText size={14} weight="600" color={Colors.textPrimary} style={styles.questionText}>
+                      {itemText}
+                    </ScaledText>
+                  </View>
+                  <View style={styles.fda2Ratings}>
+                    {ratingKeys.map((rk) => {
+                      const isSelected = answers[item.item_id] === rk;
+                      const label = scale[rk] ? (language === 'zh_hant' || language === 'zh_hans' ? scale[rk].zh : scale[rk].en) : rk;
+                      const shortLabel = rk.toUpperCase();
+                      return (
+                        <TouchableOpacity
+                          key={rk}
+                          style={[styles.fda2Button, isSelected && styles.fda2ButtonSelected]}
+                          onPress={() => onAnswer(item.item_id, rk)}
+                          activeOpacity={0.7}
+                        >
+                          <ScaledText size={14} weight="bold" color={isSelected ? Colors.white : Colors.textPrimary}>
+                            {shortLabel}
+                          </ScaledText>
+                          <ScaledText size={8} color={isSelected ? 'rgba(255,255,255,0.85)' : Colors.textSecondary} numberOfLines={2} style={styles.fda2Label}>
+                            {label.split('(')[0].trim()}
+                          </ScaledText>
+                        </TouchableOpacity>
+                      );
+                    })}
+                  </View>
+                </View>
+              );
+            })}
+          </View>
+        );
+      })}
+    </View>
+  );
+}
+
+function DToMsItems({ tool, answers, language, onAnswer }: ItemProps) {
+  const dimensions = tool.dtoms_dimensions || [];
+  const halfPointValues = [0, 0.5, 1, 1.5, 2, 2.5, 3, 3.5, 4, 4.5, 5];
+
+  return (
+    <View>
+      {dimensions.map((dim) => {
+        const dimName = txt(dim.name_en, dim.name_zh, language);
+        const dimDesc = txt(dim.description_en, dim.description_zh, language);
+        const selectedVal = answers[dim.dimension_id] as number | undefined;
+
+        return (
+          <View key={dim.dimension_id} style={styles.dtomsCard}>
+            <View style={styles.dtomsHeader}>
+              <ScaledText size={16} weight="bold" color={Colors.textPrimary}>
+                {dimName}
+              </ScaledText>
+              <ScaledText size={12} color={Colors.textSecondary} style={{ marginTop: 4 }}>
+                {dimDesc}
+              </ScaledText>
+            </View>
+
+            <View style={styles.dtomsScaleRow}>
+              {halfPointValues.map((val) => {
+                const isSelected = selectedVal === val;
+                const isWholeNumber = val % 1 === 0;
+                return (
+                  <TouchableOpacity
+                    key={val}
+                    style={[
+                      isWholeNumber ? styles.dtomsCircle : styles.dtomsHalfCircle,
+                      isSelected && styles.dtomsCircleSelected,
+                    ]}
+                    onPress={() => onAnswer(dim.dimension_id, val)}
+                    activeOpacity={0.7}
+                  >
+                    <ScaledText
+                      size={isWholeNumber ? 13 : 10}
+                      weight={isSelected ? 'bold' : 'normal'}
+                      color={isSelected ? Colors.white : Colors.textSecondary}
+                    >
+                      {val}
+                    </ScaledText>
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
+
+            {selectedVal !== undefined && (
+              <View style={styles.dtomsLevelDesc}>
+                {dim.levels.map((level) => {
+                  const isActive = Math.floor(selectedVal) === level.score || (selectedVal > level.score && selectedVal < level.score + 1);
+                  if (!isActive) return null;
+                  return (
+                    <ScaledText key={level.score} size={12} color={Colors.primary} weight="600">
+                      {txt(level.label_en, level.label_zh, language)}
+                    </ScaledText>
+                  );
+                })}
+              </View>
+            )}
+          </View>
+        );
+      })}
+    </View>
+  );
+}
+
+interface CompletionScreenProps {
+  tool: AssessmentTool;
+  scoreResult: ScoreResult;
+  answers: Record<string, number | string>;
+  language: Language | null;
+  fadeAnim: Animated.Value;
+  scaleAnim: Animated.Value;
+  onDone: () => void;
+  t: (key: string) => string;
+}
+
+function CompletionScreen({ tool, scoreResult, language, fadeAnim, scaleAnim, onDone, t }: CompletionScreenProps) {
+  const [showInterpretation, setShowInterpretation] = useState<boolean>(false);
+
+  const hasTotalScore = scoreResult.total_score !== null;
+  const hasSubscales = Object.keys(scoreResult.subscale_scores).length > 0;
+  const interpretation = tool.interpretation_en
+    ? txt(tool.interpretation_en, tool.interpretation_zh || '', language)
+    : null;
+
+  return (
+    <View style={styles.root}>
+      <SafeAreaView style={styles.container}>
+        <ScrollView contentContainerStyle={styles.completionScrollContent} showsVerticalScrollIndicator={false}>
+          <Animated.View style={[styles.completionContent, { opacity: fadeAnim, transform: [{ scale: scaleAnim }] }]}>
+            <View style={styles.completionIconCircle}>
+              <CheckCircle2 size={64} color={Colors.success} />
+            </View>
+            <ScaledText size={24} weight="bold" color={Colors.textPrimary} style={styles.completionTitle}>
+              {t('assessmentComplete')}
+            </ScaledText>
+            <ScaledText size={14} color={Colors.textSecondary} style={styles.completionTitle}>
+              {txt(tool.name_en, tool.name_zh, language)}
+            </ScaledText>
+
+            {hasTotalScore && (
+              <View style={styles.scoreCard}>
+                <ScaledText size={13} color={Colors.textSecondary}>
+                  {t('totalScore')}
+                </ScaledText>
+                <ScaledText size={42} weight="bold" color={Colors.primary}>
+                  {scoreResult.total_score}
+                </ScaledText>
+                {scoreResult.max_score !== undefined && (
+                  <ScaledText size={13} color={Colors.textSecondary}>
+                    {t('outOf')} {scoreResult.max_score}
+                  </ScaledText>
+                )}
+              </View>
+            )}
+
+            {scoreResult.severity_rating !== undefined && (
+              <View style={styles.subscaleCard}>
+                <ScaledText size={14} weight="bold" color={Colors.textPrimary} style={styles.subscaleTitle}>
+                  {t('severityRating')}
+                </ScaledText>
+                <View style={styles.subscaleRow}>
+                  <ScaledText size={28} weight="bold" color={Colors.secondary}>
+                    {scoreResult.severity_rating}
+                  </ScaledText>
+                  <ScaledText size={13} color={Colors.textSecondary}> / 7</ScaledText>
+                </View>
+              </View>
+            )}
+
+            {hasSubscales && tool.scoring_method !== 'fda2_rating' && (
+              <View style={styles.subscaleCard}>
+                <ScaledText size={14} weight="bold" color={Colors.textPrimary} style={styles.subscaleTitle}>
+                  {tool.scoring_method === 'dtoms_rating' ? t('dimensionScores') :
+                   tool.domains ? t('domainScores') : t('subscaleScores')}
+                </ScaledText>
+                {Object.entries(scoreResult.subscale_scores).map(([key, value]) => {
+                  let displayName = key;
+                  if (tool.domains) {
+                    const domain = tool.domains.find(d => d.domain_id === key);
+                    if (domain) displayName = txt(domain.name_en, domain.name_zh, language);
+                  } else if (tool.dtoms_dimensions) {
+                    const dim = tool.dtoms_dimensions.find(d => d.dimension_id === key);
+                    if (dim) displayName = txt(dim.name_en, dim.name_zh, language);
+                  } else if (tool.subscales) {
+                    displayName = key.charAt(0).toUpperCase() + key.slice(1);
+                  }
+                  return (
+                    <View key={key} style={styles.subscaleItemRow}>
+                      <ScaledText size={13} color={Colors.textSecondary} style={{ flex: 1 }}>
+                        {displayName}
+                      </ScaledText>
+                      <ScaledText size={15} weight="bold" color={Colors.textPrimary}>
+                        {typeof value === 'number' ? value : '-'}
+                      </ScaledText>
+                    </View>
+                  );
+                })}
+              </View>
+            )}
+
+            {tool.scoring_method === 'fda2_rating' && hasSubscales && (
+              <View style={styles.subscaleCard}>
+                <ScaledText size={14} weight="bold" color={Colors.textPrimary} style={styles.subscaleTitle}>
+                  {t('sectionResults')}
+                </ScaledText>
+                {(tool.fda2_sections || []).map((section) => {
+                  const sectionKey = `section_${section.section_number}`;
+                  const rawVal = scoreResult.subscale_scores[sectionKey];
+                  let parsed: Record<string, string> = {};
+                  try { parsed = typeof rawVal === 'string' ? JSON.parse(rawVal) : {}; } catch { parsed = {}; }
+                  const sectionName = txt(section.name_en, section.name_zh, language);
+                  return (
+                    <View key={sectionKey} style={styles.fda2ResultSection}>
+                      <ScaledText size={13} weight="600" color={Colors.primary}>{sectionName}</ScaledText>
+                      <View style={styles.fda2ResultItems}>
+                        {section.items.map((item) => {
+                          const rating = parsed[item.item_id] || '-';
+                          return (
+                            <View key={item.item_id} style={styles.fda2ResultItem}>
+                              <ScaledText size={12} color={Colors.textSecondary}>
+                                {txt(item.text_en, item.text_zh, language)}
+                              </ScaledText>
+                              <View style={styles.fda2ResultBadge}>
+                                <ScaledText size={12} weight="bold" color={Colors.primary}>
+                                  {String(rating).toUpperCase()}
+                                </ScaledText>
+                              </View>
+                            </View>
+                          );
+                        })}
+                      </View>
+                    </View>
+                  );
+                })}
+              </View>
+            )}
+
+            {interpretation && (
+              <TouchableOpacity
+                style={styles.interpretationToggle}
+                onPress={() => setShowInterpretation(!showInterpretation)}
+                activeOpacity={0.7}
+              >
+                <View style={styles.interpretationToggleRow}>
+                  <Info size={16} color={Colors.primary} />
+                  <ScaledText size={14} weight="600" color={Colors.primary}>{t('interpretation')}</ScaledText>
+                  {showInterpretation ? <ChevronUp size={16} color={Colors.primary} /> : <ChevronDown size={16} color={Colors.primary} />}
+                </View>
+                {showInterpretation && (
+                  <ScaledText size={13} color={Colors.textSecondary} style={styles.interpretationText}>
+                    {interpretation}
+                  </ScaledText>
+                )}
+              </TouchableOpacity>
+            )}
+
+            <TouchableOpacity style={styles.doneButton} onPress={onDone} activeOpacity={0.8} testID="done-button">
+              <ScaledText size={17} weight="bold" color={Colors.white}>
+                {t('continue')}
+              </ScaledText>
+            </TouchableOpacity>
+          </Animated.View>
+        </ScrollView>
+      </SafeAreaView>
+    </View>
+  );
+}
+
+const styles = StyleSheet.create({
+  root: {
+    flex: 1,
+    backgroundColor: Colors.background,
+  },
+  container: {
+    flex: 1,
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  header: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    gap: 8,
+  },
+  backButton: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: Colors.card,
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: Colors.border,
+  },
+  headerTitleArea: {
+    flex: 1,
+    alignItems: 'center',
+    gap: 2,
+  },
+  typeBadge: {
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 8,
+    backgroundColor: Colors.primaryLight,
+  },
+  progressBarContainer: {
+    paddingHorizontal: 20,
+    paddingBottom: 6,
+  },
+  progressBarBg: {
+    height: 5,
+    backgroundColor: Colors.border,
+    borderRadius: 3,
+    overflow: 'hidden',
+  },
+  progressBarFill: {
+    height: '100%',
+    backgroundColor: Colors.primary,
+    borderRadius: 3,
+  },
+  scrollView: {
+    flex: 1,
+  },
+  scrollContent: {
+    paddingHorizontal: 16,
+    paddingBottom: 40,
+    paddingTop: 4,
+  },
+  questionCard: {
+    backgroundColor: Colors.card,
+    borderRadius: 14,
+    padding: 16,
+    marginBottom: 12,
+    borderWidth: 1,
+    borderColor: Colors.border,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.03,
+    shadowRadius: 4,
+    elevation: 1,
+  },
+  questionCardAnswered: {
+    borderColor: Colors.primaryLight,
+    borderLeftWidth: 4,
+    borderLeftColor: Colors.primary,
+  },
+  questionHeader: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 10,
+    marginBottom: 14,
+  },
+  questionNumberBadge: {
+    width: 26,
+    height: 26,
+    borderRadius: 13,
+    backgroundColor: Colors.primary,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginTop: 1,
+  },
+  questionText: {
+    flex: 1,
+    lineHeight: 22,
+  },
+  scaleButtonsRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 6,
+    justifyContent: 'center',
+  },
+  scaleButton: {
+    minWidth: 48,
+    paddingVertical: 10,
+    paddingHorizontal: 6,
+    borderRadius: 10,
+    borderWidth: 1.5,
+    borderColor: Colors.border,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: Colors.card,
+    flex: 1,
+    maxWidth: 80,
+  },
+  scaleButtonSelected: {
+    backgroundColor: Colors.primary,
+    borderColor: Colors.primary,
+  },
+  scaleButtonLabel: {
+    textAlign: 'center',
+    marginTop: 2,
+  },
+  dhiRow: {
+    flexDirection: 'row',
+    gap: 8,
+  },
+  dhiButton: {
+    flex: 1,
+    paddingVertical: 12,
+    borderRadius: 10,
+    borderWidth: 1.5,
+    borderColor: Colors.border,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: Colors.card,
+  },
+  dhiButtonSelected: {
+    backgroundColor: Colors.primary,
+    borderColor: Colors.primary,
+  },
+  foisCard: {
+    backgroundColor: Colors.card,
+    borderRadius: 14,
+    padding: 16,
+    marginBottom: 8,
+    borderWidth: 1.5,
+    borderColor: Colors.border,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  foisCardSelected: {
+    borderColor: Colors.primary,
+    backgroundColor: Colors.primaryLight,
+  },
+  foisHeader: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 12,
+  },
+  foisLevelBadge: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: Colors.primaryLight,
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 2,
+    borderColor: Colors.primary,
+  },
+  foisLevelBadgeSelected: {
+    backgroundColor: Colors.primary,
+    borderColor: Colors.primary,
+  },
+  foisContent: {
+    flex: 1,
+    gap: 4,
+  },
+  foisCategory: {
+    letterSpacing: 0.5,
+  },
+  foisRadio: {
+    width: 22,
+    height: 22,
+    borderRadius: 11,
+    borderWidth: 2,
+    borderColor: Colors.disabled,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  foisRadioSelected: {
+    borderColor: Colors.primary,
+  },
+  foisRadioInner: {
+    width: 12,
+    height: 12,
+    borderRadius: 6,
+    backgroundColor: Colors.primary,
+  },
+  domainHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginVertical: 16,
+    gap: 12,
+  },
+  domainHeaderLine: {
+    flex: 1,
+    height: 1,
+    backgroundColor: Colors.border,
+  },
+  domainHeaderText: {
+    paddingHorizontal: 4,
+  },
+  coastChoices: {
+    gap: 6,
+  },
+  coastChoice: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+    borderRadius: 10,
+    borderWidth: 1.5,
+    borderColor: Colors.border,
+    backgroundColor: Colors.card,
+    gap: 10,
+  },
+  coastChoiceSelected: {
+    borderColor: Colors.primary,
+    backgroundColor: Colors.primaryLight,
+  },
+  coastChoiceNumber: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    backgroundColor: Colors.border,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  coastChoiceNumberSelected: {
+    backgroundColor: Colors.primary,
+  },
+  fda2Ratings: {
+    flexDirection: 'row',
+    gap: 6,
+  },
+  fda2Button: {
+    flex: 1,
+    paddingVertical: 10,
+    paddingHorizontal: 4,
+    borderRadius: 10,
+    borderWidth: 1.5,
+    borderColor: Colors.border,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: Colors.card,
+  },
+  fda2ButtonSelected: {
+    backgroundColor: Colors.primary,
+    borderColor: Colors.primary,
+  },
+  fda2Label: {
+    textAlign: 'center',
+    marginTop: 2,
+  },
+  dtomsCard: {
+    backgroundColor: Colors.card,
+    borderRadius: 14,
+    padding: 16,
+    marginBottom: 14,
+    borderWidth: 1,
+    borderColor: Colors.border,
+  },
+  dtomsHeader: {
+    marginBottom: 14,
+  },
+  dtomsScaleRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 4,
+    justifyContent: 'center',
+  },
+  dtomsCircle: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    borderWidth: 2,
+    borderColor: Colors.border,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: Colors.card,
+  },
+  dtomsHalfCircle: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    borderWidth: 1.5,
+    borderColor: Colors.border,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: Colors.background,
+  },
+  dtomsCircleSelected: {
+    backgroundColor: Colors.primary,
+    borderColor: Colors.primary,
+  },
+  dtomsLevelDesc: {
+    marginTop: 10,
+    paddingTop: 10,
+    borderTopWidth: 1,
+    borderTopColor: Colors.border,
+  },
+  submitArea: {
+    marginTop: 12,
+    alignItems: 'center',
+    gap: 10,
+  },
+  submitButton: {
+    backgroundColor: Colors.primary,
+    borderRadius: 14,
+    paddingVertical: 16,
+    paddingHorizontal: 40,
+    width: '100%',
+    alignItems: 'center',
+    justifyContent: 'center',
+    minHeight: 54,
+  },
+  submitButtonDisabled: {
+    backgroundColor: Colors.disabled,
+  },
+  hintText: {
+    textAlign: 'center',
+  },
+  completionScrollContent: {
+    flexGrow: 1,
+    paddingHorizontal: 20,
+    paddingBottom: 40,
+    paddingTop: 20,
+  },
+  completionContent: {
+    alignItems: 'center',
+    gap: 16,
+  },
+  completionIconCircle: {
+    width: 110,
+    height: 110,
+    borderRadius: 55,
+    backgroundColor: Colors.successLight,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  completionTitle: {
+    textAlign: 'center',
+  },
+  scoreCard: {
+    alignItems: 'center',
+    backgroundColor: Colors.primaryLight,
+    paddingHorizontal: 40,
+    paddingVertical: 20,
+    borderRadius: 20,
+    minWidth: 160,
+    gap: 4,
+  },
+  subscaleCard: {
+    backgroundColor: Colors.card,
+    borderRadius: 16,
+    padding: 18,
+    width: '100%',
+    borderWidth: 1,
+    borderColor: Colors.border,
+  },
+  subscaleTitle: {
+    marginBottom: 12,
+  },
+  subscaleRow: {
+    flexDirection: 'row',
+    alignItems: 'baseline',
+    justifyContent: 'center',
+  },
+  subscaleItemRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingVertical: 8,
+    borderBottomWidth: 1,
+    borderBottomColor: Colors.border,
+  },
+  fda2ResultSection: {
+    marginBottom: 12,
+    gap: 6,
+  },
+  fda2ResultItems: {
+    gap: 4,
+  },
+  fda2ResultItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingVertical: 4,
+    gap: 8,
+  },
+  fda2ResultBadge: {
+    backgroundColor: Colors.primaryLight,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 8,
+  },
+  interpretationToggle: {
+    backgroundColor: Colors.card,
+    borderRadius: 14,
+    padding: 16,
+    width: '100%',
+    borderWidth: 1,
+    borderColor: Colors.border,
+  },
+  interpretationToggleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  interpretationText: {
+    marginTop: 12,
+    lineHeight: 20,
+  },
+  doneButton: {
+    backgroundColor: Colors.primary,
+    borderRadius: 14,
+    paddingVertical: 16,
+    paddingHorizontal: 60,
+    marginTop: 8,
+  },
+});

@@ -21,6 +21,7 @@ function RootLayoutNav() {
       <Stack.Screen name="code-entry" />
       <Stack.Screen name="(tabs)" />
       <Stack.Screen name="questionnaire" options={{ headerShown: false, presentation: 'card' }} />
+      <Stack.Screen name="clinical-assessment" options={{ headerShown: false, presentation: 'card' }} />
     </Stack>
   );
 }

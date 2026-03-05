@@ -15,8 +15,9 @@ import { CopyrightFooter } from '@/components/CopyrightFooter';
 import { supabase } from '@/lib/supabase';
 import Colors from '@/constants/colors';
 import { Language } from '@/types';
+import { ASSESSMENT_TOOLS } from '@/constants/assessments';
 import { router } from 'expo-router';
-import { ClipboardCheck, Clock, CheckCircle, ChevronRight, FileText } from 'lucide-react-native';
+import { ClipboardCheck, Clock, CheckCircle, ChevronRight, FileText, Stethoscope, User } from 'lucide-react-native';
 import { log } from '@/lib/logger';
 
 interface QuestionnaireTemplate {
@@ -36,6 +37,21 @@ interface QuestionnaireAssignment {
   completed_date: string | null;
   score: number | null;
   questionnaire_templates: QuestionnaireTemplate;
+}
+
+interface ClinicalAssessmentSubmission {
+  id: string;
+  patient_id: string;
+  assessment_id: string;
+  status: string;
+  language: string | null;
+  total_score: number | null;
+  subscale_scores: Record<string, unknown> | null;
+  severity_rating: number | null;
+  completed_at: string | null;
+  scheduled_date: string | null;
+  assigned_at: string | null;
+  created_at: string;
 }
 
 function getDescription(template: QuestionnaireTemplate, language: Language | null): string {
@@ -69,6 +85,25 @@ function isOverdue(dueDateStr: string | null): boolean {
   const due = new Date(dueDateStr);
   const now = new Date();
   return due.getTime() < now.getTime();
+}
+
+function getAssessmentName(assessmentId: string, language: Language | null): string {
+  const tool = ASSESSMENT_TOOLS[assessmentId];
+  if (!tool) return assessmentId;
+  if (language === 'zh_hant' || language === 'zh_hans') return tool.name_zh;
+  return tool.name_en;
+}
+
+function getAssessmentDescription(assessmentId: string, language: Language | null): string {
+  const tool = ASSESSMENT_TOOLS[assessmentId];
+  if (!tool) return '';
+  if (language === 'zh_hant' || language === 'zh_hans') return tool.description_zh;
+  return tool.description_en;
+}
+
+function getAssessmentType(assessmentId: string): string {
+  const tool = ASSESSMENT_TOOLS[assessmentId];
+  return tool?.type || 'patient_self_report';
 }
 
 export default function AssessmentsScreen() {
@@ -117,20 +152,69 @@ export default function AssessmentsScreen() {
     enabled: !!patientId,
   });
 
+  const clinicalPendingQuery = useQuery({
+    queryKey: ['clinical_assessments', 'pending', patientId],
+    queryFn: async () => {
+      log('[Assessments] Fetching pending clinical assessments for:', patientId);
+      const { data, error } = await supabase
+        .from('assessment_submissions')
+        .select('*')
+        .eq('patient_id', patientId!)
+        .eq('status', 'pending')
+        .order('created_at', { ascending: false });
+
+      if (error) {
+        log('[Assessments] Clinical pending fetch error:', error);
+        throw error;
+      }
+      log('[Assessments] Clinical pending:', data?.length);
+      return (data || []) as ClinicalAssessmentSubmission[];
+    },
+    enabled: !!patientId,
+  });
+
+  const clinicalCompletedQuery = useQuery({
+    queryKey: ['clinical_assessments', 'completed', patientId],
+    queryFn: async () => {
+      log('[Assessments] Fetching completed clinical assessments for:', patientId);
+      const { data, error } = await supabase
+        .from('assessment_submissions')
+        .select('*')
+        .eq('patient_id', patientId!)
+        .eq('status', 'completed')
+        .order('completed_at', { ascending: false })
+        .limit(50);
+
+      if (error) {
+        log('[Assessments] Clinical completed fetch error:', error);
+        throw error;
+      }
+      log('[Assessments] Clinical completed:', data?.length);
+      return (data || []) as ClinicalAssessmentSubmission[];
+    },
+    enabled: !!patientId,
+  });
+
   const pendingAssignments = pendingQuery.data || [];
   const completedAssignments = completedQuery.data || [];
-  const isLoading = pendingQuery.isLoading || completedQuery.isLoading;
-  const isFetching = pendingQuery.isFetching || completedQuery.isFetching;
+  const clinicalPending = clinicalPendingQuery.data || [];
+  const clinicalCompleted = clinicalCompletedQuery.data || [];
 
-  const { refetch: refetchPending } = pendingQuery;
-  const { refetch: refetchCompleted } = completedQuery;
+  const isLoading = pendingQuery.isLoading || completedQuery.isLoading || clinicalPendingQuery.isLoading || clinicalCompletedQuery.isLoading;
+  const isFetching = pendingQuery.isFetching || completedQuery.isFetching || clinicalPendingQuery.isFetching || clinicalCompletedQuery.isFetching;
+
+  const totalPendingCount = pendingAssignments.length + clinicalPending.length;
+  const totalCompletedCount = completedAssignments.length + clinicalCompleted.length;
+  const hasNoData = totalPendingCount === 0 && totalCompletedCount === 0;
+
+  const { refetch: rp } = pendingQuery;
+  const { refetch: rc } = completedQuery;
+  const { refetch: rcp } = clinicalPendingQuery;
+  const { refetch: rcc } = clinicalCompletedQuery;
 
   const onRefresh = useCallback(() => {
-    refetchPending();
-    refetchCompleted();
-  }, [refetchPending, refetchCompleted]);
-
-  const hasNoData = pendingAssignments.length === 0 && completedAssignments.length === 0;
+    rp(); rc(); rcp(); rcc();
+  }, [rp, rc, rcp, rcc]);
 
   return (
     <View style={styles.root}>
@@ -168,7 +252,7 @@ export default function AssessmentsScreen() {
             </View>
           ) : (
             <>
-              {pendingAssignments.length > 0 && (
+              {totalPendingCount > 0 && (
                 <View style={styles.section}>
                   <View style={styles.sectionHeader}>
                     <View style={styles.sectionHeaderLeft}>
@@ -179,10 +263,94 @@ export default function AssessmentsScreen() {
                     </View>
                     <View style={styles.countBadge}>
                       <ScaledText size={13} weight="bold" color={Colors.white}>
-                        {pendingAssignments.length}
+                        {totalPendingCount}
                       </ScaledText>
                     </View>
                   </View>
+
+                  {clinicalPending.map((submission) => {
+                    const toolType = getAssessmentType(submission.assessment_id);
+                    const isClinician = toolType === 'clinician_rated';
+                    const overdue = isOverdue(submission.scheduled_date);
+                    const dueSoon = isDueSoon(submission.scheduled_date);
+                    return (
+                      <View
+                        key={`ca-${submission.id}`}
+                        style={[
+                          styles.card,
+                          overdue && styles.cardOverdue,
+                          dueSoon && !overdue && styles.cardDueSoon,
+                        ]}
+                      >
+                        <View style={styles.cardTop}>
+                          <View style={[styles.cardIconContainer, isClinician && styles.cardIconClinician]}>
+                            {isClinician ? (
+                              <Stethoscope size={22} color="#B8860B" />
+                            ) : (
+                              <User size={22} color={Colors.primary} />
+                            )}
+                          </View>
+                          <View style={styles.cardContent}>
+                            <ScaledText size={16} weight="bold" color={Colors.textPrimary} numberOfLines={2}>
+                              {getAssessmentName(submission.assessment_id, language)}
+                            </ScaledText>
+                            <ScaledText size={12} color={Colors.textSecondary} numberOfLines={2} style={styles.descriptionText}>
+                              {getAssessmentDescription(submission.assessment_id, language)}
+                            </ScaledText>
+                            <View style={styles.toolTypeBadge}>
+                              <ScaledText size={10} weight="600" color={isClinician ? '#B8860B' : Colors.primary}>
+                                {isClinician ? t('clinicianRated') : t('selfReport')}
+                              </ScaledText>
+                            </View>
+                          </View>
+                        </View>
+
+                        <View style={styles.cardMeta}>
+                          <View style={styles.metaRow}>
+                            <ScaledText size={12} color={Colors.textSecondary}>
+                              {formatDate(submission.assigned_at || submission.created_at)}
+                            </ScaledText>
+                            {submission.scheduled_date && (
+                              <View style={[
+                                styles.dueBadge,
+                                overdue && styles.dueBadgeOverdue,
+                                dueSoon && !overdue && styles.dueBadgeSoon,
+                              ]}>
+                                <ScaledText
+                                  size={11}
+                                  weight="600"
+                                  color={overdue ? Colors.error : dueSoon ? '#B8860B' : Colors.textSecondary}
+                                >
+                                  {t('dueDate')}: {formatDate(submission.scheduled_date)}
+                                </ScaledText>
+                              </View>
+                            )}
+                          </View>
+                        </View>
+
+                        <TouchableOpacity
+                          style={styles.startButton}
+                          activeOpacity={0.8}
+                          testID={`start-clinical-${submission.id}`}
+                          onPress={() => {
+                            log('[Assessments] Starting clinical assessment:', submission.assessment_id);
+                            router.push({
+                              pathname: '/clinical-assessment',
+                              params: {
+                                assessmentId: submission.assessment_id,
+                                submissionId: submission.id,
+                              },
+                            });
+                          }}
+                        >
+                          <ScaledText size={15} weight="bold" color={Colors.white}>
+                            {t('startAssessment')}
+                          </ScaledText>
+                          <ChevronRight size={18} color={Colors.white} />
+                        </TouchableOpacity>
+                      </View>
+                    );
+                  })}
 
                   {pendingAssignments.map((assignment) => {
                     const overdue = isOverdue(assignment.due_date);
@@ -261,7 +429,7 @@ export default function AssessmentsScreen() {
                 </View>
               )}
 
-              {completedAssignments.length > 0 && (
+              {totalCompletedCount > 0 && (
                 <View style={styles.section}>
                   <View style={styles.sectionHeader}>
                     <View style={styles.sectionHeaderLeft}>
@@ -271,6 +439,41 @@ export default function AssessmentsScreen() {
                       </ScaledText>
                     </View>
                   </View>
+
+                  {clinicalCompleted.map((submission) => {
+                    const isClinician = getAssessmentType(submission.assessment_id) === 'clinician_rated';
+                    return (
+                      <View key={`cc-${submission.id}`} style={styles.completedCard}>
+                        <View style={styles.completedCardLeft}>
+                          <View style={[styles.completedIconCircle, isClinician && styles.completedIconClinician]}>
+                            <CheckCircle size={16} color={isClinician ? '#B8860B' : Colors.success} />
+                          </View>
+                          <View style={styles.completedCardContent}>
+                            <ScaledText size={15} weight="600" color={Colors.textPrimary} numberOfLines={1}>
+                              {getAssessmentName(submission.assessment_id, language)}
+                            </ScaledText>
+                            <View style={styles.completedMeta}>
+                              {submission.completed_at && (
+                                <ScaledText size={12} color={Colors.textSecondary}>
+                                  {t('completedOn')} {formatDate(submission.completed_at)}
+                                </ScaledText>
+                              )}
+                            </View>
+                          </View>
+                        </View>
+                        {submission.total_score !== null && submission.total_score !== undefined && (
+                          <View style={styles.scoreBadge}>
+                            <ScaledText size={11} color={Colors.textSecondary}>
+                              {t('score')}
+                            </ScaledText>
+                            <ScaledText size={18} weight="bold" color={Colors.primary}>
+                              {submission.total_score}
+                            </ScaledText>
+                          </View>
+                        )}
+                      </View>
+                    );
+                  })}
 
                   {completedAssignments.map((assignment) => (
                     <View key={assignment.id} style={styles.completedCard}>
@@ -418,12 +621,23 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
+  cardIconClinician: {
+    backgroundColor: '#FFF8E1',
+  },
   cardContent: {
     flex: 1,
     gap: 4,
   },
   descriptionText: {
     marginTop: 2,
+  },
+  toolTypeBadge: {
+    alignSelf: 'flex-start',
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 6,
+    backgroundColor: Colors.primaryLight,
+    marginTop: 4,
   },
   cardMeta: {
     marginBottom: 14,
@@ -481,6 +695,9 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.successLight,
     justifyContent: 'center',
     alignItems: 'center',
+  },
+  completedIconClinician: {
+    backgroundColor: '#FFF8E1',
   },
   completedCardContent: {
     flex: 1,

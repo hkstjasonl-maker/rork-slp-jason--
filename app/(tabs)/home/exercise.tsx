@@ -121,44 +121,13 @@ export default function ExerciseScreen() {
   const exerciseQuery = useQuery({
     queryKey: ['exercise', activeExerciseId],
     queryFn: async () => {
-      log('[ExerciseDebug] Fetching exercise:', activeExerciseId);
       const { data, error } = await supabase
         .from('exercises')
         .select('*')
         .eq('id', activeExerciseId)
         .single();
 
-      if (error) {
-        log('[ExerciseDebug] Fetch error:', JSON.stringify(error));
-        throw error;
-      }
-      log('[ExerciseDebug] Raw exercise data:', JSON.stringify(data));
-      log('[ExerciseDebug] exercise.vimeo_video_id:', data?.vimeo_video_id);
-      log('[ExerciseDebug] exercise.youtube_video_id:', data?.youtube_video_id);
-      log('[ExerciseDebug] exercise.exercise_library_id:', data?.exercise_library_id);
-
-      if (!data.vimeo_video_id && data.exercise_library_id) {
-        log('[ExerciseDebug] No vimeo_video_id on exercise, looking up from exercise_library');
-        const { data: libData, error: libError } = await supabase
-          .from('exercise_library')
-          .select('vimeo_video_id, youtube_video_id')
-          .eq('id', data.exercise_library_id)
-          .single();
-
-        if (!libError && libData) {
-          log('[ExerciseDebug] Library lookup result:', JSON.stringify(libData));
-          data.exercise_library = libData as ExerciseLibrary;
-          if (libData.vimeo_video_id && !data.vimeo_video_id) {
-            data.vimeo_video_id = libData.vimeo_video_id;
-          }
-          if (libData.youtube_video_id && !data.youtube_video_id) {
-            data.youtube_video_id = libData.youtube_video_id;
-          }
-        } else {
-          log('[ExerciseDebug] Library lookup error:', JSON.stringify(libError));
-        }
-      }
-
+      if (error) throw error;
       return data as Exercise;
     },
     enabled: !!activeExerciseId,
@@ -571,39 +540,23 @@ function formatElapsed(seconds: number): string {
 }
 
 function getVimeoId(exercise: Exercise): string | null {
-  const directId = exercise.vimeo_video_id;
-  const libId = exercise.exercise_library?.vimeo_video_id;
-  const lib = exercise.exercise_library as Record<string, unknown> | null | undefined;
-  log('[VideoDebug] getVimeoId - direct:', directId, '| library:', libId, '| exercise_library keys:', lib ? Object.keys(lib) : 'null');
-  if (directId) return directId;
-  if (libId) return libId;
-  return null;
+  return exercise.vimeo_video_id || null;
 }
 
 function getYouTubeId(exercise: Exercise): string | null {
-  const directId = exercise.youtube_video_id;
-  const libId = exercise.exercise_library?.youtube_video_id;
-  log('[VideoDebug] getYouTubeId - direct:', directId, '| library:', libId);
-  if (directId) return directId;
-  if (libId) return libId;
-  return null;
+  return exercise.youtube_video_id || null;
 }
 
 function ExerciseVideoPlayer({ exercise, height }: { exercise: Exercise; height: number }) {
   const vimeoId = getVimeoId(exercise);
   const youtubeId = getYouTubeId(exercise);
 
-  log('[VideoPlayer] Rendering - vimeoId:', vimeoId, '| youtubeId:', youtubeId);
-
   if (vimeoId) {
-    log('[VideoPlayer] Using VimeoPlayer with id:', vimeoId);
     return <VimeoPlayer videoId={vimeoId} height={height} />;
   }
   if (youtubeId) {
-    log('[VideoPlayer] Using YouTubePlayer with id:', youtubeId);
     return <YouTubePlayer videoId={youtubeId} height={height} />;
   }
-  log('[VideoPlayer] No video ID found, showing fallback. Full exercise:', JSON.stringify(exercise));
   return (
     <View style={[{ height, borderRadius: 12, backgroundColor: '#000', justifyContent: 'center', alignItems: 'center' }]}>
       <VideoOff size={32} color="#666" />

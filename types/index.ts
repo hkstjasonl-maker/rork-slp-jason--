@@ -26,6 +26,12 @@ export interface ExerciseProgram {
   exercises?: Exercise[];
 }
 
+export interface ExerciseLibrary {
+  id: string;
+  vimeo_video_id?: string | null;
+  youtube_video_id?: string | null;
+}
+
 export interface Exercise {
   id: string;
   program_id: string;
@@ -34,6 +40,8 @@ export interface Exercise {
   title_zh_hans: string;
   youtube_video_id: string;
   vimeo_video_id?: string | null;
+  exercise_library_id?: string | null;
+  exercise_library?: ExerciseLibrary | null;
   duration_minutes: number;
   dosage: string;
   dosage_zh_hant: string | null;

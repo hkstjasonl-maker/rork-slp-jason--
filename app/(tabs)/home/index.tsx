@@ -234,7 +234,7 @@ export default function HomeScreen() {
       log('Fetching program for patient:', patientId);
       const { data, error } = await supabase
         .from('exercise_programs')
-        .select('*, exercises(*)')
+        .select('*, exercises(*, exercise_library(id, vimeo_video_id, youtube_video_id))')
         .eq('patient_id', patientId!)
         .eq('is_active', true)
         .order('created_at', { ascending: false })

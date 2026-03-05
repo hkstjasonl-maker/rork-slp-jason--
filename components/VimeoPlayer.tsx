@@ -9,7 +9,23 @@ interface VimeoPlayerProps {
   onEnd?: () => void;
 }
 
+function getVimeoEmbedUrl(videoId: string): string {
+  const params = new URLSearchParams({
+    h: '',
+    badge: '0',
+    autopause: '0',
+    player_id: '0',
+    title: '0',
+    byline: '0',
+    portrait: '0',
+    playsinline: '1',
+    dnt: '1',
+  });
+  return `https://player.vimeo.com/video/${videoId}?${params.toString()}`;
+}
+
 function getVimeoHTML(videoId: string): string {
+  const embedUrl = getVimeoEmbedUrl(videoId);
   return `
 <!DOCTYPE html>
 <html>
@@ -24,7 +40,7 @@ function getVimeoHTML(videoId: string): string {
 <body>
   <iframe
     id="player"
-    src="https://player.vimeo.com/video/${videoId}?title=0&byline=0&portrait=0&playsinline=1&dnt=1"
+    src="${embedUrl}"
     allow="autoplay; fullscreen; picture-in-picture; encrypted-media"
     allowfullscreen
   ></iframe>
@@ -72,7 +88,7 @@ function VimeoPlayerInner({ videoId, height, onEnd }: VimeoPlayerProps) {
       <View style={[styles.container, { height }]}>
         {/* @ts-ignore - iframe is valid on web */}
         <iframe
-          src={`https://player.vimeo.com/video/${videoId}?title=0&byline=0&portrait=0&dnt=1`}
+          src={getVimeoEmbedUrl(videoId)}
           style={{
             width: '100%',
             height: '100%',

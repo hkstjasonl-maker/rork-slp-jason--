@@ -124,7 +124,7 @@ export default function ExerciseScreen() {
       log('Fetching exercise:', activeExerciseId);
       const { data, error } = await supabase
         .from('exercises')
-        .select('*')
+        .select('*, exercise_library(id, vimeo_video_id, youtube_video_id)')
         .eq('id', activeExerciseId)
         .single();
 
@@ -139,7 +139,7 @@ export default function ExerciseScreen() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from('exercise_programs')
-        .select('*, exercises(*)')
+        .select('*, exercises(*, exercise_library(id, vimeo_video_id, youtube_video_id))')
         .eq('patient_id', patientId!)
         .eq('is_active', true)
         .order('created_at', { ascending: false })
@@ -540,12 +540,27 @@ function formatElapsed(seconds: number): string {
   return `${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
 }
 
+function getVimeoId(exercise: Exercise): string | null {
+  if (exercise.vimeo_video_id) return exercise.vimeo_video_id;
+  if (exercise.exercise_library?.vimeo_video_id) return exercise.exercise_library.vimeo_video_id;
+  return null;
+}
+
+function getYouTubeId(exercise: Exercise): string | null {
+  if (exercise.youtube_video_id) return exercise.youtube_video_id;
+  if (exercise.exercise_library?.youtube_video_id) return exercise.exercise_library.youtube_video_id;
+  return null;
+}
+
 function ExerciseVideoPlayer({ exercise, height }: { exercise: Exercise; height: number }) {
-  if (exercise.vimeo_video_id) {
-    return <VimeoPlayer videoId={exercise.vimeo_video_id} height={height} />;
+  const vimeoId = getVimeoId(exercise);
+  const youtubeId = getYouTubeId(exercise);
+
+  if (vimeoId) {
+    return <VimeoPlayer videoId={vimeoId} height={height} />;
   }
-  if (exercise.youtube_video_id) {
-    return <YouTubePlayer videoId={exercise.youtube_video_id} height={height} />;
+  if (youtubeId) {
+    return <YouTubePlayer videoId={youtubeId} height={height} />;
   }
   return (
     <View style={[{ height, borderRadius: 12, backgroundColor: '#000', justifyContent: 'center', alignItems: 'center' }]}>

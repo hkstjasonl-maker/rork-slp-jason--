@@ -13,58 +13,49 @@ interface VimeoPlayerProps {
   lowQuality?: boolean;
 }
 
-interface VimeoFile {
-  type: string;
-  link: string;
+interface VimeoProgressive {
+  url: string;
   height: number;
   width: number;
-  quality: string;
+  mime: string;
 }
 
-const VIMEO_TOKEN = process.env.EXPO_PUBLIC_VIMEO_ACCESS_TOKEN || '';
-
-async function getVimeoDirectUrl(vimeoId: string, lowQuality?: boolean): Promise<string | null> {
+async function getVimeoPlaybackUrl(vimeoId: string, lowQuality?: boolean): Promise<string | null> {
   try {
-    log('[VimeoPlayer] Fetching direct URL for video:', vimeoId);
-    const response = await fetch(`https://api.vimeo.com/videos/${vimeoId}`, {
-      headers: {
-        'Authorization': `Bearer ${VIMEO_TOKEN}`,
-        'Accept': 'application/vnd.vimeo.*+json;version=3.4',
-      },
-    });
+    log('[VimeoPlayer] Fetching playback URL via config for video:', vimeoId);
+    const response = await fetch(`https://player.vimeo.com/video/${vimeoId}/config`);
 
     if (!response.ok) {
-      log('[VimeoPlayer] Vimeo API error:', response.status);
+      log('[VimeoPlayer] Vimeo config endpoint error:', response.status);
       return null;
     }
 
-    const data = await response.json();
-    const files: VimeoFile[] = (data.files || []).filter((f: VimeoFile) => f.type === 'video/mp4');
+    const config = await response.json();
 
-    if (files.length === 0) {
-      log('[VimeoPlayer] No MP4 files found, trying download links');
-      const download = data.download;
-      if (download && Array.isArray(download)) {
-        const mp4Downloads = download.filter((d: VimeoFile) => d.type === 'video/mp4');
-        if (mp4Downloads.length > 0) {
-          const sorted = mp4Downloads.sort((a: VimeoFile, b: VimeoFile) => b.height - a.height);
-          const maxHeight = lowQuality ? 360 : 720;
-          const preferred = sorted.find((f: VimeoFile) => f.height <= maxHeight) || sorted[sorted.length - 1];
-          log('[VimeoPlayer] Using download link, quality:', preferred.height + 'p');
-          return preferred.link;
-        }
+    const progressive: VimeoProgressive[] = config?.request?.files?.progressive || [];
+    if (progressive.length > 0) {
+      const sorted = [...progressive].sort((a, b) => b.height - a.height);
+      const maxHeight = lowQuality ? 360 : 720;
+      const preferred = sorted.find(f => f.height <= maxHeight) || sorted[sorted.length - 1];
+      log('[VimeoPlayer] Progressive URL resolved, quality:', preferred.height + 'p');
+      return preferred.url;
+    }
+
+    const hls = config?.request?.files?.hls?.cdns;
+    if (hls) {
+      const cdnKey = Object.keys(hls)[0];
+      const cdn = hls[cdnKey];
+      const hlsUrl = cdn?.url || cdn?.avc_url;
+      if (hlsUrl) {
+        log('[VimeoPlayer] HLS URL resolved from cdn:', cdnKey);
+        return hlsUrl;
       }
-      log('[VimeoPlayer] No playable files found');
-      return null;
     }
 
-    const sorted = files.sort((a, b) => b.height - a.height);
-    const maxHeight = lowQuality ? 360 : 720;
-    const preferred = sorted.find(f => f.height <= maxHeight) || sorted[sorted.length - 1];
-    log('[VimeoPlayer] Direct URL resolved, quality:', preferred.height + 'p');
-    return preferred.link;
+    log('[VimeoPlayer] No playable URLs found in config');
+    return null;
   } catch (error) {
-    log('[VimeoPlayer] Error fetching Vimeo URL:', error);
+    log('[VimeoPlayer] Error fetching Vimeo config:', error);
     return null;
   }
 }
@@ -101,7 +92,7 @@ function VimeoPlayerInner({ videoId, height, onEnd, lowQuality }: VimeoPlayerPro
     setError(false);
     setDirectUrl(null);
 
-    getVimeoDirectUrl(videoId, lowQuality).then(url => {
+    getVimeoPlaybackUrl(videoId, lowQuality).then(url => {
       if (cancelled) return;
       if (url) {
         setDirectUrl(url);

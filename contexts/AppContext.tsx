@@ -25,6 +25,7 @@ export const [AppProvider, useApp] = createContextHook(() => {
   const [fontSizeLevel, setFontSizeLevelState] = useState<FontSizeLevel>('medium');
   const [isReady, setIsReady] = useState<boolean>(false);
   const [reinforcementAudioId, setReinforcementAudioId] = useState<string | null>(null);
+  const [reinforcementAudioUrl, setReinforcementAudioUrl] = useState<string | null>(null);
 
   useEffect(() => {
     loadPersistedState();
@@ -113,38 +114,72 @@ export const [AppProvider, useApp] = createContextHook(() => {
   useEffect(() => {
     if (!patientId) {
       setReinforcementAudioId(null);
+      setReinforcementAudioUrl(null);
       return;
     }
-    const fetchAudioId = async () => {
+    const fetchReinforcementAudio = async () => {
       try {
-        log('[AppContext] Fetching reinforcement audio ID for patient:', patientId);
-        const { data, error } = await supabase
+        log('[AppContext] Fetching reinforcement audio for patient:', patientId);
+        const lang = language || 'en';
+
+        const { data: patientData, error: patientError } = await supabase
           .from('patients')
-          .select('reinforcement_audio_youtube_id, reinforcement_audio_youtube_id_zh_hant, reinforcement_audio_youtube_id_zh_hans')
+          .select('reinforcement_audio_youtube_id, reinforcement_audio_youtube_id_zh_hant, reinforcement_audio_youtube_id_zh_hans, reinforcement_audio_url_en, reinforcement_audio_url_zh_hant, reinforcement_audio_url_zh_hans')
           .eq('id', patientId)
           .single();
-        if (error) {
-          log('[AppContext] Error fetching reinforcement audio:', error);
-          return;
+
+        if (patientError) {
+          log('[AppContext] Error fetching patient reinforcement audio:', patientError);
         }
-        if (data) {
-          const lang = language || 'en';
-          let audioId: string | null = null;
+
+        let audioUrl: string | null = null;
+        let audioId: string | null = null;
+
+        if (patientData) {
           if (lang === 'zh_hant') {
-            audioId = data.reinforcement_audio_youtube_id_zh_hant || data.reinforcement_audio_youtube_id || null;
+            audioUrl = patientData.reinforcement_audio_url_zh_hant || patientData.reinforcement_audio_url_en || null;
+            audioId = patientData.reinforcement_audio_youtube_id_zh_hant || patientData.reinforcement_audio_youtube_id || null;
           } else if (lang === 'zh_hans') {
-            audioId = data.reinforcement_audio_youtube_id_zh_hans || data.reinforcement_audio_youtube_id || null;
+            audioUrl = patientData.reinforcement_audio_url_zh_hans || patientData.reinforcement_audio_url_en || null;
+            audioId = patientData.reinforcement_audio_youtube_id_zh_hans || patientData.reinforcement_audio_youtube_id || null;
           } else {
-            audioId = data.reinforcement_audio_youtube_id || null;
+            audioUrl = patientData.reinforcement_audio_url_en || null;
+            audioId = patientData.reinforcement_audio_youtube_id || null;
           }
-          log('[AppContext] Reinforcement audio ID:', audioId);
-          setReinforcementAudioId(audioId);
         }
+
+        if (!audioUrl && !audioId) {
+          try {
+            const { data: libData, error: libError } = await supabase
+              .from('reinforcement_audio_library')
+              .select('audio_url_en, audio_url_zh_hant, audio_url_zh_hans')
+              .eq('is_default', true)
+              .limit(1)
+              .single();
+
+            if (!libError && libData) {
+              if (lang === 'zh_hant') {
+                audioUrl = libData.audio_url_zh_hant || libData.audio_url_en || null;
+              } else if (lang === 'zh_hans') {
+                audioUrl = libData.audio_url_zh_hans || libData.audio_url_en || null;
+              } else {
+                audioUrl = libData.audio_url_en || null;
+              }
+              log('[AppContext] Using default library reinforcement audio URL:', audioUrl);
+            }
+          } catch (libErr) {
+            log('[AppContext] Error fetching default reinforcement audio library:', libErr);
+          }
+        }
+
+        log('[AppContext] Reinforcement audio URL:', audioUrl, 'YouTube ID:', audioId);
+        setReinforcementAudioUrl(audioUrl);
+        setReinforcementAudioId(audioId);
       } catch (e) {
         log('[AppContext] Failed to fetch reinforcement audio:', e);
       }
     };
-    fetchAudioId();
+    fetchReinforcementAudio();
   }, [patientId, language]);
 
   const fontScale = FONT_SCALES[fontSizeLevel];
@@ -159,6 +194,7 @@ export const [AppProvider, useApp] = createContextHook(() => {
     fontScale,
     isReady,
     reinforcementAudioId,
+    reinforcementAudioUrl,
     setLanguage,
     setTermsAccepted,
     setPatient,

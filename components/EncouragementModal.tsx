@@ -9,6 +9,7 @@ import {
   Image,
 } from 'react-native';
 import { WebView } from 'react-native-webview';
+import { useAudioPlayer } from 'expo-audio';
 import { Check, Star, Flame, Volume2, VolumeX } from 'lucide-react-native';
 import * as Haptics from 'expo-haptics';
 import { ScaledText } from '@/components/ScaledText';
@@ -26,6 +27,7 @@ interface EncouragementModalProps {
   streakDays?: number;
   isAllComplete?: boolean;
   isHalfComplete?: boolean;
+  reinforcementAudioUrl?: string | null;
   reinforcementAudioId?: string | null;
 }
 
@@ -89,26 +91,70 @@ function EncouragementModalInner({
   streakDays = 0,
   isAllComplete = false,
   isHalfComplete = false,
+  reinforcementAudioUrl,
   reinforcementAudioId,
 }: EncouragementModalProps) {
   const { t, language } = useApp();
   const [audioMuted, setAudioMuted] = useState<boolean>(false);
   const [showAudio, setShowAudio] = useState<boolean>(false);
+  const [useUrlAudio, setUseUrlAudio] = useState<boolean>(false);
+
+  const audioPlayer = useAudioPlayer(
+    useUrlAudio && reinforcementAudioUrl ? { uri: reinforcementAudioUrl } : null
+  );
 
   useEffect(() => {
-    if (visible && reinforcementAudioId) {
-      log('[EncouragementModal] Starting audio playback:', reinforcementAudioId);
-      setShowAudio(true);
-      setAudioMuted(false);
+    if (visible && (reinforcementAudioUrl || reinforcementAudioId)) {
+      if (reinforcementAudioUrl) {
+        log('[EncouragementModal] Starting Expo Audio playback:', reinforcementAudioUrl);
+        setUseUrlAudio(true);
+        setShowAudio(true);
+        setAudioMuted(false);
+      } else if (reinforcementAudioId) {
+        log('[EncouragementModal] Falling back to YouTube audio:', reinforcementAudioId);
+        setUseUrlAudio(false);
+        setShowAudio(true);
+        setAudioMuted(false);
+      }
     } else {
       setShowAudio(false);
+      setUseUrlAudio(false);
     }
-  }, [visible, reinforcementAudioId]);
+  }, [visible, reinforcementAudioUrl, reinforcementAudioId]);
+
+  useEffect(() => {
+    if (visible && useUrlAudio && audioPlayer && reinforcementAudioUrl) {
+      try {
+        audioPlayer.seekTo(0);
+        audioPlayer.play();
+        log('[EncouragementModal] Expo Audio play started');
+      } catch (e) {
+        log('[EncouragementModal] Expo Audio play error:', e);
+      }
+    }
+    if (!visible && audioPlayer) {
+      try {
+        audioPlayer.pause();
+      } catch (err) {
+        log('[EncouragementModal] pause error on hide:', err);
+      }
+    }
+  }, [visible, useUrlAudio, audioPlayer, reinforcementAudioUrl]);
+
+  useEffect(() => {
+    if (useUrlAudio && audioPlayer) {
+      audioPlayer.muted = audioMuted;
+    }
+  }, [audioMuted, useUrlAudio, audioPlayer]);
 
   const handleContinue = useCallback(() => {
     setShowAudio(false);
+    if (useUrlAudio && audioPlayer) {
+      try { audioPlayer.pause(); } catch (err) { log('[EncouragementModal] pause error on continue:', err); }
+    }
+    setUseUrlAudio(false);
     onContinue();
-  }, [onContinue]);
+  }, [onContinue, useUrlAudio, audioPlayer]);
 
   const toggleMute = useCallback(() => {
     setAudioMuted((prev) => !prev);
@@ -261,7 +307,7 @@ function EncouragementModalInner({
             </View>
           )}
 
-          {showAudio && reinforcementAudioId && (
+          {showAudio && (reinforcementAudioUrl || reinforcementAudioId) && (
             <TouchableOpacity
               style={styles.muteButton}
               onPress={toggleMute}
@@ -290,7 +336,7 @@ function EncouragementModalInner({
           </TouchableOpacity>
         </Animated.View>
 
-        {showAudio && reinforcementAudioId && (
+        {showAudio && !useUrlAudio && reinforcementAudioId && (
           <HiddenYouTubeAudio videoId={reinforcementAudioId} muted={audioMuted} />
         )}
       </View>

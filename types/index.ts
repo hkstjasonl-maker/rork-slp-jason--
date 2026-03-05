@@ -10,6 +10,9 @@ export interface Patient {
   reinforcement_audio_youtube_id?: string | null;
   reinforcement_audio_youtube_id_zh_hant?: string | null;
   reinforcement_audio_youtube_id_zh_hans?: string | null;
+  reinforcement_audio_url_en?: string | null;
+  reinforcement_audio_url_zh_hant?: string | null;
+  reinforcement_audio_url_zh_hans?: string | null;
 }
 
 export interface ExerciseProgram {
@@ -30,6 +33,7 @@ export interface Exercise {
   title_zh_hant: string;
   title_zh_hans: string;
   youtube_video_id: string;
+  vimeo_video_id?: string | null;
   duration_minutes: number;
   dosage: string;
   dosage_zh_hant: string | null;
@@ -42,6 +46,9 @@ export interface Exercise {
   narrative_audio_youtube_id?: string | null;
   narrative_audio_youtube_id_zh_hant?: string | null;
   narrative_audio_youtube_id_zh_hans?: string | null;
+  audio_instruction_url_en?: string | null;
+  audio_instruction_url_zh_hant?: string | null;
+  audio_instruction_url_zh_hans?: string | null;
   created_at: string;
 }
 

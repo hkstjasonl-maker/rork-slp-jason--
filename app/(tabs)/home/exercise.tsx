@@ -15,11 +15,13 @@ import {
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import * as Haptics from 'expo-haptics';
-import { ArrowLeft, CheckCircle, Clock, Repeat, AlertCircle, Tag, Camera, X, Maximize2, SplitSquareHorizontal, Headphones } from 'lucide-react-native';
+import { ArrowLeft, CheckCircle, Clock, Repeat, AlertCircle, Tag, Camera, X, Maximize2, SplitSquareHorizontal, Headphones, VideoOff } from 'lucide-react-native';
 import * as MediaLibrary from 'expo-media-library';
 import { useApp } from '@/contexts/AppContext';
 import { ScaledText } from '@/components/ScaledText';
 import { YouTubePlayer } from '@/components/YouTubePlayer';
+import { VimeoPlayer } from '@/components/VimeoPlayer';
+import { AudioInstructionPlayer } from '@/components/AudioInstructionPlayer';
 import { EncouragementModal } from '@/components/EncouragementModal';
 import { SelfRatingModal } from '@/components/SelfRatingModal';
 import { CopyrightFooter } from '@/components/CopyrightFooter';
@@ -46,6 +48,18 @@ function getNarrativeAudioId(exercise: Exercise, language: Language | null): str
   }
 }
 
+function getAudioInstructionUrl(exercise: Exercise, language: Language | null): string | null {
+  const lang = language || 'en';
+  switch (lang) {
+    case 'zh_hant':
+      return exercise.audio_instruction_url_zh_hant || exercise.audio_instruction_url_en || null;
+    case 'zh_hans':
+      return exercise.audio_instruction_url_zh_hans || exercise.audio_instruction_url_en || null;
+    default:
+      return exercise.audio_instruction_url_en || null;
+  }
+}
+
 type MirrorViewMode = 'split' | 'full';
 
 function getExerciseTitle(exercise: Exercise, language: Language | null): string {
@@ -65,7 +79,7 @@ export default function ExerciseScreen() {
   }>();
   const router = useRouter();
   const queryClient = useQueryClient();
-  const { t, patientId, patientName, language, reinforcementAudioId } = useApp();
+  const { t, patientId, patientName, language, reinforcementAudioId, reinforcementAudioUrl } = useApp();
 
   const allIds: string[] = useMemo(() => {
     if (params.allExerciseIds) {
@@ -362,10 +376,7 @@ export default function ExerciseScreen() {
           ) : (
             <View style={styles.videoSection}>
               <View style={styles.videoPlayerWrapper}>
-                <YouTubePlayer
-                  videoId={exercise.youtube_video_id}
-                  height={220}
-                />
+                <ExerciseVideoPlayer exercise={exercise} height={220} />
                 <VideoWatermark patientName={patientName || ''} height={220} />
               </View>
               <Animated.View
@@ -412,6 +423,17 @@ export default function ExerciseScreen() {
               </View>
             </View>
           </View>
+
+          {!mirrorOpen && (() => {
+            const audioUrl = getAudioInstructionUrl(exercise, language);
+            return audioUrl ? (
+              <AudioInstructionPlayer
+                audioUrl={audioUrl}
+                label={t('playInstructions')}
+                stopLabel={t('stopInstructions')}
+              />
+            ) : null;
+          })()}
 
           {!mirrorOpen && (
             <TouchableOpacity
@@ -485,6 +507,7 @@ export default function ExerciseScreen() {
           streakDays={starInfo.currentStreak}
           isAllComplete={starInfo.isAll}
           isHalfComplete={starInfo.isHalf}
+          reinforcementAudioUrl={reinforcementAudioUrl}
           reinforcementAudioId={reinforcementAudioId}
         />
 
@@ -515,6 +538,21 @@ function formatElapsed(seconds: number): string {
   const m = Math.floor(seconds / 60);
   const s = seconds % 60;
   return `${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
+}
+
+function ExerciseVideoPlayer({ exercise, height }: { exercise: Exercise; height: number }) {
+  if (exercise.vimeo_video_id) {
+    return <VimeoPlayer videoId={exercise.vimeo_video_id} height={height} />;
+  }
+  if (exercise.youtube_video_id) {
+    return <YouTubePlayer videoId={exercise.youtube_video_id} height={height} />;
+  }
+  return (
+    <View style={[{ height, borderRadius: 12, backgroundColor: '#000', justifyContent: 'center', alignItems: 'center' }]}>
+      <VideoOff size={32} color="#666" />
+      <ScaledText size={14} color="#999" style={{ marginTop: 8 }}>No video available</ScaledText>
+    </View>
+  );
 }
 
 function HiddenNarrativeAudio({ videoId }: { videoId: string }) {
@@ -776,7 +814,7 @@ function MirrorModeViewInner({
     <Animated.View style={[styles.mirrorContainer, { opacity: mirrorFade }]}>
       {isSplit && (
         <View style={[styles.mirrorVideoSection, { height: videoHeight }]}>
-          <YouTubePlayer videoId={exercise.youtube_video_id} height={videoHeight - 8} />
+          <ExerciseVideoPlayer exercise={exercise} height={videoHeight - 8} />
           <VideoWatermark patientName={patientName} height={videoHeight - 8} />
         </View>
       )}

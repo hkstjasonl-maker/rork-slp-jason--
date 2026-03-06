@@ -34,6 +34,7 @@ import {
   Repeat,
   ChevronRight,
   ChevronDown,
+  ChevronUp,
   AlertTriangle,
   CalendarDays,
   FileText,
@@ -399,6 +400,7 @@ export default function HomeScreen() {
 
   const [showTutorial, setShowTutorial] = useState(false);
   const [remarksExpanded, setRemarksExpanded] = useState(false);
+  const [submissionsExpanded, setSubmissionsExpanded] = useState<boolean>(false);
 
   const reviewReqQuery = useQuery({
     queryKey: ['reviewRequirements', patientId],
@@ -712,7 +714,7 @@ export default function HomeScreen() {
             <View style={styles.submissionsSection}>
               <TouchableOpacity
                 style={styles.submissionsHeader}
-                onPress={() => router.push('/my-submissions')}
+                onPress={() => setSubmissionsExpanded(prev => !prev)}
                 activeOpacity={0.7}
               >
                 <View style={styles.submissionsHeaderLeft}>
@@ -720,60 +722,73 @@ export default function HomeScreen() {
                   <ScaledText size={18} weight="bold" color={Colors.textPrimary}>
                     {t('mySubmissions')}
                   </ScaledText>
+                  <View style={styles.submissionsCountBadge}>
+                    <ScaledText size={11} weight="600" color={Colors.white}>
+                      {submissions.length}
+                    </ScaledText>
+                  </View>
                 </View>
-                <ChevronRight size={20} color={Colors.textSecondary} />
+                {submissionsExpanded ? (
+                  <ChevronUp size={20} color={Colors.textSecondary} />
+                ) : (
+                  <ChevronDown size={20} color={Colors.textSecondary} />
+                )}
               </TouchableOpacity>
 
-              {submissions.slice(0, 3).map((sub: any) => {
-                const isRedo = sub.review_status === 'redo_requested';
-                const isReviewed = sub.review_status === 'reviewed';
-                const statusColor = isReviewed ? Colors.success : isRedo ? Colors.error : '#F59E0B';
-                const statusBg = isReviewed ? Colors.successLight : isRedo ? Colors.errorLight : '#FEF3C7';
-                const statusLabel = isReviewed ? t('reviewed') : isRedo ? t('redoRequested') : t('pending');
+              {submissionsExpanded && (
+                <>
+                  {submissions.slice(0, 3).map((sub: any) => {
+                    const isRedo = sub.review_status === 'redo_requested';
+                    const isReviewed = sub.review_status === 'reviewed';
+                    const statusColor = isReviewed ? Colors.success : isRedo ? Colors.error : '#F59E0B';
+                    const statusBg = isReviewed ? Colors.successLight : isRedo ? Colors.errorLight : '#FEF3C7';
+                    const statusLabel = isReviewed ? t('reviewed') : isRedo ? t('redoRequested') : t('pending');
 
-                return (
-                  <TouchableOpacity
-                    key={sub.id}
-                    style={[styles.submissionCard, isRedo && styles.submissionCardRedo]}
-                    onPress={() => router.push('/my-submissions')}
-                    activeOpacity={0.7}
-                  >
-                    <View style={styles.submissionCardTop}>
-                      <ScaledText size={14} weight="600" color={Colors.textPrimary} numberOfLines={1} style={{ flex: 1 }}>
-                        {sub.exercise_title_en}
+                    return (
+                      <TouchableOpacity
+                        key={sub.id}
+                        style={[styles.submissionCard, isRedo && styles.submissionCardRedo]}
+                        onPress={() => router.push('/my-submissions')}
+                        activeOpacity={0.7}
+                      >
+                        <View style={styles.submissionCardTop}>
+                          <ScaledText size={14} weight="600" color={Colors.textPrimary} numberOfLines={1} style={{ flex: 1 }}>
+                            {sub.exercise_title_en}
+                          </ScaledText>
+                          <View style={[styles.submissionStatusBadge, { backgroundColor: statusBg }]}>
+                            <ScaledText size={10} weight="600" color={statusColor}>
+                              {String(statusLabel)}
+                            </ScaledText>
+                          </View>
+                        </View>
+                        <ScaledText size={11} color={Colors.textSecondary}>
+                          {sub.created_at ? new Date(sub.created_at).toLocaleString() : sub.submission_date || ''}
+                        </ScaledText>
+                        {sub.reviewer_notes && (
+                          <View style={styles.submissionNotePreview}>
+                            <MessageSquare size={11} color={Colors.primary} />
+                            <ScaledText size={11} color={Colors.primary} numberOfLines={1} style={{ flex: 1 }}>
+                              {sub.reviewer_notes}
+                            </ScaledText>
+                          </View>
+                        )}
+                      </TouchableOpacity>
+                    );
+                  })}
+
+                  {submissions.length > 3 && (
+                    <TouchableOpacity
+                      style={styles.viewAllSubmissions}
+                      onPress={() => router.push('/my-submissions')}
+                      activeOpacity={0.7}
+                    >
+                      <ScaledText size={13} weight="600" color={Colors.primary}>
+                        {language === 'zh_hant' || language === 'zh_hans' ? `查看全部 ${submissions.length} 項提交` : `View all ${submissions.length} submissions`}
                       </ScaledText>
-                      <View style={[styles.submissionStatusBadge, { backgroundColor: statusBg }]}>
-                        <ScaledText size={10} weight="600" color={statusColor}>
-                          {String(statusLabel)}
-                        </ScaledText>
-                      </View>
-                    </View>
-                    <ScaledText size={11} color={Colors.textSecondary}>
-                      {sub.created_at ? new Date(sub.created_at).toLocaleString() : sub.submission_date || ''}
-                    </ScaledText>
-                    {sub.reviewer_notes && (
-                      <View style={styles.submissionNotePreview}>
-                        <MessageSquare size={11} color={Colors.primary} />
-                        <ScaledText size={11} color={Colors.primary} numberOfLines={1} style={{ flex: 1 }}>
-                          {sub.reviewer_notes}
-                        </ScaledText>
-                      </View>
-                    )}
-                  </TouchableOpacity>
-                );
-              })}
-
-              {submissions.length > 3 && (
-                <TouchableOpacity
-                  style={styles.viewAllSubmissions}
-                  onPress={() => router.push('/my-submissions')}
-                  activeOpacity={0.7}
-                >
-                  <ScaledText size={13} weight="600" color={Colors.primary}>
-                    {language === 'zh_hant' || language === 'zh_hans' ? `查看全部 ${submissions.length} 項提交` : `View all ${submissions.length} submissions`}
-                  </ScaledText>
-                  <ChevronRight size={16} color={Colors.primary} />
-                </TouchableOpacity>
+                      <ChevronRight size={16} color={Colors.primary} />
+                    </TouchableOpacity>
+                  )}
+                </>
               )}
             </View>
           )}
@@ -1126,6 +1141,15 @@ const styles = StyleSheet.create({
     alignItems: 'center' as const,
     justifyContent: 'space-between' as const,
     marginBottom: 12,
+  },
+  submissionsCountBadge: {
+    backgroundColor: '#2563EB',
+    borderRadius: 10,
+    minWidth: 20,
+    height: 20,
+    alignItems: 'center' as const,
+    justifyContent: 'center' as const,
+    paddingHorizontal: 5,
   },
   submissionsHeaderLeft: {
     flexDirection: 'row' as const,

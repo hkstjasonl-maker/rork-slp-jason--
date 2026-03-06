@@ -1,4 +1,4 @@
-import React, { useCallback } from 'react';
+import React, { useCallback, useState } from 'react';
 import {
   View,
   Text,
@@ -26,7 +26,9 @@ import {
   Check,
   Building2,
   Video,
+  BookOpen,
 } from 'lucide-react-native';
+import { AppTutorial } from '@/components/AppTutorial';
 
 const FONT_SIZE_OPTIONS: { key: FontSizeLevel; labelKey: string }[] = [
   { key: 'small', labelKey: 'fontSmall' },
@@ -50,6 +52,7 @@ export default function SettingsScreen() {
     setLanguage,
     clearPatient,
   } = useApp();
+  const [showTutorial, setShowTutorial] = useState(false);
   const router = useRouter();
 
   const handleSwitchProfile = useCallback(() => {
@@ -184,6 +187,25 @@ export default function SettingsScreen() {
           <View style={styles.section}>
             <TouchableOpacity
               style={styles.actionCard}
+              onPress={() => setShowTutorial(true)}
+              activeOpacity={0.7}
+            >
+              <BookOpen size={20} color={Colors.primary} />
+              <View style={styles.actionContent}>
+                <ScaledText size={15} weight="600" color={Colors.textPrimary}>
+                  {language === 'zh_hant' || language === 'zh_hans' ? '重播應用教學' : 'Replay App Tutorial'}
+                </ScaledText>
+                <ScaledText size={13} color={Colors.textSecondary}>
+                  {language === 'zh_hant' || language === 'zh_hans' ? '重新了解如何使用此應用程式' : 'Learn how to use this app again'}
+                </ScaledText>
+              </View>
+              <ChevronRight size={18} color={Colors.disabled} />
+            </TouchableOpacity>
+          </View>
+
+          <View style={styles.section}>
+            <TouchableOpacity
+              style={styles.actionCard}
               onPress={() => router.push('/partners')}
               activeOpacity={0.7}
             >
@@ -226,6 +248,10 @@ export default function SettingsScreen() {
           <CopyrightFooter />
         </ScrollView>
       </SafeAreaView>
+      <AppTutorial
+        visible={showTutorial}
+        onComplete={() => setShowTutorial(false)}
+      />
     </View>
   );
 }

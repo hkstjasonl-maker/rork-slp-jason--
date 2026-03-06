@@ -14,6 +14,7 @@ import { useQuery } from '@tanstack/react-query';
 import { useApp } from '@/contexts/AppContext';
 import { ScaledText } from '@/components/ScaledText';
 import { CopyrightFooter } from '@/components/CopyrightFooter';
+import { AppTutorial } from '@/components/AppTutorial';
 import { supabase } from '@/lib/supabase';
 import Colors from '@/constants/colors';
 import { JASON_CARTOON } from '@/constants/images';
@@ -271,7 +272,7 @@ function CategorySection({
 }
 
 export default function HomeScreen() {
-  const { t, patientId, patientName, language } = useApp();
+  const { t, patientId, patientName, language, tutorialCompleted, setTutorialCompleted } = useApp();
   const router = useRouter();
 
   const programQuery = useQuery({
@@ -393,9 +394,22 @@ export default function HomeScreen() {
     };
   }, [exercises.length, todayLogsQuery.data, allLogsQuery.data]);
 
+  const [showTutorial, setShowTutorial] = useState(false);
   const [remarksExpanded, setRemarksExpanded] = useState(false);
   const [reviewRequirements, setReviewRequirements] = useState<ExerciseReviewRequirement[]>([]);
   const [todaySubmissions, setTodaySubmissions] = useState<Record<string, number>>({});
+
+  useEffect(() => {
+    if (!tutorialCompleted && patientId) {
+      const timer = setTimeout(() => setShowTutorial(true), 500);
+      return () => clearTimeout(timer);
+    }
+  }, [tutorialCompleted, patientId]);
+
+  const handleTutorialComplete = useCallback(() => {
+    setShowTutorial(false);
+    void setTutorialCompleted();
+  }, [setTutorialCompleted]);
 
   useEffect(() => {
     if (!patientId) return;
@@ -763,6 +777,7 @@ export default function HomeScreen() {
           <CopyrightFooter />
         </ScrollView>
       </SafeAreaView>
+      <AppTutorial visible={showTutorial} onComplete={handleTutorialComplete} />
     </View>
   );
 }

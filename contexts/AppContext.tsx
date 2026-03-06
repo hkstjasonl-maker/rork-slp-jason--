@@ -1,6 +1,6 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import createContextHook from '@nkzw/create-context-hook';
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import translations from '@/constants/i18n';
 import { Language, FontSizeLevel, FONT_SCALES } from '@/types';
 import { setupSessionTracking } from '@/lib/analytics';
@@ -14,6 +14,7 @@ const STORAGE_KEYS = {
   PATIENT_NAME: 'app_patient_name',
   ACCESS_CODE: 'app_access_code',
   FONT_SIZE_LEVEL: 'app_font_size_level',
+  TUTORIAL_COMPLETED: 'app_tutorial_completed',
 };
 
 export const [AppProvider, useApp] = createContextHook(() => {
@@ -26,20 +27,22 @@ export const [AppProvider, useApp] = createContextHook(() => {
   const [isReady, setIsReady] = useState<boolean>(false);
   const [reinforcementAudioId, setReinforcementAudioId] = useState<string | null>(null);
   const [reinforcementAudioUrl, setReinforcementAudioUrl] = useState<string | null>(null);
+  const [tutorialCompleted, setTutorialCompletedState] = useState<boolean>(false);
 
   useEffect(() => {
-    loadPersistedState();
+    void loadPersistedState();
   }, []);
 
   const loadPersistedState = async () => {
     try {
-      const [lang, terms, pid, pname, code, fsize] = await Promise.all([
+      const [lang, terms, pid, pname, code, fsize, tutorialVal] = await Promise.all([
         AsyncStorage.getItem(STORAGE_KEYS.LANGUAGE),
         AsyncStorage.getItem(STORAGE_KEYS.TERMS_ACCEPTED),
         AsyncStorage.getItem(STORAGE_KEYS.PATIENT_ID),
         AsyncStorage.getItem(STORAGE_KEYS.PATIENT_NAME),
         AsyncStorage.getItem(STORAGE_KEYS.ACCESS_CODE),
         AsyncStorage.getItem(STORAGE_KEYS.FONT_SIZE_LEVEL),
+        AsyncStorage.getItem(STORAGE_KEYS.TUTORIAL_COMPLETED),
       ]);
       if (lang) setLanguageState(lang as Language);
       if (terms === 'true') setTermsAcceptedState(true);
@@ -47,6 +50,7 @@ export const [AppProvider, useApp] = createContextHook(() => {
       if (pname) setPatientNameState(pname);
       if (code) setAccessCodeState(code);
       if (fsize) setFontSizeLevelState(fsize as FontSizeLevel);
+      if (tutorialVal === 'true') setTutorialCompletedState(true);
     } catch (e) {
       log('Failed to load persisted state:', e);
     } finally {
@@ -89,6 +93,16 @@ export const [AppProvider, useApp] = createContextHook(() => {
   const setFontSizeLevel = useCallback(async (level: FontSizeLevel) => {
     setFontSizeLevelState(level);
     await AsyncStorage.setItem(STORAGE_KEYS.FONT_SIZE_LEVEL, level);
+  }, []);
+
+  const setTutorialCompleted = useCallback(async () => {
+    setTutorialCompletedState(true);
+    await AsyncStorage.setItem(STORAGE_KEYS.TUTORIAL_COMPLETED, 'true');
+  }, []);
+
+  const resetTutorial = useCallback(async () => {
+    setTutorialCompletedState(false);
+    await AsyncStorage.removeItem(STORAGE_KEYS.TUTORIAL_COMPLETED);
   }, []);
 
   const t = useCallback((key: string): string => {
@@ -179,12 +193,12 @@ export const [AppProvider, useApp] = createContextHook(() => {
         log('[AppContext] Failed to fetch reinforcement audio:', e);
       }
     };
-    fetchReinforcementAudio();
+    void fetchReinforcementAudio();
   }, [patientId, language]);
 
   const fontScale = FONT_SCALES[fontSizeLevel];
 
-  return {
+  return useMemo(() => ({
     language,
     termsAccepted,
     patientId,
@@ -195,11 +209,20 @@ export const [AppProvider, useApp] = createContextHook(() => {
     isReady,
     reinforcementAudioId,
     reinforcementAudioUrl,
+    tutorialCompleted,
     setLanguage,
     setTermsAccepted,
     setPatient,
     clearPatient,
     setFontSizeLevel,
+    setTutorialCompleted,
+    resetTutorial,
     t,
-  };
+  }), [
+    language, termsAccepted, patientId, patientName, accessCode,
+    fontSizeLevel, fontScale, isReady, reinforcementAudioId,
+    reinforcementAudioUrl, tutorialCompleted, setLanguage,
+    setTermsAccepted, setPatient, clearPatient, setFontSizeLevel,
+    setTutorialCompleted, resetTutorial, t,
+  ]);
 });

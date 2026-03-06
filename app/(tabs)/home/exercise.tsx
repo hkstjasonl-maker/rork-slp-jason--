@@ -16,7 +16,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import * as Haptics from 'expo-haptics';
 import { ArrowLeft, CheckCircle, Clock, Repeat, AlertCircle, Tag, Camera, X, Maximize2, SplitSquareHorizontal, Headphones, VideoOff } from 'lucide-react-native';
 import * as MediaLibrary from 'expo-media-library';
-import * as FileSystem from 'expo-file-system';
+
 
 import { useApp } from '@/contexts/AppContext';
 import { ScaledText } from '@/components/ScaledText';
@@ -102,107 +102,39 @@ const LiveCamera = forwardRef<CameraView, { onCameraReady?: () => void }>(
 LiveCamera.displayName = 'LiveCamera';
 const MemoLiveCamera = memo(LiveCamera, () => true);
 
-function SnapshotMirror() {
-  const snapshotCameraRef = useRef<CameraView>(null);
-  const [mirrorUri, setMirrorUri] = useState<string | null>(null);
-  const isMountedRef = useRef(true);
-  const isCapturingRef = useRef(false);
-  const prevUriRef = useRef<string | null>(null);
-  const [permission] = useCameraPermissions();
+function SplitCameraView() {
+  const [permission, requestPermission] = useCameraPermissions();
 
   useEffect(() => {
-    isMountedRef.current = true;
-    return () => {
-      isMountedRef.current = false;
-    };
-  }, []);
+    if (!permission?.granted) {
+      void requestPermission();
+    }
+  }, [permission?.granted, requestPermission]);
 
-  useEffect(() => {
-    if (!permission?.granted) return;
-
-    const captureLoop = async () => {
-      await new Promise(r => setTimeout(r, 500));
-
-      while (isMountedRef.current) {
-        if (!snapshotCameraRef.current || isCapturingRef.current) {
-          await new Promise(r => setTimeout(r, 50));
-          continue;
-        }
-
-        isCapturingRef.current = true;
-        try {
-          const photo = await snapshotCameraRef.current.takePictureAsync({
-            quality: 0.1,
-            skipProcessing: true,
-            shutterSound: false,
-          });
-          if (isMountedRef.current && photo?.uri) {
-            const oldUri = prevUriRef.current;
-            prevUriRef.current = photo.uri;
-            setMirrorUri(photo.uri);
-            if (oldUri && oldUri !== photo.uri && Platform.OS !== 'web') {
-              FileSystem.deleteAsync(oldUri, { idempotent: true }).catch(() => {});
-            }
-          }
-        } catch {
-          await new Promise(r => setTimeout(r, 100));
-        }
-        isCapturingRef.current = false;
-      }
-    };
-
-    captureLoop();
-  }, [permission?.granted]);
+  if (!permission?.granted) {
+    return (
+      <View style={splitCameraStyles.placeholder}>
+        <Camera size={24} color="#666" />
+        <ScaledText size={12} color="#666" style={{ marginTop: 6 }}>{String('Camera permission needed')}</ScaledText>
+      </View>
+    );
+  }
 
   return (
-    <View style={snapshotStyles.container}>
-      {mirrorUri ? (
-        <Image
-          source={{ uri: mirrorUri }}
-          style={snapshotStyles.mirrorImage}
-          resizeMode="cover"
-          // @ts-ignore - fadeDuration is Android-only, speeds up image swap
-          fadeDuration={0}
-        />
-      ) : (
-        <View style={snapshotStyles.placeholder}>
-          <ActivityIndicator size="small" color={Colors.primary} />
-          <ScaledText size={12} color="#666" style={{ marginTop: 6 }}>{String('Starting mirror...')}</ScaledText>
-        </View>
-      )}
-      {permission?.granted && (
-        <CameraView
-          ref={snapshotCameraRef}
-          style={snapshotStyles.hiddenCamera}
-          facing="front"
-        />
-      )}
-    </View>
+    <CameraView
+      style={{ flex: 1 }}
+      facing="front"
+    />
   );
 }
-const MemoSnapshotMirror = memo(SnapshotMirror);
+const MemoSplitCameraView = memo(SplitCameraView);
 
-const snapshotStyles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#000',
-    position: 'relative' as const,
-  },
-  mirrorImage: {
-    flex: 1,
-    transform: [{ scaleX: -1 }],
-  },
+const splitCameraStyles = StyleSheet.create({
   placeholder: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
     backgroundColor: '#000',
-  },
-  hiddenCamera: {
-    position: 'absolute' as const,
-    width: 1,
-    height: 1,
-    opacity: 0,
   },
 });
 
@@ -257,7 +189,7 @@ function SplitVideoLayerInner({ vimeoId, youtubeId }: { vimeoId: string | null; 
   );
 }
 SplitVideoLayerInner.displayName = 'SplitVideoLayer';
-const SplitVideoLayer = memo(SplitVideoLayerInner);
+const SplitVideoLayer = memo(SplitVideoLayerInner, (prev, next) => prev.vimeoId === next.vimeoId && prev.youtubeId === next.youtubeId);
 
 const splitVideoStyles = StyleSheet.create({
   container: {
@@ -543,11 +475,11 @@ export default function ExerciseScreen() {
     },
     onSuccess: (data) => {
       if (Platform.OS !== 'web') {
-        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+        void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       }
       setPendingLogId(data?.id ?? null);
-      queryClient.invalidateQueries({ queryKey: ['todayLogs'] });
-      queryClient.invalidateQueries({ queryKey: ['exerciseLogs'] });
+      void queryClient.invalidateQueries({ queryKey: ['todayLogs'] });
+      void queryClient.invalidateQueries({ queryKey: ['exerciseLogs'] });
       setCompletedThisSession((prev) => new Set(prev).add(activeExerciseId));
       setShowEncouragement(true);
     },
@@ -566,7 +498,7 @@ export default function ExerciseScreen() {
       if (error) throw error;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['exerciseLogs'] });
+      void queryClient.invalidateQueries({ queryKey: ['exerciseLogs'] });
     },
     onError: (error) => {
       log('Save rating error:', error);
@@ -624,7 +556,7 @@ export default function ExerciseScreen() {
     }
     setMediaMode('split');
     if (Platform.OS !== 'web') {
-      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+      void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     }
   }, [hasCameraPermission, requestCameraPermission, t]);
 
@@ -634,7 +566,7 @@ export default function ExerciseScreen() {
     setMediaMode('video');
     setNarrativePlaying(false);
     if (Platform.OS !== 'web') {
-      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+      void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     }
   }, [isRecording]);
 
@@ -642,7 +574,7 @@ export default function ExerciseScreen() {
     if (isRecording) return;
     setMediaMode(mode);
     if (Platform.OS !== 'web') {
-      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+      void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     }
   }, [isRecording]);
 
@@ -667,7 +599,7 @@ export default function ExerciseScreen() {
       log('Starting video recording');
       setIsRecording(true);
       if (Platform.OS !== 'web') {
-        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+        void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
       }
       const video = await cameraRef.current.recordAsync();
       log('Recording finished, uri:', video?.uri);
@@ -683,7 +615,7 @@ export default function ExerciseScreen() {
           setToastType('success');
           setToastMessage(t('videoSaved'));
           if (Platform.OS !== 'web') {
-            Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+            void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
           }
         } catch (saveError) {
           log('Error saving video:', saveError);
@@ -703,21 +635,21 @@ export default function ExerciseScreen() {
     setIsRecording(false);
     cameraRef.current.stopRecording();
     if (Platform.OS !== 'web') {
-      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+      void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     }
   }, []);
 
   const handlePlayNarrative = useCallback(() => {
     setNarrativePlaying(true);
     if (Platform.OS !== 'web') {
-      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+      void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     }
   }, []);
 
   const handleStopNarrative = useCallback(() => {
     setNarrativePlaying(false);
     if (Platform.OS !== 'web') {
-      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+      void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     }
   }, []);
 
@@ -778,7 +710,7 @@ export default function ExerciseScreen() {
                 <VideoWatermark patientName={patientName || ''} height={200} />
               </View>
               <View style={styles.splitMirrorSection}>
-                <MemoSnapshotMirror />
+                <MemoSplitCameraView />
                 <View style={styles.mirrorBadge}>
                   <ScaledText size={11} weight="600" color={Colors.white}>
                     {t('mirrorMode')}

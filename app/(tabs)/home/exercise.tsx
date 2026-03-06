@@ -28,7 +28,6 @@ import { EncouragementModal } from '@/components/EncouragementModal';
 import { SelfRatingModal } from '@/components/SelfRatingModal';
 import { CopyrightFooter } from '@/components/CopyrightFooter';
 import { RestTimer } from '@/components/RestTimer';
-import { VideoWatermark } from '@/components/VideoWatermark';
 import { RecordingWatermark } from '@/components/RecordingWatermark';
 import { supabase } from '@/lib/supabase';
 import { getStarsForSession, calculateStars } from '@/lib/stars';
@@ -284,7 +283,7 @@ export default function ExerciseScreen() {
   }>();
   const router = useRouter();
   const queryClient = useQueryClient();
-  const { t, patientId, patientName, language, reinforcementAudioId, reinforcementAudioUrl } = useApp();
+  const { t, patientId, language, reinforcementAudioId, reinforcementAudioUrl } = useApp();
 
   const allIds: string[] = useMemo(() => {
     if (params.allExerciseIds) {
@@ -410,6 +409,17 @@ export default function ExerciseScreen() {
     },
     enabled: !!activeExerciseId,
   });
+
+  useEffect(() => {
+    if (exerciseQuery.data) {
+      log('[Exercise] Loaded:', JSON.stringify({
+        id: exerciseQuery.data.id,
+        title: exerciseQuery.data.title_en,
+        vimeo_video_id: exerciseQuery.data.vimeo_video_id,
+        youtube_video_id: exerciseQuery.data.youtube_video_id,
+      }));
+    }
+  }, [exerciseQuery.data]);
 
   const programQuery = useQuery({
     queryKey: ['program', patientId],
@@ -813,7 +823,6 @@ export default function ExerciseScreen() {
             <View style={{ flex: 1 }}>
               <View style={styles.splitVideoSection}>
                 <SplitVideoLayer vimeoId={vimeoId} youtubeId={youtubeId} />
-                <VideoWatermark patientName={patientName || ''} height={200} />
               </View>
               <View style={styles.splitMirrorSection}>
                 <MemoSplitCameraView ref={splitCameraRef} onCameraReady={handleSplitCameraReady} />
@@ -1035,7 +1044,6 @@ export default function ExerciseScreen() {
               <View style={styles.videoSection}>
                 <View style={styles.videoPlayerWrapper}>
                   <ExerciseVideoPlayer exercise={exercise} height={220} />
-                  <VideoWatermark patientName={patientName || ''} height={220} />
                 </View>
                 <Animated.View
                   style={[

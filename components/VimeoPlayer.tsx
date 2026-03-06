@@ -66,11 +66,14 @@ function VimeoPlayerInner({ videoId, height, onEnd, lowQuality }: VimeoPlayerPro
     setError(false);
     setVideoUrl(null);
 
-    getVimeoHlsUrl(videoId).then((url) => {
+    log('[VimeoPlayer] Fetching config for videoId:', videoId);
+    void getVimeoHlsUrl(videoId).then((url) => {
       if (cancelled) return;
+      log('[VimeoPlayer] Resolved URL:', url ? 'found' : 'null');
       if (url) {
         setVideoUrl(url);
       } else {
+        log('[VimeoPlayer] No direct URL, will fall back to WebView embed');
         setError(true);
       }
       setLoading(false);
@@ -86,7 +89,7 @@ function VimeoPlayerInner({ videoId, height, onEnd, lowQuality }: VimeoPlayerPro
       <View style={[styles.container, { height }]}>
         <View style={styles.unavailable}>
           <VideoOff size={32} color="#666" />
-          <ScaledText size={14} color="#999" style={styles.unavailableLabel}>Video unavailable</ScaledText>
+          <ScaledText size={14} color="#999" style={styles.unavailableLabel}>{String('Video unavailable')}</ScaledText>
         </View>
       </View>
     );
@@ -166,7 +169,7 @@ function VimeoPlayerInner({ videoId, height, onEnd, lowQuality }: VimeoPlayerPro
     <View style={[styles.container, { height }]}>
       <View style={styles.unavailable}>
         <VideoOff size={32} color="#666" />
-        <ScaledText size={14} color="#999" style={styles.unavailableLabel}>Video unavailable</ScaledText>
+        <ScaledText size={14} color="#999" style={styles.unavailableLabel}>{String('Video unavailable')}</ScaledText>
       </View>
     </View>
   );

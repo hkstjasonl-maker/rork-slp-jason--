@@ -29,6 +29,7 @@ import { SelfRatingModal } from '@/components/SelfRatingModal';
 import { CopyrightFooter } from '@/components/CopyrightFooter';
 import { RestTimer } from '@/components/RestTimer';
 import { VideoWatermark } from '@/components/VideoWatermark';
+import { RecordingWatermark } from '@/components/RecordingWatermark';
 import { supabase } from '@/lib/supabase';
 import { getStarsForSession, calculateStars } from '@/lib/stars';
 import { getExerciseDosage } from '@/lib/dosage';
@@ -104,32 +105,38 @@ const LiveCamera = forwardRef<CameraView, { onCameraReady?: () => void }>(
 LiveCamera.displayName = 'LiveCamera';
 const MemoLiveCamera = memo(LiveCamera, () => true);
 
-function SplitCameraView() {
-  const [permission, requestPermission] = useCameraPermissions();
+const SplitCameraView = forwardRef<CameraView, { onCameraReady?: () => void }>(
+  function SplitCameraViewInner({ onCameraReady }, ref) {
+    const [permission, requestPermission] = useCameraPermissions();
 
-  useEffect(() => {
+    useEffect(() => {
+      if (!permission?.granted) {
+        void requestPermission();
+      }
+    }, [permission?.granted, requestPermission]);
+
     if (!permission?.granted) {
-      void requestPermission();
+      return (
+        <View style={splitCameraStyles.placeholder}>
+          <Camera size={24} color="#666" />
+          <ScaledText size={12} color="#666" style={{ marginTop: 6 }}>{String('Camera permission needed')}</ScaledText>
+        </View>
+      );
     }
-  }, [permission?.granted, requestPermission]);
 
-  if (!permission?.granted) {
     return (
-      <View style={splitCameraStyles.placeholder}>
-        <Camera size={24} color="#666" />
-        <ScaledText size={12} color="#666" style={{ marginTop: 6 }}>{String('Camera permission needed')}</ScaledText>
-      </View>
+      <CameraView
+        ref={ref}
+        style={{ flex: 1 }}
+        facing="front"
+        mode="video"
+        onCameraReady={onCameraReady}
+      />
     );
   }
-
-  return (
-    <CameraView
-      style={{ flex: 1 }}
-      facing="front"
-    />
-  );
-}
-const MemoSplitCameraView = memo(SplitCameraView);
+);
+SplitCameraView.displayName = 'SplitCameraView';
+const MemoSplitCameraView = memo(SplitCameraView, () => true);
 
 const splitCameraStyles = StyleSheet.create({
   placeholder: {
@@ -307,6 +314,10 @@ export default function ExerciseScreen() {
   const [narrativePlaying, setNarrativePlaying] = useState(false);
   const [showRestTimer, setShowRestTimer] = useState(false);
   const [showRestPrompt, setShowRestPrompt] = useState(false);
+  const [countdown, setCountdown] = useState<number | null>(null);
+  const [showProcessing, setShowProcessing] = useState(false);
+  const countdownFade = useRef(new Animated.Value(0)).current;
+  const countdownScale = useRef(new Animated.Value(0.5)).current;
 
   const cameraRef = useRef<CameraView>(null);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -317,6 +328,8 @@ export default function ExerciseScreen() {
 
   const [cameraPermission, requestCameraPermission] = useCameraPermissions();
   const [micPermission, requestMicPermission] = useMicrophonePermissions();
+  const splitCameraRef = useRef<CameraView>(null);
+  const [splitCameraReady, setSplitCameraReady] = useState(false);
 
   const hasCameraPermission = cameraPermission?.granted === true;
 
@@ -608,8 +621,79 @@ export default function ExerciseScreen() {
     setCameraReady(true);
   }, []);
 
+  const runCountdown = useCallback((): Promise<void> => {
+    return new Promise((resolve) => {
+      setCountdown(3);
+      countdownFade.setValue(1);
+      countdownScale.setValue(0.5);
+      Animated.timing(countdownScale, { toValue: 1, duration: 300, useNativeDriver: true }).start();
+      if (Platform.OS !== 'web') void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+
+      const step = (n: number) => {
+        if (n <= 0) {
+          setCountdown(null);
+          resolve();
+          return;
+        }
+        setTimeout(() => {
+          setCountdown(n - 1 > 0 ? n - 1 : null);
+          countdownScale.setValue(0.5);
+          Animated.timing(countdownScale, { toValue: 1, duration: 300, useNativeDriver: true }).start();
+          if (Platform.OS !== 'web') void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+          if (n - 1 > 0) {
+            step(n - 1);
+          } else {
+            setTimeout(resolve, 800);
+          }
+        }, 1000);
+      };
+      step(3);
+    });
+  }, [countdownFade, countdownScale]);
+
+  const activeRecordingRef = useCallback(() => {
+    if (mediaMode === 'split') return splitCameraRef;
+    return cameraRef;
+  }, [mediaMode]);
+
+  const isCameraReadyForRecording = useCallback(() => {
+    if (mediaMode === 'mirror') return cameraReady;
+    if (mediaMode === 'split') return splitCameraReady;
+    return false;
+  }, [mediaMode, cameraReady, splitCameraReady]);
+
+  const handleSplitCameraReady = useCallback(() => {
+    log('[ExerciseScreen] Split camera ready');
+    setSplitCameraReady(true);
+  }, []);
+
+  const saveVideoToLibrary = useCallback(async (uri: string) => {
+    setShowProcessing(true);
+    try {
+      const { status } = await MediaLibrary.requestPermissionsAsync();
+      if (status !== 'granted') {
+        setToastType('error');
+        setToastMessage(t('videoSaveError'));
+        return;
+      }
+      await MediaLibrary.saveToLibraryAsync(uri);
+      setToastType('success');
+      setToastMessage(t('recordingSavedToAlbum'));
+      if (Platform.OS !== 'web') {
+        void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      }
+    } catch (saveError) {
+      log('Error saving video:', saveError);
+      setToastType('error');
+      setToastMessage(t('videoSaveError'));
+    } finally {
+      setShowProcessing(false);
+    }
+  }, [t]);
+
   const handleStartRecording = useCallback(async () => {
-    if (!cameraRef.current || !cameraReady) {
+    const camRef = activeRecordingRef();
+    if (!camRef.current || !isCameraReadyForRecording()) {
       log('Camera not ready for recording');
       return;
     }
@@ -621,48 +705,33 @@ export default function ExerciseScreen() {
       }
     }
     try {
+      await runCountdown();
       log('Starting video recording');
       setIsRecording(true);
       if (Platform.OS !== 'web') {
         void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
       }
-      const video = await cameraRef.current.recordAsync();
+      const video = await camRef.current.recordAsync();
       log('Recording finished, uri:', video?.uri);
       if (video?.uri) {
-        try {
-          const { status } = await MediaLibrary.requestPermissionsAsync();
-          if (status !== 'granted') {
-            setToastType('error');
-            setToastMessage(t('videoSaveError'));
-            return;
-          }
-          await MediaLibrary.saveToLibraryAsync(video.uri);
-          setToastType('success');
-          setToastMessage(t('videoSaved'));
-          if (Platform.OS !== 'web') {
-            void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-          }
-        } catch (saveError) {
-          log('Error saving video:', saveError);
-          setToastType('error');
-          setToastMessage(t('videoSaveError'));
-        }
+        await saveVideoToLibrary(video.uri);
       }
     } catch (error) {
       log('Recording error:', error);
       setIsRecording(false);
     }
-  }, [cameraReady, micPermission, requestMicPermission, t]);
+  }, [activeRecordingRef, isCameraReadyForRecording, micPermission, requestMicPermission, t, runCountdown, saveVideoToLibrary]);
 
   const handleStopRecording = useCallback(() => {
-    if (!cameraRef.current) return;
+    const camRef = activeRecordingRef();
+    if (!camRef.current) return;
     log('Stopping video recording');
     setIsRecording(false);
-    cameraRef.current.stopRecording();
+    camRef.current.stopRecording();
     if (Platform.OS !== 'web') {
       void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     }
-  }, []);
+  }, [activeRecordingRef]);
 
   const handlePlayNarrative = useCallback(() => {
     setNarrativePlaying(true);
@@ -681,6 +750,11 @@ export default function ExerciseScreen() {
   const exercise = exerciseQuery.data;
   const narrativeAudioId = useMemo(
     () => exercise ? getNarrativeAudioId(exercise, language) : null,
+    [exercise, language]
+  );
+
+  const exerciseTitle = useMemo(
+    () => exercise ? getExerciseTitle(exercise, language) : '',
     [exercise, language]
   );
 
@@ -742,12 +816,58 @@ export default function ExerciseScreen() {
                 <VideoWatermark patientName={patientName || ''} height={200} />
               </View>
               <View style={styles.splitMirrorSection}>
-                <MemoSplitCameraView />
+                <MemoSplitCameraView ref={splitCameraRef} onCameraReady={handleSplitCameraReady} />
                 <View style={styles.mirrorBadge}>
                   <ScaledText size={11} weight="600" color={Colors.white}>
                     {t('mirrorMode')}
                   </ScaledText>
                 </View>
+                <RecordingWatermark exerciseName={exerciseTitle} visible={isRecording} />
+                {isRecording && (
+                  <View style={styles.recordingIndicator}>
+                    <Animated.View style={[styles.recordingDot, { opacity: recordPulse }]} />
+                    <ScaledText size={14} weight="700" color={Colors.white}>
+                      {formatElapsed(elapsed)}
+                    </ScaledText>
+                  </View>
+                )}
+                {splitCameraReady && (
+                  <View style={styles.recordButtonContainer}>
+                    <TouchableOpacity
+                      style={[styles.recordButton, isRecording && styles.recordButtonActive]}
+                      onPress={isRecording ? handleStopRecording : handleStartRecording}
+                      activeOpacity={0.7}
+                      testID="split-record-button"
+                      disabled={countdown !== null || showProcessing}
+                    >
+                      {isRecording ? (
+                        <View style={styles.stopIcon} />
+                      ) : (
+                        <View style={styles.recordIcon} />
+                      )}
+                    </TouchableOpacity>
+                    <ScaledText size={11} weight="600" color={Colors.white} style={styles.recordLabel}>
+                      {isRecording ? t('stopRecording') : t('record')}
+                    </ScaledText>
+                  </View>
+                )}
+                {countdown !== null && (
+                  <View style={styles.countdownOverlay}>
+                    <Animated.View style={{ transform: [{ scale: countdownScale }] }}>
+                      <ScaledText size={72} weight="bold" color={Colors.white}>
+                        {String(countdown)}
+                      </ScaledText>
+                    </Animated.View>
+                  </View>
+                )}
+                {showProcessing && (
+                  <View style={styles.countdownOverlay}>
+                    <ActivityIndicator size="large" color={Colors.white} />
+                    <ScaledText size={14} weight="600" color={Colors.white} style={{ marginTop: 8 }}>
+                      {t('processingVideo')}
+                    </ScaledText>
+                  </View>
+                )}
               </View>
             </View>
           )}
@@ -770,6 +890,8 @@ export default function ExerciseScreen() {
                 </ScaledText>
               </View>
 
+              <RecordingWatermark exerciseName={exerciseTitle} visible={isRecording} />
+
               {isRecording && (
                 <View style={styles.recordingIndicator}>
                   <Animated.View style={[styles.recordingDot, { opacity: recordPulse }]} />
@@ -786,6 +908,7 @@ export default function ExerciseScreen() {
                     onPress={isRecording ? handleStopRecording : handleStartRecording}
                     activeOpacity={0.7}
                     testID="record-button"
+                    disabled={countdown !== null || showProcessing}
                   >
                     {isRecording ? (
                       <View style={styles.stopIcon} />
@@ -795,6 +918,25 @@ export default function ExerciseScreen() {
                   </TouchableOpacity>
                   <ScaledText size={11} weight="600" color={Colors.white} style={styles.recordLabel}>
                     {isRecording ? t('stopRecording') : t('record')}
+                  </ScaledText>
+                </View>
+              )}
+
+              {countdown !== null && (
+                <View style={styles.countdownOverlay}>
+                  <Animated.View style={{ transform: [{ scale: countdownScale }] }}>
+                    <ScaledText size={72} weight="bold" color={Colors.white}>
+                      {String(countdown)}
+                    </ScaledText>
+                  </Animated.View>
+                </View>
+              )}
+
+              {showProcessing && (
+                <View style={styles.countdownOverlay}>
+                  <ActivityIndicator size="large" color={Colors.white} />
+                  <ScaledText size={14} weight="600" color={Colors.white} style={{ marginTop: 8 }}>
+                    {t('processingVideo')}
                   </ScaledText>
                 </View>
               )}
@@ -1492,5 +1634,12 @@ const styles = StyleSheet.create({
   restPromptSkipBtn: {
     paddingVertical: 12,
     alignItems: 'center',
+  },
+  countdownOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    zIndex: 30,
   },
 });

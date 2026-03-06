@@ -44,6 +44,7 @@ import {
   getNextAllowedDay,
 } from '@/lib/reviewRequirements';
 import { burnWatermarkIntoVideo } from '@/lib/videoProcessing';
+import { Audio } from 'expo-av';
 import { CameraView, useCameraPermissions, useMicrophonePermissions } from 'expo-camera';
 
 type MediaMode = 'video' | 'split' | 'mirror';
@@ -95,8 +96,8 @@ function getYouTubeId(exercise: Exercise): string | null {
   return exercise.youtube_video_id || null;
 }
 
-const LiveCamera = forwardRef<CameraView, { onCameraReady?: () => void }>(
-  function LiveCamera({ onCameraReady }, ref) {
+const LiveCamera = forwardRef<CameraView, { onCameraReady?: () => void; cameraMode?: 'picture' | 'video' }>(
+  function LiveCamera({ onCameraReady, cameraMode = 'picture' }, ref) {
     return (
       <View style={[StyleSheet.absoluteFill, { transform: [{ scaleX: -1 }] }]}>
         <CameraView
@@ -104,7 +105,7 @@ const LiveCamera = forwardRef<CameraView, { onCameraReady?: () => void }>(
           style={StyleSheet.absoluteFill}
           facing="front"
           mirror={false}
-          mode="video"
+          mode={cameraMode}
           videoQuality="720p"
           onCameraReady={onCameraReady}
         />
@@ -113,7 +114,7 @@ const LiveCamera = forwardRef<CameraView, { onCameraReady?: () => void }>(
   }
 );
 LiveCamera.displayName = 'LiveCamera';
-const MemoLiveCamera = memo(LiveCamera, () => true);
+const MemoLiveCamera = memo(LiveCamera, (prev, next) => prev.cameraMode === next.cameraMode && prev.onCameraReady === next.onCameraReady);
 
 
 
@@ -304,6 +305,7 @@ export default function ExerciseScreen() {
   const [micPermission, requestMicPermission] = useMicrophonePermissions();
   const splitCameraRef = useRef<CameraView>(null);
   const [splitCameraReady, setSplitCameraReady] = useState(false);
+  const [cameraMode, setCameraMode] = useState<'picture' | 'video'>('picture');
 
 
   const hasCameraPermission = cameraPermission?.granted === true;
@@ -364,6 +366,22 @@ export default function ExerciseScreen() {
       setNarrativePlaying(false);
     }
   }, [mediaMode, narrativePlaying]);
+
+  useEffect(() => {
+    const configureAudio = async () => {
+      try {
+        await Audio.setAudioModeAsync({
+          allowsRecordingIOS: false,
+          playsInSilentModeIOS: true,
+          staysActiveInBackground: false,
+          shouldDuckAndroid: true,
+        });
+      } catch (e) {
+        log('[ExerciseScreen] Audio mode config error:', e);
+      }
+    };
+    configureAudio();
+  }, []);
 
 
 
@@ -702,6 +720,8 @@ export default function ExerciseScreen() {
       if (Platform.OS !== 'web') {
         void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       }
+      setCameraMode('picture');
+
       if (reviewRequirement && isTodayAllowed(reviewRequirement.allowed_days) && todaySubmissionCount < reviewRequirement.max_submissions) {
         setTimeout(() => setShowSubmitPrompt(true), 1500);
       }
@@ -728,6 +748,20 @@ export default function ExerciseScreen() {
       }
     }
     try {
+      setCameraMode('video');
+      await new Promise(r => setTimeout(r, 500));
+
+      try {
+        await Audio.setAudioModeAsync({
+          allowsRecordingIOS: true,
+          playsInSilentModeIOS: true,
+          staysActiveInBackground: false,
+          shouldDuckAndroid: true,
+        });
+      } catch (e) {
+        log('[ExerciseScreen] Audio mode switch error:', e);
+      }
+
       await runCountdown();
       log('Starting video recording');
       setIsRecording(true);
@@ -751,6 +785,21 @@ export default function ExerciseScreen() {
     log('Stopping video recording');
     setIsRecording(false);
     camRef.current.stopRecording();
+
+    setTimeout(async () => {
+      setCameraMode('picture');
+      try {
+        await Audio.setAudioModeAsync({
+          allowsRecordingIOS: false,
+          playsInSilentModeIOS: true,
+          staysActiveInBackground: false,
+          shouldDuckAndroid: true,
+        });
+      } catch (e) {
+        log('[ExerciseScreen] Audio mode restore error:', e);
+      }
+    }, 500);
+
     if (Platform.OS !== 'web') {
       void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     }
@@ -900,7 +949,7 @@ export default function ExerciseScreen() {
                     ref={splitCameraRef}
                     style={StyleSheet.absoluteFill}
                     facing="front"
-                    mode="video"
+                    mode={cameraMode}
                     onCameraReady={handleSplitCameraReady}
                   />
                 ) : (
@@ -972,7 +1021,7 @@ export default function ExerciseScreen() {
           {mediaMode === 'mirror' && (
             <View style={styles.cameraVisible}>
               {hasCameraPermission && (
-                <MemoLiveCamera ref={cameraRef} onCameraReady={handleCameraReady} />
+                <MemoLiveCamera ref={cameraRef} onCameraReady={handleCameraReady} cameraMode={cameraMode} />
               )}
 
               {!cameraReady && hasCameraPermission && (

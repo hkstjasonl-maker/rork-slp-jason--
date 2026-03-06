@@ -81,6 +81,23 @@ export async function countTodaySubmissions(requirementId: string): Promise<numb
   }
 }
 
+function detectContentType(uri: string, blobType?: string): string {
+  const lowerUri = uri.toLowerCase();
+  if (lowerUri.endsWith('.mov')) return 'video/quicktime';
+  if (lowerUri.endsWith('.mp4')) return 'video/mp4';
+  if (lowerUri.endsWith('.m4v')) return 'video/x-m4v';
+  if (blobType && blobType !== 'application/octet-stream' && blobType.startsWith('video/')) {
+    return blobType;
+  }
+  return 'video/quicktime';
+}
+
+function getFileExtension(contentType: string): string {
+  if (contentType === 'video/quicktime') return 'mov';
+  if (contentType === 'video/x-m4v') return 'm4v';
+  return 'mp4';
+}
+
 export async function uploadAndSubmitVideo(
   videoUri: string,
   patientId: string,
@@ -91,24 +108,43 @@ export async function uploadAndSubmitVideo(
     const today = getTodayDateString();
     const sanitizedTitle = exerciseTitleEn.replace(/[^a-zA-Z0-9_-]/g, '_').substring(0, 50);
     const timestamp = Date.now();
-    const filePath = `${patientId}/${today}-${sanitizedTitle}-${timestamp}.mp4`;
 
-    log('[ReviewReq] Uploading video to:', filePath);
+    log('[ReviewReq] Starting upload for video URI:', videoUri);
 
     const response = await fetch(videoUri);
+    if (!response.ok) {
+      log('[ReviewReq] Failed to fetch local video file, status:', response.status);
+      return false;
+    }
+
     const blob = await response.blob();
+    log('[ReviewReq] Blob size:', blob.size, 'type:', blob.type);
+
+    if (blob.size === 0) {
+      log('[ReviewReq] Video file is empty (0 bytes), aborting upload');
+      return false;
+    }
+
+    const contentType = detectContentType(videoUri, blob.type);
+    const extension = getFileExtension(contentType);
+    const filePath = `${patientId}/${today}-${sanitizedTitle}-${timestamp}.${extension}`;
+
+    log('[ReviewReq] Uploading to:', filePath, 'contentType:', contentType, 'size:', blob.size);
 
     const { error: uploadError } = await supabase.storage
       .from('review-videos')
       .upload(filePath, blob, {
-        contentType: 'video/mp4',
-        upsert: false,
+        contentType,
+        cacheControl: '3600',
+        upsert: true,
       });
 
     if (uploadError) {
-      log('[ReviewReq] Upload error:', uploadError);
+      log('[ReviewReq] Upload error:', JSON.stringify(uploadError));
       return false;
     }
+
+    log('[ReviewReq] Upload successful');
 
     const { data: urlData } = supabase.storage
       .from('review-videos')
@@ -129,11 +165,11 @@ export async function uploadAndSubmitVideo(
       });
 
     if (insertError) {
-      log('[ReviewReq] Insert error:', insertError);
+      log('[ReviewReq] Insert error:', JSON.stringify(insertError));
       return false;
     }
 
-    log('[ReviewReq] Submission successful');
+    log('[ReviewReq] Submission successful, file:', filePath, 'size:', blob.size, 'contentType:', contentType);
     return true;
   } catch (e) {
     log('[ReviewReq] Submit exception:', e);

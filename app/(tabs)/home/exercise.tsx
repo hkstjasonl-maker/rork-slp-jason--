@@ -144,6 +144,7 @@ function SplitVideoLayerInner({ vimeoId, youtubeId }: { vimeoId: string | null; 
         style={splitVideoStyles.container}
         allowsInlineMediaPlayback={true}
         mediaPlaybackRequiresUserAction={true}
+        allowsAirPlayForMediaPlayback={false}
         javaScriptEnabled={true}
         scrollEnabled={false}
         bounces={false}

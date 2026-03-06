@@ -121,6 +121,44 @@ export interface KnowledgeVideoAssignment {
   knowledge_videos: KnowledgeVideo;
 }
 
+export type NotificationType = 'announcement' | 'festive' | 'poster' | 'video' | 'link';
+
+export interface AppNotification {
+  id: string;
+  title_en: string;
+  title_zh: string;
+  body_en: string;
+  body_zh: string;
+  type: NotificationType;
+  image_url: string | null;
+  video_url: string | null;
+  link_url: string | null;
+  target_type: string;
+  start_date: string;
+  end_date: string;
+  is_active: boolean;
+}
+
+export interface NotificationRecipient {
+  id: string;
+  notification_id: string;
+  patient_id: string;
+  dismissed_date: string | null;
+  read_at: string | null;
+  notifications: AppNotification;
+}
+
+export interface Organisation {
+  id: string;
+  name_en: string;
+  name_zh: string;
+  logo_url: string | null;
+  website_url: string | null;
+  type: 'partner' | 'supporter';
+  sort_order: number;
+  is_active: boolean;
+}
+
 export const FONT_SCALES: Record<FontSizeLevel, number> = {
   small: 0.8,
   medium: 1.0,

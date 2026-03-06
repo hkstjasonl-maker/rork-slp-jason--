@@ -1,6 +1,7 @@
 import React, { useCallback } from 'react';
 import {
   View,
+  Text,
   ScrollView,
   TouchableOpacity,
   StyleSheet,
@@ -23,6 +24,7 @@ import {
   Info,
   ChevronRight,
   Check,
+  Building2,
 } from 'lucide-react-native';
 
 const FONT_SIZE_OPTIONS: { key: FontSizeLevel; labelKey: string }[] = [
@@ -57,7 +59,7 @@ export default function SettingsScreen() {
 
     if (Platform.OS === 'web') {
       if (window.confirm(t('confirmSwitch'))) {
-        doSwitch();
+        void doSwitch();
       }
     } else {
       Alert.alert(
@@ -163,6 +165,22 @@ export default function SettingsScreen() {
           </View>
 
           <View style={styles.section}>
+            <TouchableOpacity
+              style={styles.actionCard}
+              onPress={() => router.push('/partners')}
+              activeOpacity={0.7}
+            >
+              <Building2 size={20} color={Colors.primary} />
+              <View style={styles.actionContent}>
+                <ScaledText size={15} weight="600" color={Colors.textPrimary}>
+                  {t('partnersTitle')}
+                </ScaledText>
+              </View>
+              <ChevronRight size={18} color={Colors.disabled} />
+            </TouchableOpacity>
+          </View>
+
+          <View style={styles.section}>
             <View style={styles.therapistCard}>
               <Image source={JASON_PHOTO} style={styles.therapistPhoto} />
               <View style={styles.therapistInfo}>
@@ -182,9 +200,9 @@ export default function SettingsScreen() {
           <View style={styles.section}>
             <View style={styles.infoCard}>
               <Info size={18} color={Colors.textSecondary} />
-              <ScaledText size={14} color={Colors.textSecondary}>
-                {t('appVersion')}: 1.0.0
-              </ScaledText>
+              <Text style={styles.versionText}>
+                {t('appVersion') + ': 1.0.0'}
+              </Text>
             </View>
           </View>
 
@@ -285,5 +303,9 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 10,
     paddingVertical: 8,
+  },
+  versionText: {
+    fontSize: 14,
+    color: Colors.textSecondary,
   },
 });

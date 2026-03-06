@@ -3,12 +3,13 @@ import { Stack } from "expo-router";
 import * as SplashScreen from "expo-splash-screen";
 import React, { useEffect } from "react";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
-import { AppProvider } from "@/contexts/AppContext";
+import { AppProvider, useApp } from "@/contexts/AppContext";
 import { ScreenProtection } from "@/components/ScreenProtection";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { NetworkErrorBanner } from "@/components/NetworkErrorBanner";
+import { NotificationPopup } from "@/components/NotificationPopup";
 
-SplashScreen.preventAutoHideAsync();
+void SplashScreen.preventAutoHideAsync();
 
 const queryClient = new QueryClient();
 
@@ -22,13 +23,24 @@ function RootLayoutNav() {
       <Stack.Screen name="(tabs)" />
       <Stack.Screen name="questionnaire" options={{ headerShown: false, presentation: 'card' }} />
       <Stack.Screen name="clinical-assessment" options={{ headerShown: false, presentation: 'card' }} />
+      <Stack.Screen name="partners" options={{ headerShown: false, presentation: 'card' }} />
     </Stack>
+  );
+}
+
+function NotificationLayer({ children }: { children: React.ReactNode }) {
+  const { patientId } = useApp();
+  return (
+    <>
+      {children}
+      <NotificationPopup patientId={patientId} />
+    </>
   );
 }
 
 export default function RootLayout() {
   useEffect(() => {
-    SplashScreen.hideAsync();
+    void SplashScreen.hideAsync();
   }, []);
 
   return (
@@ -38,7 +50,9 @@ export default function RootLayout() {
           <NetworkErrorBanner />
           <ScreenProtection>
             <ErrorBoundary>
-              <RootLayoutNav />
+              <NotificationLayer>
+                <RootLayoutNav />
+              </NotificationLayer>
             </ErrorBoundary>
           </ScreenProtection>
         </AppProvider>

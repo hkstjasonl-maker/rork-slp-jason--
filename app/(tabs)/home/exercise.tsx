@@ -142,8 +142,7 @@ function SplitVideoLayerInner({ vimeoId, youtubeId }: { vimeoId: string | null; 
         javaScriptEnabled={true}
         scrollEnabled={false}
         bounces={false}
-        androidLayerType="software"
-        androidHardwareAccelerationDisabled={true}
+        androidLayerType="hardware"
       />
     );
   }
@@ -302,9 +301,7 @@ export default function ExerciseScreen() {
   const [micPermission, requestMicPermission] = useMicrophonePermissions();
   const splitCameraRef = useRef<CameraView>(null);
   const [splitCameraReady, setSplitCameraReady] = useState(false);
-  const [snapshotUri, setSnapshotUri] = useState<string | null>(null);
-  const snapshotMounted = useRef(true);
-  const snapshotCapturing = useRef(false);
+
 
   const hasCameraPermission = cameraPermission?.granted === true;
 
@@ -365,46 +362,7 @@ export default function ExerciseScreen() {
     }
   }, [mediaMode, narrativePlaying]);
 
-  useEffect(() => {
-    if (mediaMode !== 'split' || !splitCameraReady) {
-      snapshotMounted.current = false;
-      return;
-    }
-    snapshotMounted.current = true;
-    snapshotCapturing.current = false;
 
-    const captureLoop = async () => {
-      await new Promise<void>((r) => setTimeout(r, 500));
-      while (snapshotMounted.current) {
-        if (!splitCameraRef.current || snapshotCapturing.current) {
-          await new Promise<void>((r) => setTimeout(r, 50));
-          continue;
-        }
-        snapshotCapturing.current = true;
-        try {
-          const photo = await splitCameraRef.current.takePictureAsync({
-            quality: 0.1,
-            skipProcessing: true,
-            imageType: 'jpg',
-            exif: false,
-            shutterSound: false,
-          });
-          if (snapshotMounted.current && photo?.uri) {
-            setSnapshotUri(photo.uri);
-          }
-        } catch (e) {
-          log('[SplitSnapshot] capture error:', e);
-          await new Promise<void>((r) => setTimeout(r, 100));
-        }
-        snapshotCapturing.current = false;
-      }
-    };
-    void captureLoop();
-
-    return () => {
-      snapshotMounted.current = false;
-    };
-  }, [mediaMode, splitCameraReady]);
 
   useEffect(() => {
     if (toastMessage) {
@@ -916,15 +874,16 @@ export default function ExerciseScreen() {
                 <SplitVideoLayer vimeoId={vimeoId} youtubeId={youtubeId} />
               </View>
               <View style={styles.splitMirrorSection}>
-                {snapshotUri ? (
-                  <Image
-                    source={{ uri: snapshotUri }}
-                    style={[StyleSheet.absoluteFill, { transform: [{ scaleX: -1 }] }]}
-                    resizeMode="cover"
-                    fadeDuration={0}
-                  />
-                ) : (
-                  <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
+                <CameraView
+                  ref={splitCameraRef}
+                  style={[StyleSheet.absoluteFill, { transform: [{ scaleX: -1 }] }]}
+                  facing="front"
+                  mirror={true}
+                  mode="video"
+                  onCameraReady={handleSplitCameraReady}
+                />
+                {!splitCameraReady && (
+                  <View style={{ ...StyleSheet.absoluteFillObject, justifyContent: 'center', alignItems: 'center', backgroundColor: 'rgba(0,0,0,0.6)' }}>
                     <ActivityIndicator color={Colors.primary} />
                   </View>
                 )}
@@ -980,14 +939,7 @@ export default function ExerciseScreen() {
                   </View>
                 )}
               </View>
-              {hasCameraPermission && (
-                <CameraView
-                  ref={splitCameraRef}
-                  style={{ position: 'absolute', width: 1, height: 1, opacity: 0 }}
-                  facing="front"
-                  onCameraReady={handleSplitCameraReady}
-                />
-              )}
+
             </View>
           )}
 

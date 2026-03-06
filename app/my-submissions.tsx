@@ -9,7 +9,7 @@ import {
   RefreshControl,
   Linking,
 } from 'react-native';
-import { useRouter } from 'expo-router';
+import { useRouter, useFocusEffect } from 'expo-router';
 import { useQuery } from '@tanstack/react-query';
 import { ArrowLeft, Video, Clock, Star, AlertTriangle, CheckCircle2, MessageSquare } from 'lucide-react-native';
 import { useApp } from '@/contexts/AppContext';
@@ -81,7 +81,16 @@ export default function MySubmissionsScreen() {
       return fetchPatientSubmissions(patientId);
     },
     enabled: !!patientId,
+    staleTime: 0,
+    refetchOnMount: 'always' as const,
   });
+
+  useFocusEffect(
+    React.useCallback(() => {
+      void submissionsQuery.refetch();
+      // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [])
+  );
 
   const submissions = submissionsQuery.data || [];
 

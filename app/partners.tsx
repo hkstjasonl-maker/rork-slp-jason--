@@ -146,7 +146,7 @@ export default function PartnersScreen() {
             <View style={styles.section}>
               <View style={styles.sectionHeader}>
                 <View style={styles.sectionDot} />
-                <ScaledText size={16} weight="bold" color={Colors.textPrimary}>
+                <ScaledText size={18} weight="bold" color={Colors.textPrimary}>
                   {t('partneringOrganisations')}
                 </ScaledText>
               </View>
@@ -160,7 +160,7 @@ export default function PartnersScreen() {
             <View style={styles.section}>
               <View style={styles.sectionHeader}>
                 <View style={[styles.sectionDot, styles.sectionDotSecondary]} />
-                <ScaledText size={16} weight="bold" color={Colors.textPrimary}>
+                <ScaledText size={18} weight="bold" color={Colors.textPrimary}>
                   {t('supportingOrganisations')}
                 </ScaledText>
               </View>
@@ -230,7 +230,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 10,
-    marginBottom: 14,
+    marginBottom: 16,
   },
   sectionDot: {
     width: 8,
@@ -251,12 +251,17 @@ const styles = StyleSheet.create({
     borderRadius: 16,
     borderWidth: 1,
     borderColor: Colors.border,
-    padding: 14,
-    gap: 14,
+    padding: 18,
+    gap: 18,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 8,
+    elevation: 2,
   },
   orgLogoContainer: {
-    width: 72,
-    height: 72,
+    width: 80,
+    height: 80,
     borderRadius: 14,
     backgroundColor: Colors.background,
     justifyContent: 'center',
@@ -264,12 +269,12 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
   },
   orgLogo: {
-    width: 64,
-    height: 64,
-  },
-  orgLogoPlaceholder: {
     width: 72,
     height: 72,
+  },
+  orgLogoPlaceholder: {
+    width: 80,
+    height: 80,
     borderRadius: 14,
     backgroundColor: Colors.primaryLight,
     justifyContent: 'center',
@@ -285,8 +290,8 @@ const styles = StyleSheet.create({
     color: Colors.primary,
   },
   orgName: {
-    fontSize: 15,
-    fontWeight: '600' as const,
+    fontSize: 17,
+    fontWeight: '700' as const,
     color: Colors.textPrimary,
   },
   websiteRow: {

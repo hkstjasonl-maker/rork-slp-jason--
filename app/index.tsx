@@ -114,20 +114,25 @@ export default function IndexScreen() {
               </Text>
               <View style={styles.orgLogosRow}>
                 {partners.map(org => (
-                  <View key={org.id} style={styles.orgLogoWrapper}>
-                    {org.logo_url ? (
-                      <Image
-                        source={{ uri: org.logo_url }}
-                        style={styles.orgLogo}
-                        resizeMode="contain"
-                      />
-                    ) : (
-                      <View style={styles.orgLogoPlaceholder}>
-                        <Text style={styles.orgInitial}>
-                          {(isZh ? (org.name_zh || org.name_en) : org.name_en)[0]}
-                        </Text>
-                      </View>
-                    )}
+                  <View key={org.id} style={styles.orgItemWithName}>
+                    <View style={styles.orgLogoWrapper}>
+                      {org.logo_url ? (
+                        <Image
+                          source={{ uri: org.logo_url }}
+                          style={styles.orgLogo}
+                          resizeMode="contain"
+                        />
+                      ) : (
+                        <View style={styles.orgLogoPlaceholder}>
+                          <Text style={styles.orgInitial}>
+                            {(isZh ? (org.name_zh || org.name_en) : org.name_en)[0]}
+                          </Text>
+                        </View>
+                      )}
+                    </View>
+                    <Text style={styles.orgNameSplash} numberOfLines={2}>
+                      {isZh ? (org.name_zh || org.name_en) : org.name_en}
+                    </Text>
                   </View>
                 ))}
               </View>
@@ -141,20 +146,25 @@ export default function IndexScreen() {
               </Text>
               <View style={styles.orgLogosRow}>
                 {supporters.map(org => (
-                  <View key={org.id} style={styles.orgLogoWrapperSmall}>
-                    {org.logo_url ? (
-                      <Image
-                        source={{ uri: org.logo_url }}
-                        style={styles.orgLogoSmall}
-                        resizeMode="contain"
-                      />
-                    ) : (
-                      <View style={styles.orgLogoPlaceholderSmall}>
-                        <Text style={styles.orgInitialSmall}>
-                          {(isZh ? (org.name_zh || org.name_en) : org.name_en)[0]}
-                        </Text>
-                      </View>
-                    )}
+                  <View key={org.id} style={styles.orgItemWithNameSmall}>
+                    <View style={styles.orgLogoWrapperSmall}>
+                      {org.logo_url ? (
+                        <Image
+                          source={{ uri: org.logo_url }}
+                          style={styles.orgLogoSmall}
+                          resizeMode="contain"
+                        />
+                      ) : (
+                        <View style={styles.orgLogoPlaceholderSmall}>
+                          <Text style={styles.orgInitialSmall}>
+                            {(isZh ? (org.name_zh || org.name_en) : org.name_en)[0]}
+                          </Text>
+                        </View>
+                      )}
+                    </View>
+                    <Text style={styles.orgNameSplash} numberOfLines={2}>
+                      {isZh ? (org.name_zh || org.name_en) : org.name_en}
+                    </Text>
                   </View>
                 ))}
               </View>
@@ -216,25 +226,34 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   orgSectionSpacing: {
-    marginTop: 14,
+    marginTop: 20,
   },
   orgLabel: {
-    fontSize: 11,
-    color: Colors.disabled,
+    fontSize: 14,
+    fontWeight: '700' as const,
+    color: '#666',
     letterSpacing: 0.5,
-    marginBottom: 8,
-    textTransform: 'uppercase' as const,
+    marginBottom: 12,
   },
   orgLogosRow: {
     flexDirection: 'row',
     flexWrap: 'wrap',
     justifyContent: 'center',
-    gap: 12,
+    gap: 20,
+    paddingHorizontal: 20,
+  },
+  orgItemWithName: {
+    alignItems: 'center',
+    width: 120,
+  },
+  orgItemWithNameSmall: {
+    alignItems: 'center',
+    width: 120,
   },
   orgLogoWrapper: {
-    width: 60,
-    height: 60,
-    borderRadius: 12,
+    width: 90,
+    height: 90,
+    borderRadius: 16,
     backgroundColor: Colors.card,
     justifyContent: 'center',
     alignItems: 'center',
@@ -246,26 +265,26 @@ const styles = StyleSheet.create({
     elevation: 2,
   },
   orgLogo: {
-    width: 52,
-    height: 52,
+    width: 78,
+    height: 78,
   },
   orgLogoPlaceholder: {
-    width: 60,
-    height: 60,
-    borderRadius: 12,
+    width: 90,
+    height: 90,
+    borderRadius: 16,
     backgroundColor: Colors.primaryLight,
     justifyContent: 'center',
     alignItems: 'center',
   },
   orgInitial: {
-    fontSize: 22,
+    fontSize: 30,
     fontWeight: 'bold' as const,
     color: Colors.primary,
   },
   orgLogoWrapperSmall: {
-    width: 50,
-    height: 50,
-    borderRadius: 10,
+    width: 80,
+    height: 80,
+    borderRadius: 14,
     backgroundColor: Colors.card,
     justifyContent: 'center',
     alignItems: 'center',
@@ -277,20 +296,27 @@ const styles = StyleSheet.create({
     elevation: 2,
   },
   orgLogoSmall: {
-    width: 42,
-    height: 42,
+    width: 68,
+    height: 68,
   },
   orgLogoPlaceholderSmall: {
-    width: 50,
-    height: 50,
-    borderRadius: 10,
+    width: 80,
+    height: 80,
+    borderRadius: 14,
     backgroundColor: Colors.primaryLight,
     justifyContent: 'center',
     alignItems: 'center',
   },
   orgInitialSmall: {
-    fontSize: 18,
+    fontSize: 26,
     fontWeight: 'bold' as const,
     color: Colors.primary,
+  },
+  orgNameSplash: {
+    fontSize: 11,
+    fontWeight: '600' as const,
+    color: '#555',
+    marginTop: 6,
+    textAlign: 'center',
   },
 });

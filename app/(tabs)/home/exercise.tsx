@@ -97,14 +97,16 @@ function getYouTubeId(exercise: Exercise): string | null {
 const LiveCamera = forwardRef<CameraView, { onCameraReady?: () => void }>(
   function LiveCamera({ onCameraReady }, ref) {
     return (
-      <CameraView
-        ref={ref}
-        style={StyleSheet.absoluteFill}
-        facing="front"
-        mirror={true}
-        mode="video"
-        onCameraReady={onCameraReady}
-      />
+      <View style={[StyleSheet.absoluteFill, { transform: [{ scaleX: -1 }] }]}>
+        <CameraView
+          ref={ref}
+          style={StyleSheet.absoluteFill}
+          facing="front"
+          mirror={false}
+          mode="video"
+          onCameraReady={onCameraReady}
+        />
+      </View>
     );
   }
 );
@@ -874,14 +876,16 @@ export default function ExerciseScreen() {
                 <SplitVideoLayer vimeoId={vimeoId} youtubeId={youtubeId} />
               </View>
               <View style={styles.splitMirrorSection}>
-                <CameraView
-                  ref={splitCameraRef}
-                  style={[StyleSheet.absoluteFill, { transform: [{ scaleX: -1 }] }]}
-                  facing="front"
-                  mirror={true}
-                  mode="video"
-                  onCameraReady={handleSplitCameraReady}
-                />
+                <View style={[StyleSheet.absoluteFill, { transform: [{ scaleX: -1 }] }]}>
+                  <CameraView
+                    ref={splitCameraRef}
+                    style={StyleSheet.absoluteFill}
+                    facing="front"
+                    mirror={false}
+                    mode="video"
+                    onCameraReady={handleSplitCameraReady}
+                  />
+                </View>
                 {!splitCameraReady && (
                   <View style={{ ...StyleSheet.absoluteFillObject, justifyContent: 'center', alignItems: 'center', backgroundColor: 'rgba(0,0,0,0.6)' }}>
                     <ActivityIndicator color={Colors.primary} />

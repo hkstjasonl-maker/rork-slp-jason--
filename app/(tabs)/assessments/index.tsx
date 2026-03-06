@@ -152,20 +152,25 @@ export default function AssessmentsScreen() {
   const questionnaireQuery = useQuery({
     queryKey: ['assessments', 'all', patientId],
     queryFn: async () => {
-      log('[Assessments] Fetching all questionnaire assignments for:', patientId);
-      const { data, error } = await supabase
-        .from('questionnaire_assignments')
-        .select('*,questionnaire_templates(name,description_en,description_zh_hant,description_zh_hans)')
-        .eq('patient_id', patientId!)
-        .order('assigned_date', { ascending: false })
-        .limit(100);
+      try {
+        log('[Assessments] Fetching all questionnaire assignments for:', patientId);
+        const { data, error } = await supabase
+          .from('questionnaire_assignments')
+          .select('*,questionnaire_templates(name,description_en,description_zh_hant,description_zh_hans)')
+          .eq('patient_id', patientId!)
+          .order('assigned_date', { ascending: false })
+          .limit(100);
 
-      if (error) {
-        log('[Assessments] Questionnaire fetch error:', error);
-        throw error;
+        if (error) {
+          log('[Assessments] Questionnaire fetch error:', error);
+          return [];
+        }
+        log('[Assessments] Questionnaire assignments:', data?.length, 'statuses:', data?.map(d => d.status));
+        return (data || []) as QuestionnaireAssignment[];
+      } catch (e) {
+        log('[Assessments] Questionnaire exception:', e);
+        return [];
       }
-      log('[Assessments] Questionnaire assignments:', data?.length, 'statuses:', data?.map(d => d.status));
-      return (data || []) as QuestionnaireAssignment[];
     },
     enabled: !!patientId,
     staleTime: 2 * 60 * 1000,
@@ -174,20 +179,25 @@ export default function AssessmentsScreen() {
   const clinicalQuery = useQuery({
     queryKey: ['clinical_assessments', 'all', patientId],
     queryFn: async () => {
-      log('[Assessments] Fetching all clinical assessments for:', patientId);
-      const { data, error } = await supabase
-        .from('assessment_submissions')
-        .select('*, assessment_library(id, name_en, name_zh, description_en, description_zh, type, key, reference)')
-        .eq('patient_id', patientId!)
-        .order('created_at', { ascending: false })
-        .limit(100);
+      try {
+        log('[Assessments] Fetching all clinical assessments for:', patientId);
+        const { data, error } = await supabase
+          .from('assessment_submissions')
+          .select('*, assessment_library(id, name_en, name_zh, description_en, description_zh, type, key, reference)')
+          .eq('patient_id', patientId!)
+          .order('created_at', { ascending: false })
+          .limit(100);
 
-      if (error) {
-        log('[Assessments] Clinical fetch error:', error);
-        throw error;
+        if (error) {
+          log('[Assessments] Clinical fetch error:', error);
+          return [];
+        }
+        log('[Assessments] Clinical assessments:', data?.length, 'statuses:', data?.map(d => d.status));
+        return (data || []) as ClinicalAssessmentSubmission[];
+      } catch (e) {
+        log('[Assessments] Clinical exception:', e);
+        return [];
       }
-      log('[Assessments] Clinical assessments:', data?.length, 'statuses:', data?.map(d => d.status));
-      return (data || []) as ClinicalAssessmentSubmission[];
     },
     enabled: !!patientId,
     staleTime: 2 * 60 * 1000,

@@ -24,6 +24,7 @@ function RootLayoutNav() {
       <Stack.Screen name="questionnaire" options={{ headerShown: false, presentation: 'card' }} />
       <Stack.Screen name="clinical-assessment" options={{ headerShown: false, presentation: 'card' }} />
       <Stack.Screen name="partners" options={{ headerShown: false, presentation: 'card' }} />
+      <Stack.Screen name="my-submissions" options={{ headerShown: false, presentation: 'card' }} />
     </Stack>
   );
 }

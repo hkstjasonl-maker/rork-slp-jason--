@@ -34,8 +34,15 @@ import { getStarsForSession, calculateStars } from '@/lib/stars';
 import { getExerciseDosage } from '@/lib/dosage';
 import Colors from '@/constants/colors';
 import { JASON_CARTOON } from '@/constants/images';
-import { Exercise, ExerciseLog, Language } from '@/types';
+import { Exercise, ExerciseLog, Language, ExerciseReviewRequirement } from '@/types';
 import { log } from '@/lib/logger';
+import {
+  fetchReviewRequirement,
+  countTodaySubmissions,
+  uploadAndSubmitVideo,
+  isTodayAllowed,
+  getNextAllowedDay,
+} from '@/lib/reviewRequirements';
 import { CameraView, useCameraPermissions, useMicrophonePermissions } from 'expo-camera';
 
 type MediaMode = 'video' | 'split' | 'mirror';
@@ -315,6 +322,12 @@ export default function ExerciseScreen() {
   const [showRestPrompt, setShowRestPrompt] = useState(false);
   const [countdown, setCountdown] = useState<number | null>(null);
   const [showProcessing, setShowProcessing] = useState(false);
+  const [reviewRequirement, setReviewRequirement] = useState<ExerciseReviewRequirement | null>(null);
+  const [todaySubmissionCount, setTodaySubmissionCount] = useState<number>(0);
+  const [_showSubmitPrompt, setShowSubmitPrompt] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [lastRecordedUri, setLastRecordedUri] = useState<string | null>(null);
+  const [submissionSuccess, setSubmissionSuccess] = useState(false);
   const countdownFade = useRef(new Animated.Value(0)).current;
   const countdownScale = useRef(new Animated.Value(0.5)).current;
 
@@ -420,6 +433,19 @@ export default function ExerciseScreen() {
       }));
     }
   }, [exerciseQuery.data]);
+
+  useEffect(() => {
+    if (!patientId || !exerciseQuery.data) return;
+    const checkReviewReq = async () => {
+      const req = await fetchReviewRequirement(patientId, exerciseQuery.data!.title_en);
+      setReviewRequirement(req);
+      if (req) {
+        const count = await countTodaySubmissions(req.id);
+        setTodaySubmissionCount(count);
+      }
+    };
+    void checkReviewReq();
+  }, [patientId, exerciseQuery.data]);
 
   const programQuery = useQuery({
     queryKey: ['program', patientId],
@@ -687,10 +713,14 @@ export default function ExerciseScreen() {
         return;
       }
       await MediaLibrary.saveToLibraryAsync(uri);
+      setLastRecordedUri(uri);
       setToastType('success');
       setToastMessage(t('recordingSavedToAlbum'));
       if (Platform.OS !== 'web') {
         void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      }
+      if (reviewRequirement && isTodayAllowed(reviewRequirement.allowed_days) && todaySubmissionCount < reviewRequirement.max_submissions) {
+        setTimeout(() => setShowSubmitPrompt(true), 1500);
       }
     } catch (saveError) {
       log('Error saving video:', saveError);
@@ -699,7 +729,7 @@ export default function ExerciseScreen() {
     } finally {
       setShowProcessing(false);
     }
-  }, [t]);
+  }, [t, reviewRequirement, todaySubmissionCount]);
 
   const handleStartRecording = useCallback(async () => {
     const camRef = activeRecordingRef();
@@ -758,6 +788,63 @@ export default function ExerciseScreen() {
   }, []);
 
   const exercise = exerciseQuery.data;
+
+  const canSubmitVideo = useMemo(() => {
+    if (!reviewRequirement) return false;
+    if (!isTodayAllowed(reviewRequirement.allowed_days)) return false;
+    if (todaySubmissionCount >= reviewRequirement.max_submissions) return false;
+    return true;
+  }, [reviewRequirement, todaySubmissionCount]);
+
+  const submissionStatusText = useMemo(() => {
+    if (!reviewRequirement) return null;
+    if (todaySubmissionCount > 0 && todaySubmissionCount >= reviewRequirement.max_submissions) {
+      return t('maxSubmissionsReached');
+    }
+    if (!isTodayAllowed(reviewRequirement.allowed_days)) {
+      const nextDay = getNextAllowedDay(reviewRequirement.allowed_days);
+      return nextDay ? `${t('nextSubmission')}${t(nextDay)}` : null;
+    }
+    if (todaySubmissionCount > 0) {
+      return t('submittedToday');
+    }
+    return t('videoRequired');
+  }, [reviewRequirement, todaySubmissionCount, t]);
+
+  const handleSubmitVideo = useCallback(async () => {
+    if (!lastRecordedUri || !patientId || !reviewRequirement || !exercise) return;
+    setIsSubmitting(true);
+    try {
+      const success = await uploadAndSubmitVideo(
+        lastRecordedUri,
+        patientId,
+        reviewRequirement.id,
+        exercise.title_en
+      );
+      if (success) {
+        setSubmissionSuccess(true);
+        setTodaySubmissionCount((prev) => prev + 1);
+        setShowSubmitPrompt(false);
+        setToastType('success');
+        setToastMessage(t('videoSubmitted'));
+        if (Platform.OS !== 'web') {
+          void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+        }
+        void queryClient.invalidateQueries({ queryKey: ['reviewRequirements'] });
+        void queryClient.invalidateQueries({ queryKey: ['videoSubmissions'] });
+        void queryClient.invalidateQueries({ queryKey: ['todaySubmissions'] });
+      } else {
+        setToastType('error');
+        setToastMessage(t('submissionFailed'));
+      }
+    } catch (e) {
+      log('[ReviewSubmit] Error:', e);
+      setToastType('error');
+      setToastMessage(t('submissionFailed'));
+    } finally {
+      setIsSubmitting(false);
+    }
+  }, [lastRecordedUri, patientId, reviewRequirement, exercise, t, queryClient]);
   const narrativeAudioId = useMemo(
     () => exercise ? getNarrativeAudioId(exercise, language) : null,
     [exercise, language]
@@ -1157,6 +1244,43 @@ export default function ExerciseScreen() {
                 <ScaledText size={13} color={Colors.success} style={styles.completedHint}>
                   {t('alreadyCompletedHint')}
                 </ScaledText>
+              )}
+
+              {reviewRequirement && canSubmitVideo && lastRecordedUri && !submissionSuccess && (
+                <TouchableOpacity
+                  style={styles.submitReviewButton}
+                  onPress={handleSubmitVideo}
+                  disabled={isSubmitting}
+                  activeOpacity={0.8}
+                  testID="submit-review-button"
+                >
+                  {isSubmitting ? (
+                    <ActivityIndicator color={Colors.white} />
+                  ) : (
+                    <>
+                      <Camera size={20} color={Colors.white} />
+                      <ScaledText size={15} weight="600" color={Colors.white}>
+                        {t('submitVideoForReview')}
+                      </ScaledText>
+                    </>
+                  )}
+                </TouchableOpacity>
+              )}
+
+              {submissionSuccess && (
+                <View style={styles.submissionSuccessBanner}>
+                  <ScaledText size={14} weight="600" color={Colors.success}>
+                    {t('videoSubmitted')}
+                  </ScaledText>
+                </View>
+              )}
+
+              {submissionStatusText && (
+                <View style={styles.submissionStatusBanner}>
+                  <ScaledText size={13} color={Colors.textSecondary}>
+                    {submissionStatusText || ''}
+                  </ScaledText>
+                </View>
               )}
 
               <CopyrightFooter />
@@ -1649,5 +1773,41 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     backgroundColor: 'rgba(0,0,0,0.5)',
     zIndex: 30,
+  },
+  submitReviewButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    marginHorizontal: 20,
+    marginBottom: 12,
+    paddingVertical: 14,
+    borderRadius: 14,
+    backgroundColor: '#2563EB',
+    shadowColor: '#2563EB',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.25,
+    shadowRadius: 10,
+    elevation: 5,
+  },
+  submissionSuccessBanner: {
+    marginHorizontal: 20,
+    marginBottom: 12,
+    paddingVertical: 10,
+    paddingHorizontal: 16,
+    borderRadius: 12,
+    backgroundColor: Colors.successLight,
+    alignItems: 'center',
+  },
+  submissionStatusBanner: {
+    marginHorizontal: 20,
+    marginBottom: 12,
+    paddingVertical: 8,
+    paddingHorizontal: 14,
+    borderRadius: 10,
+    backgroundColor: Colors.card,
+    borderWidth: 1,
+    borderColor: Colors.border,
+    alignItems: 'center',
   },
 });

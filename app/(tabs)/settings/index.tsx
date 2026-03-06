@@ -25,6 +25,7 @@ import {
   ChevronRight,
   Check,
   Building2,
+  Video,
 } from 'lucide-react-native';
 
 const FONT_SIZE_OPTIONS: { key: FontSizeLevel; labelKey: string }[] = [
@@ -158,6 +159,22 @@ export default function SettingsScreen() {
                 </ScaledText>
                 <ScaledText size={13} color={Colors.textSecondary}>
                   {t('reEnterCodeDesc')}
+                </ScaledText>
+              </View>
+              <ChevronRight size={18} color={Colors.disabled} />
+            </TouchableOpacity>
+          </View>
+
+          <View style={styles.section}>
+            <TouchableOpacity
+              style={styles.actionCard}
+              onPress={() => router.push('/my-submissions')}
+              activeOpacity={0.7}
+            >
+              <Video size={20} color="#2563EB" />
+              <View style={styles.actionContent}>
+                <ScaledText size={15} weight="600" color={Colors.textPrimary}>
+                  {t('mySubmissions')}
                 </ScaledText>
               </View>
               <ChevronRight size={18} color={Colors.disabled} />

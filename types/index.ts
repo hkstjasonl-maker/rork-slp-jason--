@@ -153,6 +153,35 @@ export interface NotificationRecipient {
   notifications: AppNotification;
 }
 
+export interface ExerciseReviewRequirement {
+  id: string;
+  program_id: string;
+  exercise_title_en: string;
+  patient_id: string;
+  max_submissions: number;
+  allowed_days: string[];
+  is_active: boolean;
+  notes: string | null;
+  created_at?: string;
+}
+
+export type ReviewStatus = 'pending' | 'reviewed' | 'redo_requested';
+
+export interface ExerciseVideoSubmission {
+  id: string;
+  requirement_id: string;
+  patient_id: string;
+  exercise_title_en: string;
+  video_url: string;
+  submission_date: string;
+  review_status: ReviewStatus;
+  reviewer_notes: string | null;
+  rating: number | null;
+  reviewed_at: string | null;
+  created_at?: string;
+  exercise_review_requirements?: ExerciseReviewRequirement;
+}
+
 export interface Organisation {
   id: string;
   name_en: string;

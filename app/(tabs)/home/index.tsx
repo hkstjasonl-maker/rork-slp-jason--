@@ -1,4 +1,4 @@
-import React, { useMemo, useCallback, useState } from 'react';
+import React, { useMemo, useCallback, useState, useEffect } from 'react';
 import {
   View,
   ScrollView,
@@ -17,9 +17,15 @@ import { CopyrightFooter } from '@/components/CopyrightFooter';
 import { supabase } from '@/lib/supabase';
 import Colors from '@/constants/colors';
 import { JASON_CARTOON } from '@/constants/images';
-import { Exercise, ExerciseProgram, ExerciseLog, Language } from '@/types';
+import { Exercise, ExerciseProgram, ExerciseLog, Language, ExerciseReviewRequirement } from '@/types';
 import { getDosageProgressText, getExerciseDosage } from '@/lib/dosage';
 import { log } from '@/lib/logger';
+import {
+  fetchAllReviewRequirements,
+  fetchTodaySubmissionsForExercises,
+  isTodayAllowed,
+  getNextAllowedDay,
+} from '@/lib/reviewRequirements';
 import { calculateStars, getStarsForSession } from '@/lib/stars';
 import {
   Play,
@@ -83,6 +89,8 @@ function CategorySection({
   onExercisePress,
   onDoAllInCategory,
   isExpired,
+  reviewRequirements,
+  todaySubmissions,
 }: {
   group: CategoryGroup;
   todayCounts: Record<string, number>;
@@ -91,6 +99,8 @@ function CategorySection({
   onExercisePress: (id: string) => void;
   onDoAllInCategory: (ids: string[]) => void;
   isExpired: boolean;
+  reviewRequirements: ExerciseReviewRequirement[];
+  todaySubmissions: Record<string, number>;
 }) {
   const [expanded, setExpanded] = useState<boolean>(true);
   const icon = getCategoryIcon(group.category);
@@ -185,6 +195,40 @@ function CategorySection({
                       </ScaledText>
                     </View>
                   </View>
+                  {(() => {
+                    const req = reviewRequirements.find(r => r.exercise_title_en === exercise.title_en);
+                    if (!req) return null;
+                    const subCount = todaySubmissions[exercise.title_en] || 0;
+                    if (subCount > 0 && subCount >= req.max_submissions) {
+                      return (
+                        <View style={styles.reviewBadgeSubmitted}>
+                          <ScaledText size={11} weight="600" color={Colors.success}>
+                            {t('submittedToday')}
+                          </ScaledText>
+                        </View>
+                      );
+                    }
+                    if (isTodayAllowed(req.allowed_days)) {
+                      return (
+                        <View style={styles.reviewBadgeRequired}>
+                          <ScaledText size={11} weight="600" color="#2563EB">
+                            {t('videoRequired')}
+                          </ScaledText>
+                        </View>
+                      );
+                    }
+                    const nextDay = getNextAllowedDay(req.allowed_days);
+                    if (nextDay) {
+                      return (
+                        <View style={styles.reviewBadgeNext}>
+                          <ScaledText size={11} weight="600" color={Colors.textSecondary}>
+                            {String(`${t('nextSubmission')}${t(nextDay)}`)}
+                          </ScaledText>
+                        </View>
+                      );
+                    }
+                    return null;
+                  })()}
                   {exercise.dosage_per_day && (
                     <View style={styles.dosageProgress}>
                       <View style={styles.dosageBarBg}>
@@ -348,6 +392,21 @@ export default function HomeScreen() {
   }, [exercises.length, todayLogsQuery.data, allLogsQuery.data]);
 
   const [remarksExpanded, setRemarksExpanded] = useState(false);
+  const [reviewRequirements, setReviewRequirements] = useState<ExerciseReviewRequirement[]>([]);
+  const [todaySubmissions, setTodaySubmissions] = useState<Record<string, number>>({});
+
+  useEffect(() => {
+    if (!patientId) return;
+    const loadReviewData = async () => {
+      const [reqs, subs] = await Promise.all([
+        fetchAllReviewRequirements(patientId),
+        fetchTodaySubmissionsForExercises(patientId),
+      ]);
+      setReviewRequirements(reqs);
+      setTodaySubmissions(subs);
+    };
+    void loadReviewData();
+  }, [patientId]);
 
   const handleExercisePress = useCallback((exerciseId: string) => {
     router.push({
@@ -387,10 +446,14 @@ export default function HomeScreen() {
   const { refetch: refetchAllLogs } = allLogsQuery;
 
   const onRefresh = useCallback(() => {
-    refetchProgram();
-    refetchLogs();
-    refetchAllLogs();
-  }, [refetchProgram, refetchLogs, refetchAllLogs]);
+    void refetchProgram();
+    void refetchLogs();
+    void refetchAllLogs();
+    if (patientId) {
+      void fetchAllReviewRequirements(patientId).then(setReviewRequirements);
+      void fetchTodaySubmissionsForExercises(patientId).then(setTodaySubmissions);
+    }
+  }, [refetchProgram, refetchLogs, refetchAllLogs, patientId]);
 
   if (programQuery.isLoading) {
     return (
@@ -597,6 +660,8 @@ export default function HomeScreen() {
                   onExercisePress={handleExercisePress}
                   onDoAllInCategory={handleDoAllInCategory}
                   isExpired={isExpired}
+                  reviewRequirements={reviewRequirements}
+                  todaySubmissions={todaySubmissions}
                 />
               ))
             )}
@@ -912,5 +977,31 @@ const styles = StyleSheet.create({
     paddingTop: 10,
     borderTopWidth: 1,
     borderTopColor: '#FFE082',
+  },
+  reviewBadgeSubmitted: {
+    marginTop: 4,
+    backgroundColor: Colors.successLight,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 8,
+    alignSelf: 'flex-start' as const,
+  },
+  reviewBadgeRequired: {
+    marginTop: 4,
+    backgroundColor: '#EBF5FF',
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 8,
+    alignSelf: 'flex-start' as const,
+  },
+  reviewBadgeNext: {
+    marginTop: 4,
+    backgroundColor: Colors.card,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 8,
+    alignSelf: 'flex-start' as const,
+    borderWidth: 1,
+    borderColor: Colors.border,
   },
 });

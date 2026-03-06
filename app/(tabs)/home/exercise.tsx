@@ -16,7 +16,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import * as Haptics from 'expo-haptics';
 import { ArrowLeft, CheckCircle, Clock, Repeat, AlertCircle, Tag, Camera, X, Maximize2, SplitSquareHorizontal, Headphones, VideoOff } from 'lucide-react-native';
 import * as MediaLibrary from 'expo-media-library';
-import { Video, ResizeMode } from 'expo-av';
+
 import { useApp } from '@/contexts/AppContext';
 import { ScaledText } from '@/components/ScaledText';
 import { YouTubePlayer } from '@/components/YouTubePlayer';
@@ -84,8 +84,8 @@ function getYouTubeId(exercise: Exercise): string | null {
   return exercise.youtube_video_id || null;
 }
 
-const PersistentCameraInner = forwardRef<CameraView, { onCameraReady?: () => void }>(
-  function PersistentCameraInner({ onCameraReady }, ref) {
+const LiveCamera = forwardRef<CameraView, { onCameraReady?: () => void }>(
+  function LiveCamera({ onCameraReady }, ref) {
     return (
       <CameraView
         ref={ref}
@@ -98,8 +98,100 @@ const PersistentCameraInner = forwardRef<CameraView, { onCameraReady?: () => voi
     );
   }
 );
-PersistentCameraInner.displayName = 'PersistentCamera';
-const PersistentCamera = memo(PersistentCameraInner, () => true);
+LiveCamera.displayName = 'LiveCamera';
+const MemoLiveCamera = memo(LiveCamera, () => true);
+
+function SnapshotMirror() {
+  const snapshotCameraRef = useRef<CameraView>(null);
+  const [mirrorUri, setMirrorUri] = useState<string | null>(null);
+  const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const isMountedRef = useRef(true);
+  const [permission] = useCameraPermissions();
+
+  useEffect(() => {
+    isMountedRef.current = true;
+    return () => {
+      isMountedRef.current = false;
+      if (intervalRef.current) clearInterval(intervalRef.current);
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!permission?.granted) return;
+
+    const timeout = setTimeout(() => {
+      intervalRef.current = setInterval(async () => {
+        if (!snapshotCameraRef.current || !isMountedRef.current) return;
+        try {
+          const photo = await snapshotCameraRef.current.takePictureAsync({
+            quality: 0.3,
+            skipProcessing: true,
+            shutterSound: false,
+          });
+          if (isMountedRef.current && photo?.uri) {
+            setMirrorUri(photo.uri);
+          }
+        } catch {
+          // camera busy, skip frame
+        }
+      }, 250);
+    }, 600);
+
+    return () => {
+      clearTimeout(timeout);
+      if (intervalRef.current) clearInterval(intervalRef.current);
+    };
+  }, [permission?.granted]);
+
+  return (
+    <View style={snapshotStyles.container}>
+      {mirrorUri ? (
+        <Image
+          source={{ uri: mirrorUri }}
+          style={snapshotStyles.mirrorImage}
+          resizeMode="cover"
+        />
+      ) : (
+        <View style={snapshotStyles.placeholder}>
+          <ActivityIndicator size="small" color={Colors.primary} />
+          <ScaledText size={12} color="#666" style={{ marginTop: 6 }}>{String('Starting mirror...')}</ScaledText>
+        </View>
+      )}
+      {permission?.granted && (
+        <CameraView
+          ref={snapshotCameraRef}
+          style={snapshotStyles.hiddenCamera}
+          facing="front"
+        />
+      )}
+    </View>
+  );
+}
+const MemoSnapshotMirror = memo(SnapshotMirror);
+
+const snapshotStyles = StyleSheet.create({
+  container: {
+    flex: 1,
+    backgroundColor: '#000',
+    position: 'relative' as const,
+  },
+  mirrorImage: {
+    flex: 1,
+    transform: [{ scaleX: -1 }],
+  },
+  placeholder: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: '#000',
+  },
+  hiddenCamera: {
+    position: 'absolute' as const,
+    width: 1,
+    height: 1,
+    opacity: 0,
+  },
+});
 
 function SplitVideoLayerInner({ vimeoId, youtubeId }: { vimeoId: string | null; youtubeId: string | null }) {
   if (vimeoId) {
@@ -147,7 +239,7 @@ function SplitVideoLayerInner({ vimeoId, youtubeId }: { vimeoId: string | null; 
   return (
     <View style={splitVideoStyles.empty}>
       <VideoOff size={28} color="#666" />
-      <ScaledText size={13} color="#999" style={{ marginTop: 6 }}>No video</ScaledText>
+      <ScaledText size={13} color="#999" style={{ marginTop: 6 }}>{String('No video')}</ScaledText>
     </View>
   );
 }
@@ -186,7 +278,7 @@ function ExerciseVideoPlayer({ exercise, height, lowQuality }: { exercise: Exerc
   return (
     <View style={[{ height, borderRadius: 12, backgroundColor: '#000', justifyContent: 'center', alignItems: 'center' }]}>
       <VideoOff size={32} color="#666" />
-      <ScaledText size={14} color="#999" style={{ marginTop: 8 }}>No video available</ScaledText>
+      <ScaledText size={14} color="#999" style={{ marginTop: 8 }}>{String('No video available')}</ScaledText>
     </View>
   );
 }
@@ -667,67 +759,70 @@ export default function ExerciseScreen() {
 
         <View style={{ flex: 1 }}>
           {mediaMode === 'split' && (
-            <View style={styles.splitVideoSection}>
-              <SplitVideoLayer vimeoId={vimeoId} youtubeId={youtubeId} />
-              <VideoWatermark patientName={patientName || ''} height={200} />
+            <View style={{ flex: 1 }}>
+              <View style={styles.splitVideoSection}>
+                <SplitVideoLayer vimeoId={vimeoId} youtubeId={youtubeId} />
+                <VideoWatermark patientName={patientName || ''} height={200} />
+              </View>
+              <View style={styles.splitMirrorSection}>
+                <MemoSnapshotMirror />
+                <View style={styles.mirrorBadge}>
+                  <ScaledText size={11} weight="600" color={Colors.white}>
+                    {t('mirrorMode')}
+                  </ScaledText>
+                </View>
+              </View>
             </View>
           )}
 
-          <View
-            style={[
-              styles.cameraContainer,
-              mediaMode === 'video' && styles.cameraHidden,
-              (mediaMode === 'split' || mediaMode === 'mirror') && styles.cameraVisible,
-            ]}
-            pointerEvents={mediaMode === 'video' ? 'none' : 'auto'}
-          >
-            {hasCameraPermission && (
-              <PersistentCamera ref={cameraRef} onCameraReady={handleCameraReady} />
-            )}
+          {mediaMode === 'mirror' && (
+            <View style={styles.cameraVisible}>
+              {hasCameraPermission && (
+                <MemoLiveCamera ref={cameraRef} onCameraReady={handleCameraReady} />
+              )}
 
-            {isInMirror && !cameraReady && hasCameraPermission && (
-              <View style={styles.cameraLoading}>
-                <ActivityIndicator size="large" color={Colors.primary} />
-              </View>
-            )}
+              {!cameraReady && hasCameraPermission && (
+                <View style={styles.cameraLoading}>
+                  <ActivityIndicator size="large" color={Colors.primary} />
+                </View>
+              )}
 
-            {isInMirror && (
               <View style={styles.mirrorBadge}>
                 <ScaledText size={11} weight="600" color={Colors.white}>
                   {t('mirrorMode')}
                 </ScaledText>
               </View>
-            )}
 
-            {isInMirror && isRecording && (
-              <View style={styles.recordingIndicator}>
-                <Animated.View style={[styles.recordingDot, { opacity: recordPulse }]} />
-                <ScaledText size={14} weight="700" color={Colors.white}>
-                  {formatElapsed(elapsed)}
-                </ScaledText>
-              </View>
-            )}
+              {isRecording && (
+                <View style={styles.recordingIndicator}>
+                  <Animated.View style={[styles.recordingDot, { opacity: recordPulse }]} />
+                  <ScaledText size={14} weight="700" color={Colors.white}>
+                    {formatElapsed(elapsed)}
+                  </ScaledText>
+                </View>
+              )}
 
-            {isInMirror && cameraReady && (
-              <View style={styles.recordButtonContainer}>
-                <TouchableOpacity
-                  style={[styles.recordButton, isRecording && styles.recordButtonActive]}
-                  onPress={isRecording ? handleStopRecording : handleStartRecording}
-                  activeOpacity={0.7}
-                  testID="record-button"
-                >
-                  {isRecording ? (
-                    <View style={styles.stopIcon} />
-                  ) : (
-                    <View style={styles.recordIcon} />
-                  )}
-                </TouchableOpacity>
-                <ScaledText size={11} weight="600" color={Colors.white} style={styles.recordLabel}>
-                  {isRecording ? t('stopRecording') : t('record')}
-                </ScaledText>
-              </View>
-            )}
-          </View>
+              {cameraReady && (
+                <View style={styles.recordButtonContainer}>
+                  <TouchableOpacity
+                    style={[styles.recordButton, isRecording && styles.recordButtonActive]}
+                    onPress={isRecording ? handleStopRecording : handleStartRecording}
+                    activeOpacity={0.7}
+                    testID="record-button"
+                  >
+                    {isRecording ? (
+                      <View style={styles.stopIcon} />
+                    ) : (
+                      <View style={styles.recordIcon} />
+                    )}
+                  </TouchableOpacity>
+                  <ScaledText size={11} weight="600" color={Colors.white} style={styles.recordLabel}>
+                    {isRecording ? t('stopRecording') : t('record')}
+                  </ScaledText>
+                </View>
+              )}
+            </View>
+          )}
 
           {isInMirror && narrativeAudioId && !isRecording && (
             <View style={styles.narrativeSection}>
@@ -768,7 +863,7 @@ export default function ExerciseScreen() {
           {isInMirror && toastMessage && (
             <View style={[styles.toast, toastType === 'error' ? styles.toastError : styles.toastSuccess]}>
               <ScaledText size={13} weight="600" color={Colors.white}>
-                {toastMessage}
+                {toastMessage || ''}
               </ScaledText>
             </View>
           )}
@@ -1000,21 +1095,20 @@ const styles = StyleSheet.create({
   headerSpacer: {
     width: 40,
   },
-  cameraContainer: {
-    overflow: 'hidden',
-    backgroundColor: '#000',
-  },
-  cameraHidden: {
-    position: 'absolute' as const,
-    width: 1,
-    height: 1,
-    opacity: 0,
-    overflow: 'hidden',
-  },
   cameraVisible: {
     flex: 1,
     borderRadius: 12,
     marginHorizontal: 16,
+    overflow: 'hidden',
+    backgroundColor: '#000',
+    position: 'relative' as const,
+  },
+  splitMirrorSection: {
+    flex: 1,
+    marginHorizontal: 16,
+    borderRadius: 12,
+    overflow: 'hidden',
+    backgroundColor: '#000',
     position: 'relative' as const,
   },
   cameraLoading: {

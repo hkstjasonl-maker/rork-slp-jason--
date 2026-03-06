@@ -26,7 +26,6 @@ import { log } from '@/lib/logger';
 import {
   BookOpen,
   Play,
-  ExternalLink,
   CheckCircle2,
   GraduationCap,
   Brain,
@@ -290,16 +289,22 @@ function AssignedVideoCard({
                 <YouTubePlayer videoId={video.youtube_video_id} height={200} />
               </View>
             ) : (
-              <TouchableOpacity
-                style={styles.youtubeButton}
-                onPress={handleOpenYouTube}
-                activeOpacity={0.8}
-              >
-                <ExternalLink size={18} color="#fff" />
-                <ScaledText size={14} weight="600" color="#fff" style={styles.youtubeButtonText}>
-                  {t('openInYouTube')}
-                </ScaledText>
-              </TouchableOpacity>
+              <View style={styles.playerContainer}>
+                <TouchableOpacity onPress={handleOpenYouTube} activeOpacity={0.9}>
+                  <View style={styles.thumbnailWrapper}>
+                    <Image
+                      source={{ uri: `https://img.youtube.com/vi/${video.youtube_video_id}/hqdefault.jpg` }}
+                      style={styles.youtubeThumbnail}
+                      resizeMode="cover"
+                    />
+                    <View style={styles.thumbnailOverlay}>
+                      <View style={styles.thumbnailPlayButton}>
+                        <Play size={28} color="#fff" fill="#fff" />
+                      </View>
+                    </View>
+                  </View>
+                </TouchableOpacity>
+              </View>
             )
           ) : null}
 
@@ -410,16 +415,22 @@ function ExploreVideoCard({
                 <YouTubePlayer videoId={video.youtube_video_id} height={200} />
               </View>
             ) : (
-              <TouchableOpacity
-                style={styles.youtubeButton}
-                onPress={handleOpenYouTube}
-                activeOpacity={0.8}
-              >
-                <ExternalLink size={18} color="#fff" />
-                <ScaledText size={14} weight="600" color="#fff" style={styles.youtubeButtonText}>
-                  {t('openInYouTube')}
-                </ScaledText>
-              </TouchableOpacity>
+              <View style={styles.playerContainer}>
+                <TouchableOpacity onPress={handleOpenYouTube} activeOpacity={0.9}>
+                  <View style={styles.thumbnailWrapper}>
+                    <Image
+                      source={{ uri: `https://img.youtube.com/vi/${video.youtube_video_id}/hqdefault.jpg` }}
+                      style={styles.youtubeThumbnail}
+                      resizeMode="cover"
+                    />
+                    <View style={styles.thumbnailOverlay}>
+                      <View style={styles.thumbnailPlayButton}>
+                        <Play size={28} color="#fff" fill="#fff" />
+                      </View>
+                    </View>
+                  </View>
+                </TouchableOpacity>
+              </View>
             )
           ) : null}
 
@@ -1080,6 +1091,32 @@ const styles = StyleSheet.create({
   },
   youtubeButtonText: {
     marginLeft: 4,
+  },
+  thumbnailWrapper: {
+    position: 'relative' as const,
+  },
+  youtubeThumbnail: {
+    width: '100%' as unknown as number,
+    height: 200,
+    borderRadius: 10,
+    backgroundColor: '#000',
+  },
+  thumbnailOverlay: {
+    position: 'absolute' as const,
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    justifyContent: 'center' as const,
+    alignItems: 'center' as const,
+  },
+  thumbnailPlayButton: {
+    width: 60,
+    height: 60,
+    borderRadius: 30,
+    backgroundColor: 'rgba(255,0,0,0.85)',
+    justifyContent: 'center' as const,
+    alignItems: 'center' as const,
   },
   tagsRow: {
     flexDirection: 'row',

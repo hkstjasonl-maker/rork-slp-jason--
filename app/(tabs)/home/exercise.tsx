@@ -43,6 +43,7 @@ import {
   isTodayAllowed,
   getNextAllowedDay,
 } from '@/lib/reviewRequirements';
+import { burnWatermarkIntoVideo } from '@/lib/videoProcessing';
 import { CameraView, useCameraPermissions, useMicrophonePermissions } from 'expo-camera';
 
 type MediaMode = 'video' | 'split' | 'mirror';
@@ -252,7 +253,7 @@ export default function ExerciseScreen() {
   }>();
   const router = useRouter();
   const queryClient = useQueryClient();
-  const { t, patientId, language, reinforcementAudioId, reinforcementAudioUrl } = useApp();
+  const { t, patientId, patientName, language, reinforcementAudioId, reinforcementAudioUrl } = useApp();
 
   const allIds: string[] = useMemo(() => {
     if (params.allExerciseIds) {
@@ -677,10 +678,28 @@ export default function ExerciseScreen() {
         setToastMessage(t('videoSaveError'));
         return;
       }
-      await MediaLibrary.saveToLibraryAsync(uri);
-      setLastRecordedUri(uri);
+
+      const ex = exerciseQuery.data;
+      const exTitle = ex ? getExerciseTitle(ex, language) : '';
+      log('[SaveVideo] Attempting watermark burn, exercise:', exTitle);
+
+      const { uri: processedUri, wasProcessed } = await burnWatermarkIntoVideo(uri, {
+        exerciseName: exTitle,
+        patientName: patientName ?? undefined,
+      });
+
+      log('[SaveVideo] Watermark result — processed:', wasProcessed, 'uri:', processedUri);
+
+      await MediaLibrary.saveToLibraryAsync(processedUri);
+      setLastRecordedUri(processedUri);
       setToastType('success');
-      setToastMessage(t('recordingSavedToAlbum'));
+
+      if (wasProcessed) {
+        setToastMessage(t('recordingSavedToAlbum'));
+      } else {
+        setToastMessage(t('recordingSavedWatermarkNote'));
+      }
+
       if (Platform.OS !== 'web') {
         void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       }
@@ -694,7 +713,7 @@ export default function ExerciseScreen() {
     } finally {
       setShowProcessing(false);
     }
-  }, [t, reviewRequirement, todaySubmissionCount]);
+  }, [t, reviewRequirement, todaySubmissionCount, exerciseQuery.data, language, patientName]);
 
   const handleStartRecording = useCallback(async () => {
     const camRef = activeRecordingRef();

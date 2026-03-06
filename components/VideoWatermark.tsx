@@ -17,15 +17,15 @@ function VideoWatermarkInner({ patientName, height }: VideoWatermarkProps) {
 
   const tiles = useMemo(() => {
     const screenWidth = Dimensions.get('window').width;
-    const spacingX = 180;
-    const spacingY = 160;
-    const cols = Math.ceil(screenWidth / spacingX) + 2;
-    const rows = Math.ceil(height / spacingY) + 2;
+    const spacingX = 125;
+    const spacingY = 120;
+    const cols = Math.ceil(screenWidth / spacingX) + 3;
+    const rows = Math.ceil(height / spacingY) + 3;
     const items: { key: string; top: number; left: number }[] = [];
 
-    for (let row = -1; row < rows; row++) {
+    for (let row = -2; row < rows; row++) {
       const offsetX = row % 2 === 0 ? 0 : spacingX / 2;
-      for (let col = -1; col < cols; col++) {
+      for (let col = -2; col < cols; col++) {
         items.push({
           key: `${row}-${col}`,
           top: row * spacingY,
@@ -70,8 +70,8 @@ const styles = StyleSheet.create({
     transform: [{ rotate: '-30deg' }],
   },
   watermarkText: {
-    color: 'rgba(255, 255, 255, 0.13)',
-    fontSize: 14,
+    color: 'rgba(255, 255, 255, 0.19)',
+    fontSize: 26,
     fontWeight: 'bold' as const,
     letterSpacing: 0.5,
   },

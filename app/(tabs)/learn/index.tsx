@@ -136,12 +136,10 @@ function CreatorProviderDetail({ video, language }: { video: KnowledgeVideo; lan
           <User size={14} color={Colors.textSecondary} />
           <View style={styles.creatorDetailText}>
             <ScaledText size={13} weight="600" color={Colors.textPrimary}>
-              {/* eslint-disable-next-line rork/general-no-raw-text */}
               {creator}
             </ScaledText>
             {creatorAlt ? (
               <ScaledText size={11} color={Colors.textSecondary}>
-                {/* eslint-disable-next-line rork/general-no-raw-text */}
                 {creatorAlt}
               </ScaledText>
             ) : null}
@@ -157,12 +155,10 @@ function CreatorProviderDetail({ video, language }: { video: KnowledgeVideo; lan
           )}
           <View style={styles.creatorDetailText}>
             <ScaledText size={13} weight="600" color={Colors.textPrimary}>
-              {/* eslint-disable-next-line rork/general-no-raw-text */}
               {provider}
             </ScaledText>
             {providerAlt ? (
               <ScaledText size={11} color={Colors.textSecondary}>
-                {/* eslint-disable-next-line rork/general-no-raw-text */}
                 {providerAlt}
               </ScaledText>
             ) : null}
@@ -250,13 +246,11 @@ function AssignedVideoCard({
           </View>
           <View style={styles.cardTitleContent}>
             <ScaledText size={15} weight="600" color={Colors.textPrimary} numberOfLines={2}>
-              {/* eslint-disable-next-line rork/general-no-raw-text */}
               {title}
             </ScaledText>
             {!expanded && <CreatorProviderLine video={video} language={language} />}
             {!expanded && description ? (
               <ScaledText size={13} color={Colors.textSecondary} numberOfLines={2} style={styles.descriptionPreview}>
-                {/* eslint-disable-next-line rork/general-no-raw-text */}
                 {description}
               </ScaledText>
             ) : null}
@@ -274,7 +268,6 @@ function AssignedVideoCard({
           <CreatorProviderDetail video={video} language={language} />
           {description ? (
             <ScaledText size={13} color={Colors.textSecondary} style={styles.descriptionFull}>
-              {/* eslint-disable-next-line rork/general-no-raw-text */}
               {description}
             </ScaledText>
           ) : null}
@@ -313,7 +306,6 @@ function AssignedVideoCard({
               {video.tags.map((tag, i) => (
                 <View key={i} style={styles.tagChip}>
                   <ScaledText size={11} color={Colors.textSecondary}>
-                    {/* eslint-disable-next-line rork/general-no-raw-text */}
                     {tag}
                   </ScaledText>
                 </View>
@@ -376,13 +368,11 @@ function ExploreVideoCard({
           </View>
           <View style={styles.cardTitleContent}>
             <ScaledText size={15} weight="600" color={Colors.textPrimary} numberOfLines={2}>
-              {/* eslint-disable-next-line rork/general-no-raw-text */}
               {title}
             </ScaledText>
             {!expanded && <CreatorProviderLine video={video} language={language} />}
             {!expanded && description ? (
               <ScaledText size={13} color={Colors.textSecondary} numberOfLines={2} style={styles.descriptionPreview}>
-                {/* eslint-disable-next-line rork/general-no-raw-text */}
                 {description}
               </ScaledText>
             ) : null}
@@ -400,7 +390,6 @@ function ExploreVideoCard({
           <CreatorProviderDetail video={video} language={language} />
           {description ? (
             <ScaledText size={13} color={Colors.textSecondary} style={styles.descriptionFull}>
-              {/* eslint-disable-next-line rork/general-no-raw-text */}
               {description}
             </ScaledText>
           ) : null}
@@ -439,7 +428,6 @@ function ExploreVideoCard({
               {video.tags.map((tag, i) => (
                 <View key={i} style={styles.tagChip}>
                   <ScaledText size={11} color={Colors.textSecondary}>
-                    {/* eslint-disable-next-line rork/general-no-raw-text */}
                     {tag}
                   </ScaledText>
                 </View>

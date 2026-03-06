@@ -1,4 +1,4 @@
-import React, { useCallback } from 'react';
+import React, { useCallback, useMemo } from 'react';
 import {
   View,
   ScrollView,
@@ -149,116 +149,85 @@ function getAssessmentReference(submission: ClinicalAssessmentSubmission): strin
 export default function AssessmentsScreen() {
   const { t, patientId, language } = useApp();
 
-  const pendingQuery = useQuery({
-    queryKey: ['assessments', 'pending', patientId],
+  const questionnaireQuery = useQuery({
+    queryKey: ['assessments', 'all', patientId],
     queryFn: async () => {
-      log('[Assessments] Fetching pending assignments for:', patientId);
+      log('[Assessments] Fetching all questionnaire assignments for:', patientId);
       const { data, error } = await supabase
         .from('questionnaire_assignments')
         .select('*,questionnaire_templates(name,description_en,description_zh_hant,description_zh_hans)')
         .eq('patient_id', patientId!)
-        .eq('status', 'pending')
-        .order('assigned_date', { ascending: false });
+        .order('assigned_date', { ascending: false })
+        .limit(100);
 
       if (error) {
-        log('[Assessments] Pending fetch error:', error);
+        log('[Assessments] Questionnaire fetch error:', error);
         throw error;
       }
-      log('[Assessments] Pending assignments:', data?.length);
+      log('[Assessments] Questionnaire assignments:', data?.length, 'statuses:', data?.map(d => d.status));
       return (data || []) as QuestionnaireAssignment[];
     },
     enabled: !!patientId,
     staleTime: 2 * 60 * 1000,
   });
 
-  const completedQuery = useQuery({
-    queryKey: ['assessments', 'completed', patientId],
+  const clinicalQuery = useQuery({
+    queryKey: ['clinical_assessments', 'all', patientId],
     queryFn: async () => {
-      log('[Assessments] Fetching completed assignments for:', patientId);
-      const { data, error } = await supabase
-        .from('questionnaire_assignments')
-        .select('*,questionnaire_templates(name,description_en,description_zh_hant,description_zh_hans)')
-        .eq('patient_id', patientId!)
-        .eq('status', 'completed')
-        .order('completed_date', { ascending: false })
-        .limit(50);
-
-      if (error) {
-        log('[Assessments] Completed fetch error:', error);
-        throw error;
-      }
-      log('[Assessments] Completed assignments:', data?.length);
-      return (data || []) as QuestionnaireAssignment[];
-    },
-    enabled: !!patientId,
-    staleTime: 2 * 60 * 1000,
-  });
-
-  const clinicalPendingQuery = useQuery({
-    queryKey: ['clinical_assessments', 'pending', patientId],
-    queryFn: async () => {
-      log('[Assessments] Fetching pending clinical assessments for:', patientId);
+      log('[Assessments] Fetching all clinical assessments for:', patientId);
       const { data, error } = await supabase
         .from('assessment_submissions')
         .select('*, assessment_library(id, name_en, name_zh, description_en, description_zh, type, key, reference)')
         .eq('patient_id', patientId!)
-        .eq('status', 'pending')
-        .order('created_at', { ascending: false });
+        .order('created_at', { ascending: false })
+        .limit(100);
 
       if (error) {
-        log('[Assessments] Clinical pending fetch error:', error);
+        log('[Assessments] Clinical fetch error:', error);
         throw error;
       }
-      log('[Assessments] Clinical pending:', data?.length);
+      log('[Assessments] Clinical assessments:', data?.length, 'statuses:', data?.map(d => d.status));
       return (data || []) as ClinicalAssessmentSubmission[];
     },
     enabled: !!patientId,
     staleTime: 2 * 60 * 1000,
   });
 
-  const clinicalCompletedQuery = useQuery({
-    queryKey: ['clinical_assessments', 'completed', patientId],
-    queryFn: async () => {
-      log('[Assessments] Fetching completed clinical assessments for:', patientId);
-      const { data, error } = await supabase
-        .from('assessment_submissions')
-        .select('*, assessment_library(id, name_en, name_zh, description_en, description_zh, type, key, reference)')
-        .eq('patient_id', patientId!)
-        .eq('status', 'completed')
-        .order('completed_at', { ascending: false })
-        .limit(50);
+  const qData = questionnaireQuery.data;
+  const cData = clinicalQuery.data;
 
-      if (error) {
-        log('[Assessments] Clinical completed fetch error:', error);
-        throw error;
-      }
-      log('[Assessments] Clinical completed:', data?.length);
-      return (data || []) as ClinicalAssessmentSubmission[];
-    },
-    enabled: !!patientId,
-    staleTime: 2 * 60 * 1000,
-  });
+  const pendingAssignments = useMemo(() =>
+    (qData || []).filter(a => a.status !== 'completed'),
+    [qData]
+  );
+  const completedAssignments = useMemo(() =>
+    (qData || []).filter(a => a.status === 'completed'),
+    [qData]
+  );
+  const clinicalPending = useMemo(() =>
+    (cData || []).filter(s => s.status !== 'completed'),
+    [cData]
+  );
+  const clinicalCompleted = useMemo(() =>
+    (cData || []).filter(s => s.status === 'completed'),
+    [cData]
+  );
 
-  const pendingAssignments = pendingQuery.data || [];
-  const completedAssignments = completedQuery.data || [];
-  const clinicalPending = clinicalPendingQuery.data || [];
-  const clinicalCompleted = clinicalCompletedQuery.data || [];
-
-  const isLoading = pendingQuery.isLoading || completedQuery.isLoading || clinicalPendingQuery.isLoading || clinicalCompletedQuery.isLoading;
-  const isFetching = pendingQuery.isFetching || completedQuery.isFetching || clinicalPendingQuery.isFetching || clinicalCompletedQuery.isFetching;
+  const isLoading = questionnaireQuery.isLoading || clinicalQuery.isLoading;
+  const isFetching = questionnaireQuery.isFetching || clinicalQuery.isFetching;
+  const hasError = questionnaireQuery.isError || clinicalQuery.isError;
+  const errorMessage = questionnaireQuery.error?.message || clinicalQuery.error?.message || '';
 
   const totalPendingCount = pendingAssignments.length + clinicalPending.length;
   const totalCompletedCount = completedAssignments.length + clinicalCompleted.length;
   const hasNoData = totalPendingCount === 0 && totalCompletedCount === 0;
 
-  const { refetch: rp } = pendingQuery;
-  const { refetch: rc } = completedQuery;
-  const { refetch: rcp } = clinicalPendingQuery;
-  const { refetch: rcc } = clinicalCompletedQuery;
+  const { refetch: rq } = questionnaireQuery;
+  const { refetch: rcl } = clinicalQuery;
 
   const onRefresh = useCallback(() => {
-    void rp(); void rc(); void rcp(); void rcc();
-  }, [rp, rc, rcp, rcc]);
+    void rq(); void rcl();
+  }, [rq, rcl]);
 
   return (
     <View style={styles.root}>
@@ -284,6 +253,27 @@ export default function AssessmentsScreen() {
           {isLoading ? (
             <View style={styles.loadingContainer}>
               <ActivityIndicator size="large" color={Colors.primary} />
+            </View>
+          ) : hasError ? (
+            <View style={styles.emptyContainer}>
+              <View style={styles.emptyIconCircle}>
+                <ClipboardCheck size={48} color={Colors.error} />
+              </View>
+              <Text size={16} color={Colors.error} style={styles.emptyText}>
+                {t('error') || 'Error loading assessments'}
+              </Text>
+              <Text size={13} color={Colors.textSecondary} style={styles.emptyText}>
+                {errorMessage}
+              </Text>
+              <TouchableOpacity
+                style={styles.retryButton}
+                onPress={onRefresh}
+                activeOpacity={0.7}
+              >
+                <Text size={14} weight="600" color={Colors.white}>
+                  {t('retry') || 'Retry'}
+                </Text>
+              </TouchableOpacity>
             </View>
           ) : hasNoData ? (
             <View style={styles.emptyContainer}>
@@ -775,5 +765,12 @@ const styles = StyleSheet.create({
     paddingVertical: 6,
     borderRadius: 12,
     minWidth: 56,
+  },
+  retryButton: {
+    backgroundColor: Colors.primary,
+    paddingHorizontal: 24,
+    paddingVertical: 10,
+    borderRadius: 10,
+    marginTop: 8,
   },
 });

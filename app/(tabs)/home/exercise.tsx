@@ -10,11 +10,12 @@ import {
   Image,
   Animated,
   Alert,
+  Modal,
 } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import * as Haptics from 'expo-haptics';
-import { ArrowLeft, CheckCircle, Clock, Repeat, AlertCircle, Tag, Camera, X, Maximize2, SplitSquareHorizontal, Headphones, VideoOff } from 'lucide-react-native';
+import { ArrowLeft, CheckCircle, Clock, Repeat, AlertCircle, Tag, Camera, X, Maximize2, SplitSquareHorizontal, Headphones, VideoOff, Coffee } from 'lucide-react-native';
 import * as MediaLibrary from 'expo-media-library';
 
 
@@ -26,6 +27,7 @@ import { AudioInstructionPlayer } from '@/components/AudioInstructionPlayer';
 import { EncouragementModal } from '@/components/EncouragementModal';
 import { SelfRatingModal } from '@/components/SelfRatingModal';
 import { CopyrightFooter } from '@/components/CopyrightFooter';
+import { RestTimer } from '@/components/RestTimer';
 import { VideoWatermark } from '@/components/VideoWatermark';
 import { supabase } from '@/lib/supabase';
 import { getStarsForSession, calculateStars } from '@/lib/stars';
@@ -303,6 +305,8 @@ export default function ExerciseScreen() {
   const [toastMessage, setToastMessage] = useState<string | null>(null);
   const [toastType, setToastType] = useState<'success' | 'error'>('success');
   const [narrativePlaying, setNarrativePlaying] = useState(false);
+  const [showRestTimer, setShowRestTimer] = useState(false);
+  const [showRestPrompt, setShowRestPrompt] = useState(false);
 
   const cameraRef = useRef<CameraView>(null);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -522,15 +526,19 @@ export default function ExerciseScreen() {
     setShowRating(true);
   }, []);
 
-  const handleRatingSkip = useCallback(() => {
-    setShowRating(false);
-    setPendingLogId(null);
+  const proceedAfterRating = useCallback(() => {
     if (hasNext) {
-      setCurrentIdx((prev) => prev + 1);
+      setShowRestPrompt(true);
     } else {
       router.back();
     }
   }, [hasNext, router]);
+
+  const handleRatingSkip = useCallback(() => {
+    setShowRating(false);
+    setPendingLogId(null);
+    proceedAfterRating();
+  }, [proceedAfterRating]);
 
   const handleRatingSave = useCallback((rating: number) => {
     setShowRating(false);
@@ -538,12 +546,29 @@ export default function ExerciseScreen() {
       saveRating({ logId: pendingLogId, rating });
     }
     setPendingLogId(null);
+    proceedAfterRating();
+  }, [pendingLogId, saveRating, proceedAfterRating]);
+
+  const handleRestPromptRest = useCallback(() => {
+    setShowRestPrompt(false);
+    setShowRestTimer(true);
+  }, []);
+
+  const handleRestPromptSkip = useCallback(() => {
+    setShowRestPrompt(false);
+    setCurrentIdx((prev) => prev + 1);
+  }, []);
+
+  const handleRestTimerClose = useCallback(() => {
+    setShowRestTimer(false);
+  }, []);
+
+  const handleRestTimerContinue = useCallback(() => {
+    setShowRestTimer(false);
     if (hasNext) {
       setCurrentIdx((prev) => prev + 1);
-    } else {
-      router.back();
     }
-  }, [hasNext, router, pendingLogId, saveRating]);
+  }, [hasNext]);
 
   const handleOpenMirror = useCallback(async () => {
     log('[ExerciseScreen] Opening mirror mode');
@@ -699,7 +724,14 @@ export default function ExerciseScreen() {
                 : t('exercisePlayer')}
             </ScaledText>
           </View>
-          <View style={styles.headerSpacer} />
+          <TouchableOpacity
+            style={styles.restButton}
+            onPress={() => setShowRestTimer(true)}
+            activeOpacity={0.7}
+            testID="rest-timer-button"
+          >
+            <Coffee size={18} color={Colors.primary} />
+          </TouchableOpacity>
         </View>
 
         <View style={{ flex: 1 }}>
@@ -999,6 +1031,55 @@ export default function ExerciseScreen() {
           onSkip={handleRatingSkip}
           onSave={handleRatingSave}
         />
+
+        <RestTimer
+          visible={showRestTimer}
+          onClose={handleRestTimerClose}
+          onContinue={handleRestTimerContinue}
+          hasNext={hasNext}
+        />
+
+        {showRestPrompt && (
+          <Modal
+            visible={showRestPrompt}
+            transparent
+            animationType="fade"
+            onRequestClose={handleRestPromptSkip}
+          >
+            <View style={styles.restPromptOverlay}>
+              <View style={styles.restPromptCard}>
+                <View style={styles.restPromptIcon}>
+                  <Coffee size={28} color={Colors.primary} />
+                </View>
+                <ScaledText size={18} weight="700" color={Colors.textPrimary} style={styles.restPromptTitle}>
+                  {t('restBeforeNext')}
+                </ScaledText>
+                <View style={styles.restPromptActions}>
+                  <TouchableOpacity
+                    style={styles.restPromptRestBtn}
+                    onPress={handleRestPromptRest}
+                    activeOpacity={0.8}
+                    testID="rest-prompt-rest"
+                  >
+                    <ScaledText size={16} weight="700" color={Colors.white}>
+                      {t('rest')}
+                    </ScaledText>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={styles.restPromptSkipBtn}
+                    onPress={handleRestPromptSkip}
+                    activeOpacity={0.7}
+                    testID="rest-prompt-skip"
+                  >
+                    <ScaledText size={15} weight="600" color={Colors.textSecondary}>
+                      {t('skip')}
+                    </ScaledText>
+                  </TouchableOpacity>
+                </View>
+              </View>
+            </View>
+          </Modal>
+        )}
       </SafeAreaView>
     </View>
   );
@@ -1356,5 +1437,60 @@ const styles = StyleSheet.create({
     overflow: 'hidden' as const,
     top: -9999,
     left: -9999,
+  },
+  restButton: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: Colors.primaryLight,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  restPromptOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 32,
+  },
+  restPromptCard: {
+    backgroundColor: Colors.card,
+    borderRadius: 20,
+    padding: 28,
+    alignItems: 'center',
+    width: '100%',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.15,
+    shadowRadius: 20,
+    elevation: 10,
+  },
+  restPromptIcon: {
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    backgroundColor: Colors.primaryLight,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 16,
+  },
+  restPromptTitle: {
+    textAlign: 'center',
+    marginBottom: 24,
+    lineHeight: 26,
+  },
+  restPromptActions: {
+    width: '100%',
+    gap: 10,
+  },
+  restPromptRestBtn: {
+    backgroundColor: Colors.primary,
+    paddingVertical: 14,
+    borderRadius: 14,
+    alignItems: 'center',
+  },
+  restPromptSkipBtn: {
+    paddingVertical: 12,
+    alignItems: 'center',
   },
 });

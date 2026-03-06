@@ -1,5 +1,5 @@
 import React from 'react';
-import { Text, TextProps, StyleSheet } from 'react-native';
+import { Text, TextProps } from 'react-native';
 import { useApp } from '@/contexts/AppContext';
 
 interface ScaledTextProps extends TextProps {
@@ -8,7 +8,7 @@ interface ScaledTextProps extends TextProps {
   weight?: 'normal' | 'bold' | '500' | '600' | '700';
 }
 
-function ScaledTextInner({ size = 16, color, weight, style, ...props }: ScaledTextProps) {
+export function ScaledText({ size = 16, color, weight, style, ...props }: ScaledTextProps) {
   const { fontScale } = useApp();
   const scaledSize = Math.round(size * fontScale);
 
@@ -24,8 +24,6 @@ function ScaledTextInner({ size = 16, color, weight, style, ...props }: ScaledTe
     />
   );
 }
-
-export const ScaledText = React.memo(ScaledTextInner);
 
 export function useScaledSize(baseSize: number): number {
   const { fontScale } = useApp();

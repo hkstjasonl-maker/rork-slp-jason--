@@ -10,7 +10,7 @@ import {
 } from 'react-native';
 import { useQuery } from '@tanstack/react-query';
 import { useApp } from '@/contexts/AppContext';
-import { ScaledText } from '@/components/ScaledText';
+import { ScaledText as Text } from '@/components/ScaledText';
 import { CopyrightFooter } from '@/components/CopyrightFooter';
 import { supabase } from '@/lib/supabase';
 import Colors from '@/constants/colors';
@@ -39,6 +39,16 @@ interface QuestionnaireAssignment {
   questionnaire_templates: QuestionnaireTemplate;
 }
 
+interface AssessmentLibraryRecord {
+  id: string;
+  name_en: string | null;
+  name_zh: string | null;
+  description_en: string | null;
+  description_zh: string | null;
+  type: string | null;
+  key: string | null;
+}
+
 interface ClinicalAssessmentSubmission {
   id: string;
   patient_id: string;
@@ -52,6 +62,7 @@ interface ClinicalAssessmentSubmission {
   scheduled_date: string | null;
   assigned_at: string | null;
   created_at: string;
+  assessment_library?: AssessmentLibraryRecord | null;
 }
 
 function getDescription(template: QuestionnaireTemplate, language: Language | null): string {
@@ -87,23 +98,45 @@ function isOverdue(dueDateStr: string | null): boolean {
   return due.getTime() < now.getTime();
 }
 
-function getAssessmentName(assessmentId: string, language: Language | null): string {
-  const tool = ASSESSMENT_TOOLS[assessmentId];
-  if (!tool) return assessmentId;
-  if (language === 'zh_hant' || language === 'zh_hans') return tool.name_zh;
-  return tool.name_en;
+function resolveToolKey(submission: ClinicalAssessmentSubmission): string {
+  const lib = submission.assessment_library;
+  if (lib?.key && ASSESSMENT_TOOLS[lib.key]) return lib.key;
+  if (ASSESSMENT_TOOLS[submission.assessment_id]) return submission.assessment_id;
+  return '';
 }
 
-function getAssessmentDescription(assessmentId: string, language: Language | null): string {
-  const tool = ASSESSMENT_TOOLS[assessmentId];
-  if (!tool) return '';
-  if (language === 'zh_hant' || language === 'zh_hans') return tool.description_zh;
-  return tool.description_en;
+function getAssessmentName(submission: ClinicalAssessmentSubmission, language: Language | null): string {
+  const key = resolveToolKey(submission);
+  if (key) {
+    const tool = ASSESSMENT_TOOLS[key];
+    return language === 'zh_hant' || language === 'zh_hans' ? tool.name_zh : tool.name_en;
+  }
+  const lib = submission.assessment_library;
+  if (lib) {
+    const name = language === 'zh_hant' || language === 'zh_hans' ? lib.name_zh : lib.name_en;
+    return name || lib.name_en || submission.assessment_id;
+  }
+  return submission.assessment_id;
 }
 
-function getAssessmentType(assessmentId: string): string {
-  const tool = ASSESSMENT_TOOLS[assessmentId];
-  return tool?.type || 'patient_self_report';
+function getAssessmentDescription(submission: ClinicalAssessmentSubmission, language: Language | null): string {
+  const key = resolveToolKey(submission);
+  if (key) {
+    const tool = ASSESSMENT_TOOLS[key];
+    return language === 'zh_hant' || language === 'zh_hans' ? tool.description_zh : tool.description_en;
+  }
+  const lib = submission.assessment_library;
+  if (lib) {
+    const desc = language === 'zh_hant' || language === 'zh_hans' ? lib.description_zh : lib.description_en;
+    return desc || lib.description_en || '';
+  }
+  return '';
+}
+
+function getAssessmentType(submission: ClinicalAssessmentSubmission): string {
+  const key = resolveToolKey(submission);
+  if (key) return ASSESSMENT_TOOLS[key].type;
+  return submission.assessment_library?.type || 'patient_self_report';
 }
 
 export default function AssessmentsScreen() {
@@ -158,7 +191,7 @@ export default function AssessmentsScreen() {
       log('[Assessments] Fetching pending clinical assessments for:', patientId);
       const { data, error } = await supabase
         .from('assessment_submissions')
-        .select('*')
+        .select('*, assessment_library(id, name_en, name_zh, description_en, description_zh, type, key)')
         .eq('patient_id', patientId!)
         .eq('status', 'pending')
         .order('created_at', { ascending: false });
@@ -179,7 +212,7 @@ export default function AssessmentsScreen() {
       log('[Assessments] Fetching completed clinical assessments for:', patientId);
       const { data, error } = await supabase
         .from('assessment_submissions')
-        .select('*')
+        .select('*, assessment_library(id, name_en, name_zh, description_en, description_zh, type, key)')
         .eq('patient_id', patientId!)
         .eq('status', 'completed')
         .order('completed_at', { ascending: false })
@@ -213,16 +246,16 @@ export default function AssessmentsScreen() {
   const { refetch: rcc } = clinicalCompletedQuery;
 
   const onRefresh = useCallback(() => {
-    rp(); rc(); rcp(); rcc();
+    void rp(); void rc(); void rcp(); void rcc();
   }, [rp, rc, rcp, rcc]);
 
   return (
     <View style={styles.root}>
       <SafeAreaView style={styles.container}>
         <View style={styles.headerSection}>
-          <ScaledText size={26} weight="bold" color={Colors.textPrimary}>
+          <Text size={26} weight="bold" color={Colors.textPrimary}>
             {t('assessments')}
-          </ScaledText>
+          </Text>
         </View>
 
         <ScrollView
@@ -246,9 +279,9 @@ export default function AssessmentsScreen() {
               <View style={styles.emptyIconCircle}>
                 <ClipboardCheck size={48} color={Colors.disabled} />
               </View>
-              <ScaledText size={16} color={Colors.textSecondary} style={styles.emptyText}>
+              <Text size={16} color={Colors.textSecondary} style={styles.emptyText}>
                 {t('noAssessments')}
-              </ScaledText>
+              </Text>
             </View>
           ) : (
             <>
@@ -257,19 +290,19 @@ export default function AssessmentsScreen() {
                   <View style={styles.sectionHeader}>
                     <View style={styles.sectionHeaderLeft}>
                       <Clock size={18} color={Colors.secondary} />
-                      <ScaledText size={17} weight="bold" color={Colors.textPrimary}>
+                      <Text size={17} weight="bold" color={Colors.textPrimary}>
                         {t('pendingAssessments')}
-                      </ScaledText>
+                      </Text>
                     </View>
                     <View style={styles.countBadge}>
-                      <ScaledText size={13} weight="bold" color={Colors.white}>
+                      <Text size={13} weight="bold" color={Colors.white}>
                         {totalPendingCount}
-                      </ScaledText>
+                      </Text>
                     </View>
                   </View>
 
                   {clinicalPending.map((submission) => {
-                    const toolType = getAssessmentType(submission.assessment_id);
+                    const toolType = getAssessmentType(submission);
                     const isClinician = toolType === 'clinician_rated';
                     const overdue = isOverdue(submission.scheduled_date);
                     const dueSoon = isDueSoon(submission.scheduled_date);
@@ -291,38 +324,38 @@ export default function AssessmentsScreen() {
                             )}
                           </View>
                           <View style={styles.cardContent}>
-                            <ScaledText size={16} weight="bold" color={Colors.textPrimary} numberOfLines={2}>
-                              {getAssessmentName(submission.assessment_id, language)}
-                            </ScaledText>
-                            <ScaledText size={12} color={Colors.textSecondary} numberOfLines={2} style={styles.descriptionText}>
-                              {getAssessmentDescription(submission.assessment_id, language)}
-                            </ScaledText>
+                            <Text size={16} weight="bold" color={Colors.textPrimary} numberOfLines={2}>
+                              {getAssessmentName(submission, language)}
+                            </Text>
+                            <Text size={12} color={Colors.textSecondary} numberOfLines={2} style={styles.descriptionText}>
+                              {getAssessmentDescription(submission, language)}
+                            </Text>
                             <View style={styles.toolTypeBadge}>
-                              <ScaledText size={10} weight="600" color={isClinician ? '#B8860B' : Colors.primary}>
+                              <Text size={10} weight="600" color={isClinician ? '#B8860B' : Colors.primary}>
                                 {isClinician ? t('clinicianRated') : t('selfReport')}
-                              </ScaledText>
+                              </Text>
                             </View>
                           </View>
                         </View>
 
                         <View style={styles.cardMeta}>
                           <View style={styles.metaRow}>
-                            <ScaledText size={12} color={Colors.textSecondary}>
+                            <Text size={12} color={Colors.textSecondary}>
                               {formatDate(submission.assigned_at || submission.created_at)}
-                            </ScaledText>
+                            </Text>
                             {submission.scheduled_date && (
                               <View style={[
                                 styles.dueBadge,
                                 overdue && styles.dueBadgeOverdue,
                                 dueSoon && !overdue && styles.dueBadgeSoon,
                               ]}>
-                                <ScaledText
+                                <Text
                                   size={11}
                                   weight="600"
                                   color={overdue ? Colors.error : dueSoon ? '#B8860B' : Colors.textSecondary}
                                 >
                                   {t('dueDate')}: {formatDate(submission.scheduled_date)}
-                                </ScaledText>
+                                </Text>
                               </View>
                             )}
                           </View>
@@ -333,19 +366,21 @@ export default function AssessmentsScreen() {
                           activeOpacity={0.8}
                           testID={`start-clinical-${submission.id}`}
                           onPress={() => {
-                            log('[Assessments] Starting clinical assessment:', submission.assessment_id);
+                            const toolKey = resolveToolKey(submission);
+                            log('[Assessments] Starting clinical assessment:', submission.assessment_id, 'toolKey:', toolKey);
                             router.push({
                               pathname: '/clinical-assessment',
                               params: {
                                 assessmentId: submission.assessment_id,
                                 submissionId: submission.id,
+                                toolKey: toolKey || '',
                               },
                             });
                           }}
                         >
-                          <ScaledText size={15} weight="bold" color={Colors.white}>
+                          <Text size={15} weight="bold" color={Colors.white}>
                             {t('startAssessment')}
-                          </ScaledText>
+                          </Text>
                           <ChevronRight size={18} color={Colors.white} />
                         </TouchableOpacity>
                       </View>
@@ -369,35 +404,35 @@ export default function AssessmentsScreen() {
                             <FileText size={22} color={Colors.primary} />
                           </View>
                           <View style={styles.cardContent}>
-                            <ScaledText size={16} weight="bold" color={Colors.textPrimary} numberOfLines={2}>
+                            <Text size={16} weight="bold" color={Colors.textPrimary} numberOfLines={2}>
                               {assignment.questionnaire_templates.name}
-                            </ScaledText>
+                            </Text>
                             {getDescription(assignment.questionnaire_templates, language) ? (
-                              <ScaledText size={13} color={Colors.textSecondary} numberOfLines={2} style={styles.descriptionText}>
+                              <Text size={13} color={Colors.textSecondary} numberOfLines={2} style={styles.descriptionText}>
                                 {getDescription(assignment.questionnaire_templates, language)}
-                              </ScaledText>
+                              </Text>
                             ) : null}
                           </View>
                         </View>
 
                         <View style={styles.cardMeta}>
                           <View style={styles.metaRow}>
-                            <ScaledText size={12} color={Colors.textSecondary}>
+                            <Text size={12} color={Colors.textSecondary}>
                               {formatDate(assignment.assigned_date)}
-                            </ScaledText>
+                            </Text>
                             {assignment.due_date && (
                               <View style={[
                                 styles.dueBadge,
                                 overdue && styles.dueBadgeOverdue,
                                 dueSoon && !overdue && styles.dueBadgeSoon,
                               ]}>
-                                <ScaledText
+                                <Text
                                   size={11}
                                   weight="600"
                                   color={overdue ? Colors.error : dueSoon ? '#B8860B' : Colors.textSecondary}
                                 >
                                   {t('dueDate')}: {formatDate(assignment.due_date)}
-                                </ScaledText>
+                                </Text>
                               </View>
                             )}
                           </View>
@@ -418,9 +453,9 @@ export default function AssessmentsScreen() {
                             });
                           }}
                         >
-                          <ScaledText size={15} weight="bold" color={Colors.white}>
+                          <Text size={15} weight="bold" color={Colors.white}>
                             {t('startAssessment')}
-                          </ScaledText>
+                          </Text>
                           <ChevronRight size={18} color={Colors.white} />
                         </TouchableOpacity>
                       </View>
@@ -434,14 +469,14 @@ export default function AssessmentsScreen() {
                   <View style={styles.sectionHeader}>
                     <View style={styles.sectionHeaderLeft}>
                       <CheckCircle size={18} color={Colors.success} />
-                      <ScaledText size={17} weight="bold" color={Colors.textPrimary}>
+                      <Text size={17} weight="bold" color={Colors.textPrimary}>
                         {t('completedAssessments')}
-                      </ScaledText>
+                      </Text>
                     </View>
                   </View>
 
                   {clinicalCompleted.map((submission) => {
-                    const isClinician = getAssessmentType(submission.assessment_id) === 'clinician_rated';
+                    const isClinician = getAssessmentType(submission) === 'clinician_rated';
                     return (
                       <View key={`cc-${submission.id}`} style={styles.completedCard}>
                         <View style={styles.completedCardLeft}>
@@ -449,26 +484,26 @@ export default function AssessmentsScreen() {
                             <CheckCircle size={16} color={isClinician ? '#B8860B' : Colors.success} />
                           </View>
                           <View style={styles.completedCardContent}>
-                            <ScaledText size={15} weight="600" color={Colors.textPrimary} numberOfLines={1}>
-                              {getAssessmentName(submission.assessment_id, language)}
-                            </ScaledText>
+                            <Text size={15} weight="600" color={Colors.textPrimary} numberOfLines={1}>
+                              {getAssessmentName(submission, language)}
+                            </Text>
                             <View style={styles.completedMeta}>
                               {submission.completed_at && (
-                                <ScaledText size={12} color={Colors.textSecondary}>
+                                <Text size={12} color={Colors.textSecondary}>
                                   {t('completedOn')} {formatDate(submission.completed_at)}
-                                </ScaledText>
+                                </Text>
                               )}
                             </View>
                           </View>
                         </View>
                         {submission.total_score !== null && submission.total_score !== undefined && (
                           <View style={styles.scoreBadge}>
-                            <ScaledText size={11} color={Colors.textSecondary}>
+                            <Text size={11} color={Colors.textSecondary}>
                               {t('score')}
-                            </ScaledText>
-                            <ScaledText size={18} weight="bold" color={Colors.primary}>
+                            </Text>
+                            <Text size={18} weight="bold" color={Colors.primary}>
                               {submission.total_score}
-                            </ScaledText>
+                            </Text>
                           </View>
                         )}
                       </View>
@@ -482,26 +517,26 @@ export default function AssessmentsScreen() {
                           <CheckCircle size={16} color={Colors.success} />
                         </View>
                         <View style={styles.completedCardContent}>
-                          <ScaledText size={15} weight="600" color={Colors.textPrimary} numberOfLines={1}>
+                          <Text size={15} weight="600" color={Colors.textPrimary} numberOfLines={1}>
                             {assignment.questionnaire_templates.name}
-                          </ScaledText>
+                          </Text>
                           <View style={styles.completedMeta}>
                             {assignment.completed_date && (
-                              <ScaledText size={12} color={Colors.textSecondary}>
+                              <Text size={12} color={Colors.textSecondary}>
                                 {t('completedOn')} {formatDate(assignment.completed_date)}
-                              </ScaledText>
+                              </Text>
                             )}
                           </View>
                         </View>
                       </View>
                       {assignment.score !== null && assignment.score !== undefined && (
                         <View style={styles.scoreBadge}>
-                          <ScaledText size={11} color={Colors.textSecondary}>
+                          <Text size={11} color={Colors.textSecondary}>
                             {t('score')}
-                          </ScaledText>
-                          <ScaledText size={18} weight="bold" color={Colors.primary}>
+                          </Text>
+                          <Text size={18} weight="bold" color={Colors.primary}>
                             {assignment.score}
-                          </ScaledText>
+                          </Text>
                         </View>
                       )}
                     </View>

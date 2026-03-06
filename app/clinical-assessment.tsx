@@ -11,13 +11,26 @@ import {
   TextInput,
 } from 'react-native';
 import { useLocalSearchParams, router } from 'expo-router';
-import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useApp } from '@/contexts/AppContext';
-import { ScaledText } from '@/components/ScaledText';
+import { ScaledText as Text } from '@/components/ScaledText';
 import { supabase } from '@/lib/supabase';
 import Colors from '@/constants/colors';
 import { Language } from '@/types';
-import { ASSESSMENT_TOOLS, AssessmentTool, ScaleLabel, MCASection, OHATItem, BeckmanStructure } from '@/constants/assessments';
+import {
+  ASSESSMENT_TOOLS,
+  AssessmentTool,
+  ScaleLabel,
+  MCASection,
+  OHATItem,
+  BeckmanStructure,
+  BeckmanAdditionalObs,
+  AssessmentItem,
+  AssessmentDomain,
+  FOISItem,
+  FDA2Section,
+  DToMsDimension,
+} from '@/constants/assessments';
 import { ArrowLeft, CheckCircle2, Info, ChevronDown, ChevronUp } from 'lucide-react-native';
 import { log } from '@/lib/logger';
 
@@ -272,8 +285,143 @@ function getAnsweredCount(tool: AssessmentTool, answers: Record<string, number |
   return Object.keys(answers).length;
 }
 
+interface AssessmentLibraryRow {
+  id: string;
+  name_en: string | null;
+  name_zh: string | null;
+  description_en: string | null;
+  description_zh: string | null;
+  type: string | null;
+  key: string | null;
+  items: unknown;
+  scoring_config: unknown;
+  reference: string | null;
+  interpretation_en: string | null;
+  interpretation_zh: string | null;
+}
+
+function buildDynamicTool(record: AssessmentLibraryRow): AssessmentTool | null {
+  log('[ClinicalAssessment] Building dynamic tool from assessment_library:', record.id);
+  const base: AssessmentTool = {
+    id: record.key || record.id,
+    name_en: record.name_en || record.id,
+    name_zh: record.name_zh || record.name_en || record.id,
+    description_en: record.description_en || '',
+    description_zh: record.description_zh || '',
+    reference: record.reference || '',
+    type: (record.type as 'patient_self_report' | 'clinician_rated') || 'clinician_rated',
+    scoring_method: 'summation',
+    interpretation_en: record.interpretation_en || undefined,
+    interpretation_zh: record.interpretation_zh || undefined,
+  };
+
+  const items = record.items;
+  const sc = (record.scoring_config || {}) as Record<string, unknown>;
+
+  if (!items || !Array.isArray(items) || items.length === 0) {
+    log('[ClinicalAssessment] No items found in assessment_library record');
+    return { ...base, items: [] };
+  }
+
+  const first = items[0] as Record<string, unknown>;
+
+  if (first.section_id && Array.isArray(first.items)) {
+    log('[ClinicalAssessment] Detected MCA-style sections');
+    return {
+      ...base,
+      scoring_method: (sc.scoring_method as string) || 'categorical_risk_pathway',
+      mca_sections: items as unknown as MCASection[],
+      risk_pathways: sc.risk_pathways as Record<string, { en: string; zh: string }> | undefined,
+      total_max: sc.total_max as number | undefined,
+    };
+  }
+
+  if (first.structure_id && Array.isArray(first.assessment_areas)) {
+    log('[ClinicalAssessment] Detected Beckman-style structures');
+    return {
+      ...base,
+      scoring_method: (sc.scoring_method as string) || 'beckman_recording',
+      beckman_structures: items as unknown as BeckmanStructure[],
+      beckman_additional: sc.beckman_additional as BeckmanAdditionalObs | undefined,
+    };
+  }
+
+  if (first.category_en && first.scores && first.item_number !== undefined) {
+    log('[ClinicalAssessment] Detected OHAT-style items');
+    return {
+      ...base,
+      scoring_method: (sc.scoring_method as string) || 'ohat_summation',
+      ohat_items: items as unknown as OHATItem[],
+      total_min: sc.total_min as number | undefined,
+      total_max: sc.total_max as number | undefined,
+    };
+  }
+
+  if (first.domain_id && Array.isArray(first.items)) {
+    log('[ClinicalAssessment] Detected domain-style items');
+    return {
+      ...base,
+      scoring_method: (sc.scoring_method as string) || 'domain_scoring',
+      domains: items as unknown as AssessmentDomain[],
+      scale_min: sc.scale_min as number | undefined,
+      scale_max: sc.scale_max as number | undefined,
+      total_min: sc.total_min as number | undefined,
+      total_max: sc.total_max as number | undefined,
+    };
+  }
+
+  if (first.level !== undefined && first.category_en && first.text_en) {
+    log('[ClinicalAssessment] Detected FOIS-style items');
+    return {
+      ...base,
+      scoring_method: (sc.scoring_method as string) || 'single_level',
+      fois_items: items as unknown as FOISItem[],
+      total_min: sc.total_min as number | undefined,
+      total_max: sc.total_max as number | undefined,
+    };
+  }
+
+  if (first.section_number !== undefined && first.name_en && Array.isArray(first.items)) {
+    log('[ClinicalAssessment] Detected FDA2-style sections');
+    return {
+      ...base,
+      scoring_method: (sc.scoring_method as string) || 'fda2_rating',
+      fda2_sections: items as unknown as FDA2Section[],
+      fda2_scale: sc.fda2_scale as Record<string, ScaleLabel> | undefined,
+    };
+  }
+
+  if (first.dimension_id && Array.isArray(first.levels)) {
+    log('[ClinicalAssessment] Detected DToMs-style dimensions');
+    return {
+      ...base,
+      scoring_method: (sc.scoring_method as string) || 'dtoms_rating',
+      dtoms_dimensions: items as unknown as DToMsDimension[],
+    };
+  }
+
+  if (first.item_number !== undefined && first.text_en) {
+    log('[ClinicalAssessment] Detected flat scale items');
+    return {
+      ...base,
+      scoring_method: (sc.scoring_method as string) || 'summation',
+      items: items as unknown as AssessmentItem[],
+      scale_min: sc.scale_min as number | undefined,
+      scale_max: sc.scale_max as number | undefined,
+      scale_labels: sc.scale_labels as Record<string, ScaleLabel> | undefined,
+      total_min: sc.total_min as number | undefined,
+      total_max: sc.total_max as number | undefined,
+      subscales: sc.subscales as Record<string, { items: number[]; max: number }> | undefined,
+      severity_question: sc.severity_question as { text_en: string; text_zh: string; scale_min: number; scale_max: number } | undefined,
+    };
+  }
+
+  log('[ClinicalAssessment] Unknown item structure, returning base tool');
+  return { ...base, items: [] };
+}
+
 export default function ClinicalAssessmentScreen() {
-  const { assessmentId, submissionId } = useLocalSearchParams<{ assessmentId: string; submissionId: string }>();
+  const { assessmentId, submissionId, toolKey } = useLocalSearchParams<{ assessmentId: string; submissionId: string; toolKey?: string }>();
   const { t, language, patientId } = useApp();
   const queryClient = useQueryClient();
   const [answers, setAnswers] = useState<Record<string, number | string>>({});
@@ -283,7 +431,43 @@ export default function ClinicalAssessmentScreen() {
   const fadeAnim = useRef(new Animated.Value(0)).current;
   const scaleAnim = useRef(new Animated.Value(0.8)).current;
 
-  const tool = useMemo(() => assessmentId ? ASSESSMENT_TOOLS[assessmentId] : null, [assessmentId]);
+  const localTool = useMemo(() => {
+    if (toolKey && ASSESSMENT_TOOLS[toolKey]) return ASSESSMENT_TOOLS[toolKey];
+    if (assessmentId && ASSESSMENT_TOOLS[assessmentId]) return ASSESSMENT_TOOLS[assessmentId];
+    return null;
+  }, [assessmentId, toolKey]);
+
+  const libraryQuery = useQuery({
+    queryKey: ['assessment_library', assessmentId],
+    queryFn: async () => {
+      log('[ClinicalAssessment] Fetching assessment_library for:', assessmentId);
+      const { data, error } = await supabase
+        .from('assessment_library')
+        .select('id, name_en, name_zh, description_en, description_zh, type, key, items, scoring_config, reference, interpretation_en, interpretation_zh')
+        .eq('id', assessmentId!)
+        .maybeSingle();
+
+      if (error) {
+        log('[ClinicalAssessment] assessment_library fetch error:', error);
+        return null;
+      }
+      log('[ClinicalAssessment] assessment_library record:', data?.id, data?.name_en);
+      return data as AssessmentLibraryRow | null;
+    },
+    enabled: !localTool && !!assessmentId,
+  });
+
+  const tool = useMemo(() => {
+    if (localTool) return localTool;
+    if (libraryQuery.data) {
+      const libRecord = libraryQuery.data;
+      if (libRecord.key && ASSESSMENT_TOOLS[libRecord.key]) {
+        return ASSESSMENT_TOOLS[libRecord.key];
+      }
+      return buildDynamicTool(libRecord);
+    }
+    return null;
+  }, [localTool, libraryQuery.data]);
 
   const totalItems = useMemo(() => tool ? getTotalItemCount(tool) : 0, [tool]);
   const answeredCount = useMemo(() => tool ? getAnsweredCount(tool, answers) : 0, [tool, answers]);
@@ -348,8 +532,8 @@ export default function ClinicalAssessmentScreen() {
         Animated.timing(fadeAnim, { toValue: 1, duration: 500, useNativeDriver: true }),
         Animated.spring(scaleAnim, { toValue: 1, friction: 6, useNativeDriver: true }),
       ]).start();
-      queryClient.invalidateQueries({ queryKey: ['clinical_assessments'] });
-      queryClient.invalidateQueries({ queryKey: ['assessments'] });
+      void queryClient.invalidateQueries({ queryKey: ['clinical_assessments'] });
+      void queryClient.invalidateQueries({ queryKey: ['assessments'] });
     },
     onError: (error) => {
       log('[ClinicalAssessment] Submit error:', error);
@@ -377,11 +561,25 @@ export default function ClinicalAssessmentScreen() {
   }, []);
 
   if (!tool) {
+    if (libraryQuery.isLoading) {
+      return (
+        <View style={styles.root}>
+          <SafeAreaView style={styles.container}>
+            <View style={styles.loadingContainer}>
+              <ActivityIndicator size="large" color={Colors.primary} />
+            </View>
+          </SafeAreaView>
+        </View>
+      );
+    }
     return (
       <View style={styles.root}>
         <SafeAreaView style={styles.container}>
           <View style={styles.loadingContainer}>
-            <ScaledText size={16} color={Colors.textSecondary}>Assessment not found</ScaledText>
+            <Text size={16} color={Colors.textSecondary}>Assessment not found</Text>
+            <TouchableOpacity onPress={() => router.back()} style={{ marginTop: 20 }}>
+              <Text size={14} color={Colors.primary}>{t('goBack')}</Text>
+            </TouchableOpacity>
           </View>
         </SafeAreaView>
       </View>
@@ -413,17 +611,17 @@ export default function ClinicalAssessmentScreen() {
             <ArrowLeft size={24} color={Colors.textPrimary} />
           </TouchableOpacity>
           <View style={styles.headerTitleArea}>
-            <ScaledText size={16} weight="bold" color={Colors.textPrimary} numberOfLines={1}>
+            <Text size={16} weight="bold" color={Colors.textPrimary} numberOfLines={1}>
               {toolName}
-            </ScaledText>
-            <ScaledText size={12} color={Colors.textSecondary}>
+            </Text>
+            <Text size={12} color={Colors.textSecondary}>
               {answeredCount} {t('questionOf')} {totalItems}
-            </ScaledText>
+            </Text>
           </View>
           <View style={styles.typeBadge}>
-            <ScaledText size={10} weight="600" color={tool.type === 'clinician_rated' ? '#B8860B' : Colors.primary}>
+            <Text size={10} weight="600" color={tool.type === 'clinician_rated' ? '#B8860B' : Colors.primary}>
               {tool.type === 'clinician_rated' ? t('clinicianRated') : t('selfReport')}
-            </ScaledText>
+            </Text>
           </View>
         </View>
 
@@ -458,15 +656,15 @@ export default function ClinicalAssessmentScreen() {
               {isSubmitting ? (
                 <ActivityIndicator color={Colors.white} />
               ) : (
-                <ScaledText size={17} weight="bold" color={Colors.white}>
+                <Text size={17} weight="bold" color={Colors.white}>
                   {t('submitAssessment')}
-                </ScaledText>
+                </Text>
               )}
             </TouchableOpacity>
             {!allAnswered && (
-              <ScaledText size={12} color={Colors.textSecondary} style={styles.hintText}>
+              <Text size={12} color={Colors.textSecondary} style={styles.hintText}>
                 {t('pleaseAnswerAll')}
-              </ScaledText>
+              </Text>
             )}
           </View>
         </ScrollView>
@@ -536,11 +734,11 @@ function ScaleItems({ tool, answers, language, onAnswer }: ItemProps) {
           <View key={key} style={[styles.questionCard, isAnswered && styles.questionCardAnswered]}>
             <View style={styles.questionHeader}>
               <View style={styles.questionNumberBadge}>
-                <ScaledText size={12} weight="bold" color={Colors.white}>{index + 1}</ScaledText>
+                <Text size={12} weight="bold" color={Colors.white}>{index + 1}</Text>
               </View>
-              <ScaledText size={15} weight="600" color={Colors.textPrimary} style={styles.questionText}>
+              <Text size={15} weight="600" color={Colors.textPrimary} style={styles.questionText}>
                 {itemText}
-              </ScaledText>
+              </Text>
             </View>
             <View style={styles.scaleButtonsRow}>
               {Array.from({ length: max - min + 1 }, (_, i) => min + i).map((val) => {
@@ -554,13 +752,13 @@ function ScaleItems({ tool, answers, language, onAnswer }: ItemProps) {
                     activeOpacity={0.7}
                     testID={`scale-${key}-${val}`}
                   >
-                    <ScaledText size={15} weight={isSelected ? 'bold' : 'normal'} color={isSelected ? Colors.white : Colors.textPrimary}>
+                    <Text size={15} weight={isSelected ? 'bold' : 'normal'} color={isSelected ? Colors.white : Colors.textPrimary}>
                       {val}
-                    </ScaledText>
+                    </Text>
                     {label ? (
-                      <ScaledText size={9} color={isSelected ? 'rgba(255,255,255,0.85)' : Colors.textSecondary} numberOfLines={2} style={styles.scaleButtonLabel}>
+                      <Text size={9} color={isSelected ? 'rgba(255,255,255,0.85)' : Colors.textSecondary} numberOfLines={2} style={styles.scaleButtonLabel}>
                         {label}
-                      </ScaledText>
+                      </Text>
                     ) : null}
                   </TouchableOpacity>
                 );
@@ -573,7 +771,7 @@ function ScaleItems({ tool, answers, language, onAnswer }: ItemProps) {
   );
 }
 
-function DHIItems({ tool, answers, language, onAnswer, t }: ItemProps) {
+function DHIItems({ tool, answers, language, onAnswer }: ItemProps) {
   const items = tool.items || [];
   const dhiValues = [0, 2, 4] as const;
   const labels = tool.scale_labels;
@@ -590,13 +788,13 @@ function DHIItems({ tool, answers, language, onAnswer, t }: ItemProps) {
           <View key={key} style={[styles.questionCard, isAnswered && styles.questionCardAnswered]}>
             <View style={styles.questionHeader}>
               <View style={styles.questionNumberBadge}>
-                <ScaledText size={12} weight="bold" color={Colors.white}>{index + 1}</ScaledText>
+                <Text size={12} weight="bold" color={Colors.white}>{index + 1}</Text>
               </View>
               <View style={{ flex: 1 }}>
-                <ScaledText size={15} weight="600" color={Colors.textPrimary} style={styles.questionText}>
+                <Text size={15} weight="600" color={Colors.textPrimary} style={styles.questionText}>
                   {itemText}
-                </ScaledText>
-                <ScaledText size={10} color={Colors.textSecondary}>{subscaleLabel}</ScaledText>
+                </Text>
+                <Text size={10} color={Colors.textSecondary}>{subscaleLabel}</Text>
               </View>
             </View>
             <View style={styles.dhiRow}>
@@ -610,9 +808,9 @@ function DHIItems({ tool, answers, language, onAnswer, t }: ItemProps) {
                     onPress={() => onAnswer(key, val)}
                     activeOpacity={0.7}
                   >
-                    <ScaledText size={14} weight={isSelected ? 'bold' : 'normal'} color={isSelected ? Colors.white : Colors.textPrimary}>
+                    <Text size={14} weight={isSelected ? 'bold' : 'normal'} color={isSelected ? Colors.white : Colors.textPrimary}>
                       {label}
-                    </ScaledText>
+                    </Text>
                   </TouchableOpacity>
                 );
               })}
@@ -625,11 +823,11 @@ function DHIItems({ tool, answers, language, onAnswer, t }: ItemProps) {
         <View style={[styles.questionCard, answers['severity'] !== undefined && styles.questionCardAnswered]}>
           <View style={styles.questionHeader}>
             <View style={[styles.questionNumberBadge, { backgroundColor: Colors.secondary }]}>
-              <ScaledText size={10} weight="bold" color={Colors.white}>★</ScaledText>
+              <Text size={10} weight="bold" color={Colors.white}>★</Text>
             </View>
-            <ScaledText size={15} weight="600" color={Colors.textPrimary} style={styles.questionText}>
+            <Text size={15} weight="600" color={Colors.textPrimary} style={styles.questionText}>
               {txt(tool.severity_question.text_en, tool.severity_question.text_zh, language)}
-            </ScaledText>
+            </Text>
           </View>
           <View style={styles.scaleButtonsRow}>
             {Array.from({ length: tool.severity_question.scale_max - tool.severity_question.scale_min + 1 }, (_, i) => tool.severity_question!.scale_min + i).map((val) => {
@@ -641,9 +839,9 @@ function DHIItems({ tool, answers, language, onAnswer, t }: ItemProps) {
                   onPress={() => onAnswer('severity', val)}
                   activeOpacity={0.7}
                 >
-                  <ScaledText size={15} weight={isSelected ? 'bold' : 'normal'} color={isSelected ? Colors.white : Colors.textPrimary}>
+                  <Text size={15} weight={isSelected ? 'bold' : 'normal'} color={isSelected ? Colors.white : Colors.textPrimary}>
                     {val}
-                  </ScaledText>
+                  </Text>
                 </TouchableOpacity>
               );
             })}
@@ -675,17 +873,17 @@ function FOISItems({ tool, answers, language, onAnswer }: ItemProps) {
           >
             <View style={styles.foisHeader}>
               <View style={[styles.foisLevelBadge, isSelected && styles.foisLevelBadgeSelected]}>
-                <ScaledText size={16} weight="bold" color={isSelected ? Colors.white : Colors.primary}>
+                <Text size={16} weight="bold" color={isSelected ? Colors.white : Colors.primary}>
                   {item.level}
-                </ScaledText>
+                </Text>
               </View>
               <View style={styles.foisContent}>
-                <ScaledText size={10} weight="600" color={isSelected ? Colors.primary : Colors.textSecondary} style={styles.foisCategory}>
+                <Text size={10} weight="600" color={isSelected ? Colors.primary : Colors.textSecondary} style={styles.foisCategory}>
                   {category}
-                </ScaledText>
-                <ScaledText size={14} weight={isSelected ? '600' : 'normal'} color={Colors.textPrimary}>
+                </Text>
+                <Text size={14} weight={isSelected ? '600' : 'normal'} color={Colors.textPrimary}>
                   {text}
-                </ScaledText>
+                </Text>
               </View>
             </View>
             <View style={[styles.foisRadio, isSelected && styles.foisRadioSelected]}>
@@ -712,9 +910,9 @@ function DomainItems({ tool, answers, language, onAnswer }: ItemProps) {
           <View key={domain.domain_id}>
             <View style={styles.domainHeader}>
               <View style={styles.domainHeaderLine} />
-              <ScaledText size={14} weight="bold" color={Colors.primary} style={styles.domainHeaderText}>
+              <Text size={14} weight="bold" color={Colors.primary} style={styles.domainHeaderText}>
                 {domainName}
-              </ScaledText>
+              </Text>
               <View style={styles.domainHeaderLine} />
             </View>
 
@@ -728,11 +926,11 @@ function DomainItems({ tool, answers, language, onAnswer }: ItemProps) {
                 <View key={key} style={[styles.questionCard, isAnswered && styles.questionCardAnswered]}>
                   <View style={styles.questionHeader}>
                     <View style={styles.questionNumberBadge}>
-                      <ScaledText size={11} weight="bold" color={Colors.white}>{item.item_number}</ScaledText>
+                      <Text size={11} weight="bold" color={Colors.white}>{item.item_number}</Text>
                     </View>
-                    <ScaledText size={14} weight="600" color={Colors.textPrimary} style={styles.questionText}>
+                    <Text size={14} weight="600" color={Colors.textPrimary} style={styles.questionText}>
                       {itemText}
-                    </ScaledText>
+                    </Text>
                   </View>
                   <View style={styles.scaleButtonsRow}>
                     {Array.from({ length: max - min + 1 }, (_, i) => min + i).map((val) => {
@@ -745,13 +943,13 @@ function DomainItems({ tool, answers, language, onAnswer }: ItemProps) {
                           onPress={() => onAnswer(key, val)}
                           activeOpacity={0.7}
                         >
-                          <ScaledText size={14} weight={isSelected ? 'bold' : 'normal'} color={isSelected ? Colors.white : Colors.textPrimary}>
+                          <Text size={14} weight={isSelected ? 'bold' : 'normal'} color={isSelected ? Colors.white : Colors.textPrimary}>
                             {val}
-                          </ScaledText>
+                          </Text>
                           {label ? (
-                            <ScaledText size={8} color={isSelected ? 'rgba(255,255,255,0.85)' : Colors.textSecondary} numberOfLines={2} style={styles.scaleButtonLabel}>
+                            <Text size={8} color={isSelected ? 'rgba(255,255,255,0.85)' : Colors.textSecondary} numberOfLines={2} style={styles.scaleButtonLabel}>
                               {label}
-                            </ScaledText>
+                            </Text>
                           ) : null}
                         </TouchableOpacity>
                       );
@@ -779,9 +977,9 @@ function COASTItems({ tool, answers, language, onAnswer }: ItemProps) {
           <View key={domain.domain_id}>
             <View style={styles.domainHeader}>
               <View style={styles.domainHeaderLine} />
-              <ScaledText size={14} weight="bold" color={Colors.primary} style={styles.domainHeaderText}>
+              <Text size={14} weight="bold" color={Colors.primary} style={styles.domainHeaderText}>
                 {domainName}
-              </ScaledText>
+              </Text>
               <View style={styles.domainHeaderLine} />
             </View>
 
@@ -795,11 +993,11 @@ function COASTItems({ tool, answers, language, onAnswer }: ItemProps) {
                 <View key={key} style={[styles.questionCard, isAnswered && styles.questionCardAnswered]}>
                   <View style={styles.questionHeader}>
                     <View style={styles.questionNumberBadge}>
-                      <ScaledText size={11} weight="bold" color={Colors.white}>{item.item_number}</ScaledText>
+                      <Text size={11} weight="bold" color={Colors.white}>{item.item_number}</Text>
                     </View>
-                    <ScaledText size={14} weight="600" color={Colors.textPrimary} style={styles.questionText}>
+                    <Text size={14} weight="600" color={Colors.textPrimary} style={styles.questionText}>
                       {itemText}
-                    </ScaledText>
+                    </Text>
                   </View>
                   {itemLabels ? (
                     <View style={styles.coastChoices}>
@@ -815,13 +1013,13 @@ function COASTItems({ tool, answers, language, onAnswer }: ItemProps) {
                             activeOpacity={0.7}
                           >
                             <View style={[styles.coastChoiceNumber, isSelected && styles.coastChoiceNumberSelected]}>
-                              <ScaledText size={13} weight="bold" color={isSelected ? Colors.white : Colors.textSecondary}>
+                              <Text size={13} weight="bold" color={isSelected ? Colors.white : Colors.textSecondary}>
                                 {val}
-                              </ScaledText>
+                              </Text>
                             </View>
-                            <ScaledText size={13} color={isSelected ? Colors.primary : Colors.textPrimary} weight={isSelected ? '600' : 'normal'} style={{ flex: 1 }}>
+                            <Text size={13} color={isSelected ? Colors.primary : Colors.textPrimary} weight={isSelected ? '600' : 'normal'} style={{ flex: 1 }}>
                               {labelText}
-                            </ScaledText>
+                            </Text>
                           </TouchableOpacity>
                         );
                       })}
@@ -837,9 +1035,9 @@ function COASTItems({ tool, answers, language, onAnswer }: ItemProps) {
                             onPress={() => onAnswer(key, val)}
                             activeOpacity={0.7}
                           >
-                            <ScaledText size={14} weight={isSelected ? 'bold' : 'normal'} color={isSelected ? Colors.white : Colors.textPrimary}>
+                            <Text size={14} weight={isSelected ? 'bold' : 'normal'} color={isSelected ? Colors.white : Colors.textPrimary}>
                               {val}
-                            </ScaledText>
+                            </Text>
                           </TouchableOpacity>
                         );
                       })}
@@ -869,9 +1067,9 @@ function FDA2Items({ tool, answers, language, onAnswer }: ItemProps) {
           <View key={section.section_number}>
             <View style={styles.domainHeader}>
               <View style={styles.domainHeaderLine} />
-              <ScaledText size={14} weight="bold" color={Colors.primary} style={styles.domainHeaderText}>
+              <Text size={14} weight="bold" color={Colors.primary} style={styles.domainHeaderText}>
                 {section.section_number}. {sectionName}
-              </ScaledText>
+              </Text>
               <View style={styles.domainHeaderLine} />
             </View>
 
@@ -883,11 +1081,11 @@ function FDA2Items({ tool, answers, language, onAnswer }: ItemProps) {
                 <View key={item.item_id} style={[styles.questionCard, isAnswered && styles.questionCardAnswered]}>
                   <View style={styles.questionHeader}>
                     <View style={styles.questionNumberBadge}>
-                      <ScaledText size={10} weight="bold" color={Colors.white}>{item.item_id}</ScaledText>
+                      <Text size={10} weight="bold" color={Colors.white}>{item.item_id}</Text>
                     </View>
-                    <ScaledText size={14} weight="600" color={Colors.textPrimary} style={styles.questionText}>
+                    <Text size={14} weight="600" color={Colors.textPrimary} style={styles.questionText}>
                       {itemText}
-                    </ScaledText>
+                    </Text>
                   </View>
                   <View style={styles.fda2Ratings}>
                     {ratingKeys.map((rk) => {
@@ -901,12 +1099,12 @@ function FDA2Items({ tool, answers, language, onAnswer }: ItemProps) {
                           onPress={() => onAnswer(item.item_id, rk)}
                           activeOpacity={0.7}
                         >
-                          <ScaledText size={14} weight="bold" color={isSelected ? Colors.white : Colors.textPrimary}>
+                          <Text size={14} weight="bold" color={isSelected ? Colors.white : Colors.textPrimary}>
                             {shortLabel}
-                          </ScaledText>
-                          <ScaledText size={8} color={isSelected ? 'rgba(255,255,255,0.85)' : Colors.textSecondary} numberOfLines={2} style={styles.fda2Label}>
+                          </Text>
+                          <Text size={8} color={isSelected ? 'rgba(255,255,255,0.85)' : Colors.textSecondary} numberOfLines={2} style={styles.fda2Label}>
                             {label.split('(')[0].trim()}
-                          </ScaledText>
+                          </Text>
                         </TouchableOpacity>
                       );
                     })}
@@ -935,12 +1133,12 @@ function DToMsItems({ tool, answers, language, onAnswer }: ItemProps) {
         return (
           <View key={dim.dimension_id} style={styles.dtomsCard}>
             <View style={styles.dtomsHeader}>
-              <ScaledText size={16} weight="bold" color={Colors.textPrimary}>
+              <Text size={16} weight="bold" color={Colors.textPrimary}>
                 {dimName}
-              </ScaledText>
-              <ScaledText size={12} color={Colors.textSecondary} style={{ marginTop: 4 }}>
+              </Text>
+              <Text size={12} color={Colors.textSecondary} style={{ marginTop: 4 }}>
                 {dimDesc}
-              </ScaledText>
+              </Text>
             </View>
 
             <View style={styles.dtomsScaleRow}>
@@ -957,13 +1155,13 @@ function DToMsItems({ tool, answers, language, onAnswer }: ItemProps) {
                     onPress={() => onAnswer(dim.dimension_id, val)}
                     activeOpacity={0.7}
                   >
-                    <ScaledText
+                    <Text
                       size={isWholeNumber ? 13 : 10}
                       weight={isSelected ? 'bold' : 'normal'}
                       color={isSelected ? Colors.white : Colors.textSecondary}
                     >
                       {val}
-                    </ScaledText>
+                    </Text>
                   </TouchableOpacity>
                 );
               })}
@@ -975,9 +1173,9 @@ function DToMsItems({ tool, answers, language, onAnswer }: ItemProps) {
                   const isActive = Math.floor(selectedVal) === level.score || (selectedVal > level.score && selectedVal < level.score + 1);
                   if (!isActive) return null;
                   return (
-                    <ScaledText key={level.score} size={12} color={Colors.primary} weight="600">
+                    <Text key={level.score} size={12} color={Colors.primary} weight="600">
                       {txt(level.label_en, level.label_zh, language)}
-                    </ScaledText>
+                    </Text>
                   );
                 })}
               </View>
@@ -1008,14 +1206,14 @@ function AllWalesMCAItems({ tool, answers, language, onAnswer }: ItemProps) {
           <View key={section.section_id}>
             <View style={styles.domainHeader}>
               <View style={styles.domainHeaderLine} />
-              <ScaledText size={14} weight="bold" color={Colors.primary} style={styles.domainHeaderText}>
+              <Text size={14} weight="bold" color={Colors.primary} style={styles.domainHeaderText}>
                 {sectionName}
-              </ScaledText>
+              </Text>
               <View style={styles.domainHeaderLine} />
             </View>
-            <ScaledText size={12} color={Colors.textSecondary} style={styles.mcaSectionDesc}>
+            <Text size={12} color={Colors.textSecondary} style={styles.mcaSectionDesc}>
               {sectionDesc}
-            </ScaledText>
+            </Text>
 
             {section.items.map((item) => {
               const isAnswered = answers[item.item_id] !== undefined;
@@ -1026,11 +1224,11 @@ function AllWalesMCAItems({ tool, answers, language, onAnswer }: ItemProps) {
                   <View key={item.item_id} style={[styles.questionCard, isAnswered && styles.questionCardAnswered]}>
                     <View style={styles.questionHeader}>
                       <View style={styles.questionNumberBadge}>
-                        <ScaledText size={10} weight="bold" color={Colors.white}>{item.item_id}</ScaledText>
+                        <Text size={10} weight="bold" color={Colors.white}>{item.item_id}</Text>
                       </View>
-                      <ScaledText size={15} weight="600" color={Colors.textPrimary} style={styles.questionText}>
+                      <Text size={15} weight="600" color={Colors.textPrimary} style={styles.questionText}>
                         {categoryText}
-                      </ScaledText>
+                      </Text>
                     </View>
                     <View style={styles.coastChoices}>
                       {Object.entries(item.scores).map(([val, label]) => {
@@ -1045,13 +1243,13 @@ function AllWalesMCAItems({ tool, answers, language, onAnswer }: ItemProps) {
                             activeOpacity={0.7}
                           >
                             <View style={[styles.coastChoiceNumber, isSelected && styles.coastChoiceNumberSelected]}>
-                              <ScaledText size={13} weight="bold" color={isSelected ? Colors.white : Colors.textSecondary}>
+                              <Text size={13} weight="bold" color={isSelected ? Colors.white : Colors.textSecondary}>
                                 {val}
-                              </ScaledText>
+                              </Text>
                             </View>
-                            <ScaledText size={13} color={isSelected ? Colors.primary : Colors.textPrimary} weight={isSelected ? '600' : 'normal'} style={{ flex: 1 }}>
+                            <Text size={13} color={isSelected ? Colors.primary : Colors.textPrimary} weight={isSelected ? '600' : 'normal'} style={{ flex: 1 }}>
                               {labelText}
-                            </ScaledText>
+                            </Text>
                           </TouchableOpacity>
                         );
                       })}
@@ -1066,11 +1264,11 @@ function AllWalesMCAItems({ tool, answers, language, onAnswer }: ItemProps) {
                   <View key={item.item_id} style={[styles.questionCard, isAnswered && styles.questionCardAnswered]}>
                     <View style={styles.questionHeader}>
                       <View style={styles.questionNumberBadge}>
-                        <ScaledText size={10} weight="bold" color={Colors.white}>{item.item_id}</ScaledText>
+                        <Text size={10} weight="bold" color={Colors.white}>{item.item_id}</Text>
                       </View>
-                      <ScaledText size={14} weight="600" color={Colors.textPrimary} style={styles.questionText}>
+                      <Text size={14} weight="600" color={Colors.textPrimary} style={styles.questionText}>
                         {itemText}
-                      </ScaledText>
+                      </Text>
                     </View>
                     <TextInput
                       style={styles.mcaTextInput}
@@ -1090,11 +1288,11 @@ function AllWalesMCAItems({ tool, answers, language, onAnswer }: ItemProps) {
                 <View key={item.item_id} style={[styles.questionCard, isAnswered && styles.questionCardAnswered]}>
                   <View style={styles.questionHeader}>
                     <View style={styles.questionNumberBadge}>
-                      <ScaledText size={10} weight="bold" color={Colors.white}>{item.item_id}</ScaledText>
+                      <Text size={10} weight="bold" color={Colors.white}>{item.item_id}</Text>
                     </View>
-                    <ScaledText size={14} weight="600" color={Colors.textPrimary} style={styles.questionText}>
+                    <Text size={14} weight="600" color={Colors.textPrimary} style={styles.questionText}>
                       {itemText}
-                    </ScaledText>
+                    </Text>
                   </View>
                   <View style={styles.dhiRow}>
                     <TouchableOpacity
@@ -1102,18 +1300,18 @@ function AllWalesMCAItems({ tool, answers, language, onAnswer }: ItemProps) {
                       onPress={() => onAnswer(item.item_id, 'yes')}
                       activeOpacity={0.7}
                     >
-                      <ScaledText size={14} weight={answers[item.item_id] === 'yes' ? 'bold' : 'normal'} color={answers[item.item_id] === 'yes' ? Colors.white : Colors.textPrimary}>
+                      <Text size={14} weight={answers[item.item_id] === 'yes' ? 'bold' : 'normal'} color={answers[item.item_id] === 'yes' ? Colors.white : Colors.textPrimary}>
                         {yesLabel}
-                      </ScaledText>
+                      </Text>
                     </TouchableOpacity>
                     <TouchableOpacity
                       style={[styles.dhiButton, answers[item.item_id] === 'no' && styles.dhiButtonSelected]}
                       onPress={() => onAnswer(item.item_id, 'no')}
                       activeOpacity={0.7}
                     >
-                      <ScaledText size={14} weight={answers[item.item_id] === 'no' ? 'bold' : 'normal'} color={answers[item.item_id] === 'no' ? Colors.white : Colors.textPrimary}>
+                      <Text size={14} weight={answers[item.item_id] === 'no' ? 'bold' : 'normal'} color={answers[item.item_id] === 'no' ? Colors.white : Colors.textPrimary}>
                         {noLabel}
-                      </ScaledText>
+                      </Text>
                     </TouchableOpacity>
                   </View>
                 </View>
@@ -1140,11 +1338,11 @@ function KoreanOHATItems({ tool, answers, language, onAnswer }: ItemProps) {
           <View key={key} style={[styles.questionCard, isAnswered && styles.questionCardAnswered]}>
             <View style={styles.questionHeader}>
               <View style={styles.questionNumberBadge}>
-                <ScaledText size={12} weight="bold" color={Colors.white}>{index + 1}</ScaledText>
+                <Text size={12} weight="bold" color={Colors.white}>{index + 1}</Text>
               </View>
-              <ScaledText size={15} weight="600" color={Colors.textPrimary} style={styles.questionText}>
+              <Text size={15} weight="600" color={Colors.textPrimary} style={styles.questionText}>
                 {categoryText}
-              </ScaledText>
+              </Text>
             </View>
             <View style={styles.coastChoices}>
               {Object.entries(item.scores).map(([val, label]) => {
@@ -1159,13 +1357,13 @@ function KoreanOHATItems({ tool, answers, language, onAnswer }: ItemProps) {
                     activeOpacity={0.7}
                   >
                     <View style={[styles.coastChoiceNumber, isSelected && styles.coastChoiceNumberSelected]}>
-                      <ScaledText size={13} weight="bold" color={isSelected ? Colors.white : Colors.textSecondary}>
+                      <Text size={13} weight="bold" color={isSelected ? Colors.white : Colors.textSecondary}>
                         {val}
-                      </ScaledText>
+                      </Text>
                     </View>
-                    <ScaledText size={13} color={isSelected ? Colors.primary : Colors.textPrimary} weight={isSelected ? '600' : 'normal'} style={{ flex: 1 }}>
+                    <Text size={13} color={isSelected ? Colors.primary : Colors.textPrimary} weight={isSelected ? '600' : 'normal'} style={{ flex: 1 }}>
                       {labelText}
-                    </ScaledText>
+                    </Text>
                   </TouchableOpacity>
                 );
               })}
@@ -1185,9 +1383,9 @@ function BeckmanOMAItems({ tool, answers, language, onAnswer }: ItemProps) {
     const isAnswered = answers[itemId] !== undefined;
     return (
       <View key={itemId} style={[styles.questionCard, isAnswered && styles.questionCardAnswered]}>
-        <ScaledText size={13} weight="600" color={Colors.textPrimary} style={{ marginBottom: 10 }}>
+        <Text size={13} weight="600" color={Colors.textPrimary} style={{ marginBottom: 10 }}>
           {itemText}
-        </ScaledText>
+        </Text>
         <View style={styles.scaleButtonsRow}>
           {['1', '2', '3'].map((val) => {
             const numVal = Number(val);
@@ -1201,12 +1399,12 @@ function BeckmanOMAItems({ tool, answers, language, onAnswer }: ItemProps) {
                 onPress={() => onAnswer(itemId, numVal)}
                 activeOpacity={0.7}
               >
-                <ScaledText size={13} weight={isSelected ? 'bold' : 'normal'} color={isSelected ? Colors.white : Colors.textPrimary}>
+                <Text size={13} weight={isSelected ? 'bold' : 'normal'} color={isSelected ? Colors.white : Colors.textPrimary}>
                   {val}
-                </ScaledText>
-                <ScaledText size={8} color={isSelected ? 'rgba(255,255,255,0.85)' : Colors.textSecondary} numberOfLines={2} style={styles.scaleButtonLabel}>
+                </Text>
+                <Text size={8} color={isSelected ? 'rgba(255,255,255,0.85)' : Colors.textSecondary} numberOfLines={2} style={styles.scaleButtonLabel}>
                   {labelText}
-                </ScaledText>
+                </Text>
               </TouchableOpacity>
             );
           })}
@@ -1220,9 +1418,9 @@ function BeckmanOMAItems({ tool, answers, language, onAnswer }: ItemProps) {
     if (maxScore > 6) {
       return (
         <View key={itemId} style={[styles.questionCard, isAnswered && styles.questionCardAnswered]}>
-          <ScaledText size={13} weight="600" color={Colors.textPrimary} style={{ marginBottom: 10 }}>
+          <Text size={13} weight="600" color={Colors.textPrimary} style={{ marginBottom: 10 }}>
             {itemText}
-          </ScaledText>
+          </Text>
           <View style={styles.beckmanNumericRow}>
             <TextInput
               style={styles.beckmanNumericInput}
@@ -1240,18 +1438,18 @@ function BeckmanOMAItems({ tool, answers, language, onAnswer }: ItemProps) {
               placeholderTextColor={Colors.disabled}
               maxLength={String(maxScore).length}
             />
-            <ScaledText size={12} color={Colors.textSecondary}>
+            <Text size={12} color={Colors.textSecondary}>
               {'/ '}{maxScore}
-            </ScaledText>
+            </Text>
           </View>
         </View>
       );
     }
     return (
       <View key={itemId} style={[styles.questionCard, isAnswered && styles.questionCardAnswered]}>
-        <ScaledText size={13} weight="600" color={Colors.textPrimary} style={{ marginBottom: 10 }}>
+        <Text size={13} weight="600" color={Colors.textPrimary} style={{ marginBottom: 10 }}>
           {itemText}
-        </ScaledText>
+        </Text>
         <View style={styles.scaleButtonsRow}>
           {Array.from({ length: maxScore + 1 }, (_, i) => i).map((val) => {
             const isSelected = answers[itemId] === val;
@@ -1262,9 +1460,9 @@ function BeckmanOMAItems({ tool, answers, language, onAnswer }: ItemProps) {
                 onPress={() => onAnswer(itemId, val)}
                 activeOpacity={0.7}
               >
-                <ScaledText size={13} weight={isSelected ? 'bold' : 'normal'} color={isSelected ? Colors.white : Colors.textPrimary}>
+                <Text size={13} weight={isSelected ? 'bold' : 'normal'} color={isSelected ? Colors.white : Colors.textPrimary}>
                   {String(val)}
-                </ScaledText>
+                </Text>
               </TouchableOpacity>
             );
           })}
@@ -1280,9 +1478,9 @@ function BeckmanOMAItems({ tool, answers, language, onAnswer }: ItemProps) {
         return (
           <View key={structure.structure_id}>
             <View style={styles.beckmanStructureHeader}>
-              <ScaledText size={16} weight="bold" color={Colors.primary}>
+              <Text size={16} weight="bold" color={Colors.primary}>
                 {structureName}
-              </ScaledText>
+              </Text>
             </View>
 
             {structure.assessment_areas.map((area) => {
@@ -1291,9 +1489,9 @@ function BeckmanOMAItems({ tool, answers, language, onAnswer }: ItemProps) {
                 <View key={area.area_id}>
                   <View style={styles.domainHeader}>
                     <View style={styles.domainHeaderLine} />
-                    <ScaledText size={13} weight="600" color={Colors.secondary} style={styles.domainHeaderText}>
+                    <Text size={13} weight="600" color={Colors.secondary} style={styles.domainHeaderText}>
                       {areaName}
-                    </ScaledText>
+                    </Text>
                     <View style={styles.domainHeaderLine} />
                   </View>
 
@@ -1314,9 +1512,9 @@ function BeckmanOMAItems({ tool, answers, language, onAnswer }: ItemProps) {
       {additional && (
         <View>
           <View style={styles.beckmanStructureHeader}>
-            <ScaledText size={16} weight="bold" color={Colors.primary}>
+            <Text size={16} weight="bold" color={Colors.primary}>
               {txt(additional.name_en, additional.name_zh, language)}
-            </ScaledText>
+            </Text>
           </View>
           {additional.items.map((item) => {
             const itemText = txt(item.text_en, item.text_zh, language);
@@ -1356,49 +1554,49 @@ function CompletionScreen({ tool, scoreResult, language, fadeAnim, scaleAnim, on
             <View style={styles.completionIconCircle}>
               <CheckCircle2 size={64} color={Colors.success} />
             </View>
-            <ScaledText size={24} weight="bold" color={Colors.textPrimary} style={styles.completionTitle}>
+            <Text size={24} weight="bold" color={Colors.textPrimary} style={styles.completionTitle}>
               {t('assessmentComplete')}
-            </ScaledText>
-            <ScaledText size={14} color={Colors.textSecondary} style={styles.completionTitle}>
+            </Text>
+            <Text size={14} color={Colors.textSecondary} style={styles.completionTitle}>
               {txt(tool.name_en, tool.name_zh, language)}
-            </ScaledText>
+            </Text>
 
             {hasTotalScore && (
               <View style={styles.scoreCard}>
-                <ScaledText size={13} color={Colors.textSecondary}>
+                <Text size={13} color={Colors.textSecondary}>
                   {t('totalScore')}
-                </ScaledText>
-                <ScaledText size={42} weight="bold" color={Colors.primary}>
+                </Text>
+                <Text size={42} weight="bold" color={Colors.primary}>
                   {scoreResult.total_score}
-                </ScaledText>
+                </Text>
                 {scoreResult.max_score !== undefined && (
-                  <ScaledText size={13} color={Colors.textSecondary}>
+                  <Text size={13} color={Colors.textSecondary}>
                     {t('outOf')} {scoreResult.max_score}
-                  </ScaledText>
+                  </Text>
                 )}
               </View>
             )}
 
             {scoreResult.severity_rating !== undefined && (
               <View style={styles.subscaleCard}>
-                <ScaledText size={14} weight="bold" color={Colors.textPrimary} style={styles.subscaleTitle}>
+                <Text size={14} weight="bold" color={Colors.textPrimary} style={styles.subscaleTitle}>
                   {t('severityRating')}
-                </ScaledText>
+                </Text>
                 <View style={styles.subscaleRow}>
-                  <ScaledText size={28} weight="bold" color={Colors.secondary}>
+                  <Text size={28} weight="bold" color={Colors.secondary}>
                     {scoreResult.severity_rating}
-                  </ScaledText>
-                  <ScaledText size={13} color={Colors.textSecondary}> / 7</ScaledText>
+                  </Text>
+                  <Text size={13} color={Colors.textSecondary}> / 7</Text>
                 </View>
               </View>
             )}
 
             {hasSubscales && tool.scoring_method !== 'fda2_rating' && (
               <View style={styles.subscaleCard}>
-                <ScaledText size={14} weight="bold" color={Colors.textPrimary} style={styles.subscaleTitle}>
+                <Text size={14} weight="bold" color={Colors.textPrimary} style={styles.subscaleTitle}>
                   {tool.scoring_method === 'dtoms_rating' ? t('dimensionScores') :
                    tool.domains ? t('domainScores') : t('subscaleScores')}
-                </ScaledText>
+                </Text>
                 {Object.entries(scoreResult.subscale_scores).map(([key, value]) => {
                   let displayName = key;
                   if (tool.domains) {
@@ -1412,12 +1610,12 @@ function CompletionScreen({ tool, scoreResult, language, fadeAnim, scaleAnim, on
                   }
                   return (
                     <View key={key} style={styles.subscaleItemRow}>
-                      <ScaledText size={13} color={Colors.textSecondary} style={{ flex: 1 }}>
+                      <Text size={13} color={Colors.textSecondary} style={{ flex: 1 }}>
                         {displayName}
-                      </ScaledText>
-                      <ScaledText size={15} weight="bold" color={Colors.textPrimary}>
+                      </Text>
+                      <Text size={15} weight="bold" color={Colors.textPrimary}>
                         {typeof value === 'number' ? value : '-'}
-                      </ScaledText>
+                      </Text>
                     </View>
                   );
                 })}
@@ -1426,9 +1624,9 @@ function CompletionScreen({ tool, scoreResult, language, fadeAnim, scaleAnim, on
 
             {tool.scoring_method === 'fda2_rating' && hasSubscales && (
               <View style={styles.subscaleCard}>
-                <ScaledText size={14} weight="bold" color={Colors.textPrimary} style={styles.subscaleTitle}>
+                <Text size={14} weight="bold" color={Colors.textPrimary} style={styles.subscaleTitle}>
                   {t('sectionResults')}
-                </ScaledText>
+                </Text>
                 {(tool.fda2_sections || []).map((section) => {
                   const sectionKey = `section_${section.section_number}`;
                   const rawVal = scoreResult.subscale_scores[sectionKey];
@@ -1437,19 +1635,19 @@ function CompletionScreen({ tool, scoreResult, language, fadeAnim, scaleAnim, on
                   const sectionName = txt(section.name_en, section.name_zh, language);
                   return (
                     <View key={sectionKey} style={styles.fda2ResultSection}>
-                      <ScaledText size={13} weight="600" color={Colors.primary}>{sectionName}</ScaledText>
+                      <Text size={13} weight="600" color={Colors.primary}>{sectionName}</Text>
                       <View style={styles.fda2ResultItems}>
                         {section.items.map((item) => {
                           const rating = parsed[item.item_id] || '-';
                           return (
                             <View key={item.item_id} style={styles.fda2ResultItem}>
-                              <ScaledText size={12} color={Colors.textSecondary}>
+                              <Text size={12} color={Colors.textSecondary}>
                                 {txt(item.text_en, item.text_zh, language)}
-                              </ScaledText>
+                              </Text>
                               <View style={styles.fda2ResultBadge}>
-                                <ScaledText size={12} weight="bold" color={Colors.primary}>
+                                <Text size={12} weight="bold" color={Colors.primary}>
                                   {String(rating).toUpperCase()}
-                                </ScaledText>
+                                </Text>
                               </View>
                             </View>
                           );
@@ -1469,21 +1667,21 @@ function CompletionScreen({ tool, scoreResult, language, fadeAnim, scaleAnim, on
               >
                 <View style={styles.interpretationToggleRow}>
                   <Info size={16} color={Colors.primary} />
-                  <ScaledText size={14} weight="600" color={Colors.primary}>{t('interpretation')}</ScaledText>
+                  <Text size={14} weight="600" color={Colors.primary}>{t('interpretation')}</Text>
                   {showInterpretation ? <ChevronUp size={16} color={Colors.primary} /> : <ChevronDown size={16} color={Colors.primary} />}
                 </View>
                 {showInterpretation && (
-                  <ScaledText size={13} color={Colors.textSecondary} style={styles.interpretationText}>
+                  <Text size={13} color={Colors.textSecondary} style={styles.interpretationText}>
                     {interpretation}
-                  </ScaledText>
+                  </Text>
                 )}
               </TouchableOpacity>
             )}
 
             <TouchableOpacity style={styles.doneButton} onPress={onDone} activeOpacity={0.8} testID="done-button">
-              <ScaledText size={17} weight="bold" color={Colors.white}>
+              <Text size={17} weight="bold" color={Colors.white}>
                 {t('continue')}
-              </ScaledText>
+              </Text>
             </TouchableOpacity>
           </Animated.View>
         </ScrollView>

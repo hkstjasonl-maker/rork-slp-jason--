@@ -80,8 +80,7 @@ export default function MySubmissionsScreen() {
       return fetchPatientSubmissions(patientId);
     },
     enabled: !!patientId,
-    staleTime: 0,
-    refetchOnMount: 'always' as const,
+    staleTime: 30 * 1000,
   });
 
   useFocusEffect(

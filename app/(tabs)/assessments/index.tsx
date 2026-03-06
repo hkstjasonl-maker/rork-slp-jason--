@@ -168,6 +168,7 @@ export default function AssessmentsScreen() {
       return (data || []) as QuestionnaireAssignment[];
     },
     enabled: !!patientId,
+    staleTime: 2 * 60 * 1000,
   });
 
   const completedQuery = useQuery({
@@ -190,6 +191,7 @@ export default function AssessmentsScreen() {
       return (data || []) as QuestionnaireAssignment[];
     },
     enabled: !!patientId,
+    staleTime: 2 * 60 * 1000,
   });
 
   const clinicalPendingQuery = useQuery({
@@ -211,6 +213,7 @@ export default function AssessmentsScreen() {
       return (data || []) as ClinicalAssessmentSubmission[];
     },
     enabled: !!patientId,
+    staleTime: 2 * 60 * 1000,
   });
 
   const clinicalCompletedQuery = useQuery({
@@ -233,6 +236,7 @@ export default function AssessmentsScreen() {
       return (data || []) as ClinicalAssessmentSubmission[];
     },
     enabled: !!patientId,
+    staleTime: 2 * 60 * 1000,
   });
 
   const pendingAssignments = pendingQuery.data || [];

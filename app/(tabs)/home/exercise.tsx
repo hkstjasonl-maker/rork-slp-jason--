@@ -381,7 +381,7 @@ export default function ExerciseScreen() {
         log('[ExerciseScreen] Audio mode config error:', e);
       }
     };
-    configureAudio();
+    void configureAudio();
   }, []);
 
 
@@ -405,6 +405,7 @@ export default function ExerciseScreen() {
       return data as Exercise;
     },
     enabled: !!activeExerciseId,
+    staleTime: 5 * 60 * 1000,
   });
 
   useEffect(() => {
@@ -446,6 +447,7 @@ export default function ExerciseScreen() {
       return data;
     },
     enabled: !!patientId,
+    staleTime: 5 * 60 * 1000,
   });
 
   const totalExercises = useMemo(() => {
@@ -457,14 +459,15 @@ export default function ExerciseScreen() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from('exercise_logs')
-        .select('*, exercises(title_en, title_zh_hant, title_zh_hans)')
+        .select('id, exercise_id, completed_at, self_rating, exercises(title_en, title_zh_hant, title_zh_hans)')
         .eq('patient_id', patientId!)
         .order('completed_at', { ascending: false })
         .limit(200);
       if (error) throw error;
-      return (data || []) as ExerciseLog[];
+      return (data || []) as unknown as ExerciseLog[];
     },
     enabled: !!patientId,
+    staleTime: 60 * 1000,
   });
 
   const todayLogsQuery = useQuery({
@@ -474,13 +477,14 @@ export default function ExerciseScreen() {
       today.setHours(0, 0, 0, 0);
       const { data, error } = await supabase
         .from('exercise_logs')
-        .select('*')
+        .select('id, exercise_id, completed_at')
         .eq('patient_id', patientId!)
         .gte('completed_at', today.toISOString());
       if (error) return [];
       return (data || []) as ExerciseLog[];
     },
     enabled: !!patientId,
+    staleTime: 30 * 1000,
   });
 
   const starInfo = useMemo(() => {

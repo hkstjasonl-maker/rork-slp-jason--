@@ -479,6 +479,7 @@ function ForYouTab({
       return (data || []) as KnowledgeVideoAssignment[];
     },
     enabled: !!patientId,
+    staleTime: 2 * 60 * 1000,
   });
 
   const markViewedMutation = useMutation({
@@ -621,6 +622,7 @@ function ExploreTab({
       log('[Learn] Fetched', data?.length, 'total knowledge videos');
       return (data || []) as KnowledgeVideo[];
     },
+    staleTime: 5 * 60 * 1000,
   });
 
   const onRefresh = useCallback(async () => {
@@ -780,6 +782,7 @@ export default function LearnScreen() {
       return count || 0;
     },
     enabled: !!patientId,
+    staleTime: 2 * 60 * 1000,
   });
 
   const newCount = newCountQuery.data || 0;

@@ -83,6 +83,7 @@ export default function ProgressScreen() {
       return data as ExerciseProgram;
     },
     enabled: !!patientId,
+    staleTime: 5 * 60 * 1000,
   });
 
   const totalExercises = useMemo(() => {
@@ -110,6 +111,7 @@ export default function ProgressScreen() {
       })) as ExerciseLog[];
     },
     enabled: !!patientId,
+    staleTime: 60 * 1000,
   });
 
   const programId = programQuery.data?.id;
@@ -120,6 +122,7 @@ export default function ProgressScreen() {
       return fetchExerciseCompliance(patientId!, programId!);
     },
     enabled: !!patientId && !!programId,
+    staleTime: 2 * 60 * 1000,
   });
 
   const overallCompliance = useMemo(() => {
@@ -218,9 +221,9 @@ export default function ProgressScreen() {
   const { refetch: refetchProgram } = programQuery;
 
   const onRefresh = useCallback(() => {
-    refetchLogs();
-    refetchCompliance();
-    refetchProgram();
+    void refetchLogs();
+    void refetchCompliance();
+    void refetchProgram();
   }, [refetchLogs, refetchCompliance, refetchProgram]);
 
   return (

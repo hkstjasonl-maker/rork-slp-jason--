@@ -111,47 +111,7 @@ const LiveCamera = forwardRef<CameraView, { onCameraReady?: () => void }>(
 LiveCamera.displayName = 'LiveCamera';
 const MemoLiveCamera = memo(LiveCamera, () => true);
 
-const SplitCameraView = forwardRef<CameraView, { onCameraReady?: () => void }>(
-  function SplitCameraViewInner({ onCameraReady }, ref) {
-    const [permission, requestPermission] = useCameraPermissions();
 
-    useEffect(() => {
-      if (!permission?.granted) {
-        void requestPermission();
-      }
-    }, [permission?.granted, requestPermission]);
-
-    if (!permission?.granted) {
-      return (
-        <View style={splitCameraStyles.placeholder}>
-          <Camera size={24} color="#666" />
-          <ScaledText size={12} color="#666" style={{ marginTop: 6 }}>{String('Camera permission needed')}</ScaledText>
-        </View>
-      );
-    }
-
-    return (
-      <CameraView
-        ref={ref}
-        style={{ flex: 1 }}
-        facing="front"
-        mode="video"
-        onCameraReady={onCameraReady}
-      />
-    );
-  }
-);
-SplitCameraView.displayName = 'SplitCameraView';
-const MemoSplitCameraView = memo(SplitCameraView, () => true);
-
-const splitCameraStyles = StyleSheet.create({
-  placeholder: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: '#000',
-  },
-});
 
 function SplitVideoLayerInner({ vimeoId, youtubeId }: { vimeoId: string | null; youtubeId: string | null }) {
   if (vimeoId) {
@@ -342,6 +302,9 @@ export default function ExerciseScreen() {
   const [micPermission, requestMicPermission] = useMicrophonePermissions();
   const splitCameraRef = useRef<CameraView>(null);
   const [splitCameraReady, setSplitCameraReady] = useState(false);
+  const [snapshotUri, setSnapshotUri] = useState<string | null>(null);
+  const snapshotMounted = useRef(true);
+  const snapshotCapturing = useRef(false);
 
   const hasCameraPermission = cameraPermission?.granted === true;
 
@@ -401,6 +364,47 @@ export default function ExerciseScreen() {
       setNarrativePlaying(false);
     }
   }, [mediaMode, narrativePlaying]);
+
+  useEffect(() => {
+    if (mediaMode !== 'split' || !splitCameraReady) {
+      snapshotMounted.current = false;
+      return;
+    }
+    snapshotMounted.current = true;
+    snapshotCapturing.current = false;
+
+    const captureLoop = async () => {
+      await new Promise<void>((r) => setTimeout(r, 500));
+      while (snapshotMounted.current) {
+        if (!splitCameraRef.current || snapshotCapturing.current) {
+          await new Promise<void>((r) => setTimeout(r, 50));
+          continue;
+        }
+        snapshotCapturing.current = true;
+        try {
+          const photo = await splitCameraRef.current.takePictureAsync({
+            quality: 0.1,
+            skipProcessing: true,
+            imageType: 'jpg',
+            exif: false,
+            shutterSound: false,
+          });
+          if (snapshotMounted.current && photo?.uri) {
+            setSnapshotUri(photo.uri);
+          }
+        } catch (e) {
+          log('[SplitSnapshot] capture error:', e);
+          await new Promise<void>((r) => setTimeout(r, 100));
+        }
+        snapshotCapturing.current = false;
+      }
+    };
+    void captureLoop();
+
+    return () => {
+      snapshotMounted.current = false;
+    };
+  }, [mediaMode, splitCameraReady]);
 
   useEffect(() => {
     if (toastMessage) {
@@ -912,7 +916,18 @@ export default function ExerciseScreen() {
                 <SplitVideoLayer vimeoId={vimeoId} youtubeId={youtubeId} />
               </View>
               <View style={styles.splitMirrorSection}>
-                <MemoSplitCameraView ref={splitCameraRef} onCameraReady={handleSplitCameraReady} />
+                {snapshotUri ? (
+                  <Image
+                    source={{ uri: snapshotUri }}
+                    style={[StyleSheet.absoluteFill, { transform: [{ scaleX: -1 }] }]}
+                    resizeMode="cover"
+                    fadeDuration={0}
+                  />
+                ) : (
+                  <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
+                    <ActivityIndicator color={Colors.primary} />
+                  </View>
+                )}
                 <View style={styles.mirrorBadge}>
                   <ScaledText size={11} weight="600" color={Colors.white}>
                     {t('mirrorMode')}
@@ -965,6 +980,14 @@ export default function ExerciseScreen() {
                   </View>
                 )}
               </View>
+              {hasCameraPermission && (
+                <CameraView
+                  ref={splitCameraRef}
+                  style={{ position: 'absolute', width: 1, height: 1, opacity: 0 }}
+                  facing="front"
+                  onCameraReady={handleSplitCameraReady}
+                />
+              )}
             </View>
           )}
 

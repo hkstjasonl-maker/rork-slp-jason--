@@ -20,6 +20,7 @@ function RecordingWatermarkInner({ exerciseName, visible }: RecordingWatermarkPr
   return (
     <View style={styles.overlay} pointerEvents="none">
       <Text style={styles.watermarkText}>{watermarkText}</Text>
+      <Text style={styles.disclaimerText}>Recorded with SLP Jason 使用SLP Jason錄製</Text>
     </View>
   );
 }
@@ -33,7 +34,7 @@ const styles = StyleSheet.create({
     left: 12,
     backgroundColor: 'rgba(0, 0, 0, 0.65)',
     paddingHorizontal: 10,
-    paddingVertical: 5,
+    paddingVertical: 6,
     borderRadius: 4,
     zIndex: 20,
   },
@@ -42,5 +43,12 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: '700' as const,
     letterSpacing: 0.3,
+  },
+  disclaimerText: {
+    color: '#FFFFFF',
+    fontSize: 9,
+    fontWeight: '500' as const,
+    opacity: 0.85,
+    marginTop: 2,
   },
 });

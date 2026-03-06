@@ -17,7 +17,10 @@ function VideoWatermarkInner({ patientName, height }: VideoWatermarkProps) {
 
   return (
     <View style={[styles.overlay, { height }]} pointerEvents="none">
-      <Text style={styles.watermarkText}>{watermarkText}</Text>
+      <View style={styles.watermarkBox}>
+        <Text style={styles.watermarkText}>{watermarkText}</Text>
+        <Text style={styles.disclaimerText}>Recorded with SLP Jason 使用SLP Jason錄製</Text>
+      </View>
     </View>
   );
 }
@@ -31,18 +34,26 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     zIndex: 10,
   },
-  watermarkText: {
+  watermarkBox: {
     position: 'absolute',
     top: 32,
     left: 12,
     backgroundColor: 'rgba(0, 0, 0, 0.65)',
     paddingHorizontal: 10,
-    paddingVertical: 5,
+    paddingVertical: 6,
     borderRadius: 4,
+  },
+  watermarkText: {
     color: '#FFFFFF',
     fontSize: 12,
     fontWeight: '700' as const,
     letterSpacing: 0.3,
-    overflow: 'hidden',
+  },
+  disclaimerText: {
+    color: '#FFFFFF',
+    fontSize: 9,
+    fontWeight: '500' as const,
+    opacity: 0.85,
+    marginTop: 2,
   },
 });

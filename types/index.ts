@@ -105,6 +105,8 @@ export interface KnowledgeVideo {
   vimeo_video_id: string | null;
   youtube_video_id: string | null;
   tags: string[] | null;
+  is_active?: boolean;
+  created_at?: string;
 }
 
 export interface KnowledgeVideoAssignment {

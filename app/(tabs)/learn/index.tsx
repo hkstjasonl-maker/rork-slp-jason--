@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useMemo } from 'react';
+import React, { useState, useCallback, useMemo, useRef } from 'react';
 import {
   View,
   ScrollView,
@@ -9,6 +9,9 @@ import {
   RefreshControl,
   Linking,
   Platform,
+  TextInput,
+  FlatList,
+  Animated,
 } from 'react-native';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useApp } from '@/contexts/AppContext';
@@ -18,7 +21,7 @@ import { YouTubePlayer } from '@/components/YouTubePlayer';
 import { CopyrightFooter } from '@/components/CopyrightFooter';
 import { supabase } from '@/lib/supabase';
 import Colors from '@/constants/colors';
-import { KnowledgeVideoAssignment, KnowledgeVideoCategory, Language } from '@/types';
+import { KnowledgeVideo, KnowledgeVideoAssignment, KnowledgeVideoCategory, Language } from '@/types';
 import { log } from '@/lib/logger';
 import {
   BookOpen,
@@ -31,7 +34,14 @@ import {
   Tag,
   ChevronDown,
   ChevronUp,
+  Search,
+  X,
+  Sparkles,
+  Compass,
+  Inbox,
 } from 'lucide-react-native';
+
+type TabType = 'foryou' | 'explore';
 
 const CATEGORY_CONFIG: Record<KnowledgeVideoCategory, { color: string; bgColor: string; icon: typeof GraduationCap }> = {
   educational: { color: '#2E86AB', bgColor: '#E8F4F8', icon: GraduationCap },
@@ -39,6 +49,13 @@ const CATEGORY_CONFIG: Record<KnowledgeVideoCategory, { color: string; bgColor: 
   caregiver_guidance: { color: '#F18F01', bgColor: '#FFF3E0', icon: Heart },
   other: { color: '#636E72', bgColor: '#F0F0F0', icon: Tag },
 };
+
+const CATEGORY_FILTERS: { key: string; en: string; zh: string }[] = [
+  { key: 'all', en: 'All', zh: '全部' },
+  { key: 'educational', en: 'Educational', zh: '教育' },
+  { key: 'condition_knowledge', en: 'Condition', zh: '病症知識' },
+  { key: 'caregiver_guidance', en: 'Caregiver', zh: '照顧者' },
+];
 
 function getCategoryLabel(category: KnowledgeVideoCategory, t: (key: string) => string): string {
   const map: Record<KnowledgeVideoCategory, string> = {
@@ -50,21 +67,21 @@ function getCategoryLabel(category: KnowledgeVideoCategory, t: (key: string) => 
   return map[category] || t('otherCategory');
 }
 
-function getVideoTitle(video: KnowledgeVideoAssignment['knowledge_videos'], language: Language | null): string {
+function getVideoTitle(video: KnowledgeVideo, language: Language | null): string {
   if (language === 'zh_hant' || language === 'zh_hans') {
     return video.title_zh || video.title_en;
   }
   return video.title_en || video.title_zh;
 }
 
-function getVideoDescription(video: KnowledgeVideoAssignment['knowledge_videos'], language: Language | null): string {
+function getVideoDescription(video: KnowledgeVideo, language: Language | null): string {
   if (language === 'zh_hant' || language === 'zh_hans') {
     return video.description_zh || video.description_en;
   }
   return video.description_en || video.description_zh;
 }
 
-function VideoCard({
+function AssignedVideoCard({
   assignment,
   language,
   t,
@@ -209,35 +226,159 @@ function VideoCard({
   );
 }
 
-const MemoizedVideoCard = React.memo(VideoCard);
+function ExploreVideoCard({
+  video,
+  language,
+  t,
+}: {
+  video: KnowledgeVideo;
+  language: Language | null;
+  t: (key: string) => string;
+}) {
+  const [expanded, setExpanded] = useState(false);
+  const category = (video.category as KnowledgeVideoCategory) || 'other';
+  const config = CATEGORY_CONFIG[category] || CATEGORY_CONFIG.other;
+  const CategoryIcon = config.icon;
+  const title = getVideoTitle(video, language);
+  const description = getVideoDescription(video, language);
 
-export default function LearnScreen() {
-  const { t, patientId, language } = useApp();
-  const queryClient = useQueryClient();
-
-  const today = useMemo(() => {
-    const d = new Date();
-    return d.toISOString().split('T')[0];
+  const handleExpand = useCallback(() => {
+    setExpanded((prev) => !prev);
   }, []);
+
+  const handleOpenYouTube = useCallback(() => {
+    if (video.youtube_video_id) {
+      const url = `https://www.youtube.com/watch?v=${video.youtube_video_id}`;
+      Linking.openURL(url).catch((err) => log('[Learn] Failed to open YouTube:', err));
+    }
+  }, [video.youtube_video_id]);
+
+  return (
+    <View style={styles.card}>
+      <TouchableOpacity
+        style={styles.cardHeader}
+        onPress={handleExpand}
+        activeOpacity={0.7}
+        testID={`explore-video-${video.id}`}
+      >
+        <View style={styles.cardTopRow}>
+          <View style={[styles.categoryBadge, { backgroundColor: config.bgColor }]}>
+            <CategoryIcon size={12} color={config.color} />
+            <ScaledText size={11} weight="600" color={config.color} style={styles.categoryText}>
+              {getCategoryLabel(category, t)}
+            </ScaledText>
+          </View>
+        </View>
+
+        <View style={styles.cardTitleRow}>
+          <View style={[styles.playIconWrap, styles.playIconWrapExplore]}>
+            <Play size={18} color="#fff" fill="#fff" />
+          </View>
+          <View style={styles.cardTitleContent}>
+            <ScaledText size={15} weight="600" color={Colors.textPrimary} numberOfLines={2}>
+              {/* eslint-disable-next-line rork/general-no-raw-text */}
+              {title}
+            </ScaledText>
+            {!expanded && description ? (
+              <ScaledText size={13} color={Colors.textSecondary} numberOfLines={2} style={styles.descriptionPreview}>
+                {/* eslint-disable-next-line rork/general-no-raw-text */}
+                {description}
+              </ScaledText>
+            ) : null}
+          </View>
+          {expanded ? (
+            <ChevronUp size={20} color={Colors.textSecondary} />
+          ) : (
+            <ChevronDown size={20} color={Colors.textSecondary} />
+          )}
+        </View>
+      </TouchableOpacity>
+
+      {expanded && (
+        <View style={styles.cardBody}>
+          {description ? (
+            <ScaledText size={13} color={Colors.textSecondary} style={styles.descriptionFull}>
+              {/* eslint-disable-next-line rork/general-no-raw-text */}
+              {description}
+            </ScaledText>
+          ) : null}
+
+          {video.vimeo_video_id ? (
+            <View style={styles.playerContainer}>
+              <VimeoPlayer videoId={video.vimeo_video_id} height={200} />
+            </View>
+          ) : video.youtube_video_id ? (
+            Platform.OS === 'web' ? (
+              <View style={styles.playerContainer}>
+                <YouTubePlayer videoId={video.youtube_video_id} height={200} />
+              </View>
+            ) : (
+              <TouchableOpacity
+                style={styles.youtubeButton}
+                onPress={handleOpenYouTube}
+                activeOpacity={0.8}
+              >
+                <ExternalLink size={18} color="#fff" />
+                <ScaledText size={14} weight="600" color="#fff" style={styles.youtubeButtonText}>
+                  {t('openInYouTube')}
+                </ScaledText>
+              </TouchableOpacity>
+            )
+          ) : null}
+
+          {video.tags && video.tags.length > 0 && (
+            <View style={styles.tagsRow}>
+              {video.tags.map((tag, i) => (
+                <View key={i} style={styles.tagChip}>
+                  <ScaledText size={11} color={Colors.textSecondary}>
+                    {/* eslint-disable-next-line rork/general-no-raw-text */}
+                    {tag}
+                  </ScaledText>
+                </View>
+              ))}
+            </View>
+          )}
+        </View>
+      )}
+    </View>
+  );
+}
+
+const MemoizedAssignedVideoCard = React.memo(AssignedVideoCard);
+const MemoizedExploreVideoCard = React.memo(ExploreVideoCard);
+
+function ForYouTab({
+  patientId,
+  language,
+  t,
+  today,
+}: {
+  patientId: string;
+  language: Language | null;
+  t: (key: string) => string;
+  today: string;
+}) {
+  const queryClient = useQueryClient();
+  const [refreshing, setRefreshing] = useState(false);
 
   const videosQuery = useQuery({
     queryKey: ['knowledge_videos', patientId, today],
     queryFn: async () => {
-      log('[Learn] Fetching knowledge videos for patient:', patientId);
+      log('[Learn] Fetching assigned knowledge videos for patient:', patientId);
       const { data, error } = await supabase
         .from('knowledge_video_assignments')
         .select('*, knowledge_videos(*)')
-        .eq('patient_id', patientId!)
+        .eq('patient_id', patientId)
         .eq('is_active', true)
         .lte('start_date', today)
         .gte('end_date', today);
 
       if (error) {
-        log('[Learn] Error fetching knowledge videos:', error);
+        log('[Learn] Error fetching assigned knowledge videos:', error);
         throw error;
       }
 
-      log('[Learn] Fetched', data?.length, 'knowledge video assignments');
+      log('[Learn] Fetched', data?.length, 'assigned knowledge video assignments');
       return (data || []) as KnowledgeVideoAssignment[];
     },
     enabled: !!patientId,
@@ -266,7 +407,6 @@ export default function LearnScreen() {
     markViewedMutation.mutate(assignmentId);
   }, [markViewedMutation]);
 
-  const [refreshing, setRefreshing] = useState(false);
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
     await queryClient.invalidateQueries({ queryKey: ['knowledge_videos'] });
@@ -274,7 +414,6 @@ export default function LearnScreen() {
   }, [queryClient]);
 
   const videos = useMemo(() => videosQuery.data || [], [videosQuery.data]);
-  const newCount = useMemo(() => videos.filter((v) => !v.viewed_at).length, [videos]);
 
   const groupedVideos = useMemo(() => {
     const groups: Record<string, KnowledgeVideoAssignment[]> = {};
@@ -289,76 +428,343 @@ export default function LearnScreen() {
       .map((cat) => ({ category: cat, items: groups[cat] }));
   }, [videos]);
 
+  if (videosQuery.isLoading) {
+    return (
+      <View style={styles.center}>
+        <ActivityIndicator size="large" color={Colors.primary} />
+        <ScaledText size={14} color={Colors.textSecondary} style={styles.loadingText}>
+          {t('loading')}
+        </ScaledText>
+      </View>
+    );
+  }
+
+  if (videos.length === 0) {
+    return (
+      <View style={styles.center}>
+        <View style={styles.emptyIconCircle}>
+          <Inbox size={32} color={Colors.disabled} />
+        </View>
+        <ScaledText size={15} weight="600" color={Colors.textSecondary} style={styles.emptyText}>
+          {t('noAssignedVideos')}
+        </ScaledText>
+        <ScaledText size={13} color={Colors.disabled} style={styles.emptySubtext}>
+          {t('forYouDescription')}
+        </ScaledText>
+      </View>
+    );
+  }
+
+  return (
+    <ScrollView
+      style={styles.scrollView}
+      contentContainerStyle={styles.scrollContent}
+      showsVerticalScrollIndicator={false}
+      refreshControl={
+        <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={Colors.primary} />
+      }
+    >
+      {groupedVideos.map((group) => {
+        const catConfig = CATEGORY_CONFIG[group.category] || CATEGORY_CONFIG.other;
+        return (
+          <View key={group.category} style={styles.sectionContainer}>
+            <View style={styles.sectionHeader}>
+              <View style={[styles.sectionDot, { backgroundColor: catConfig.color }]} />
+              <ScaledText size={14} weight="600" color={catConfig.color}>
+                {getCategoryLabel(group.category, t)}
+              </ScaledText>
+              <ScaledText size={12} color={Colors.textSecondary} style={styles.sectionCount}>
+                {group.items.length}
+              </ScaledText>
+            </View>
+            {group.items.map((assignment) => (
+              <MemoizedAssignedVideoCard
+                key={assignment.id}
+                assignment={assignment}
+                language={language}
+                t={t}
+                onMarkViewed={handleMarkViewed}
+              />
+            ))}
+          </View>
+        );
+      })}
+      <CopyrightFooter />
+    </ScrollView>
+  );
+}
+
+function ExploreTab({
+  language,
+  t,
+}: {
+  language: Language | null;
+  t: (key: string) => string;
+}) {
+  const queryClient = useQueryClient();
+  const [refreshing, setRefreshing] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [categoryFilter, setCategoryFilter] = useState('all');
+
+  const allVideosQuery = useQuery({
+    queryKey: ['knowledge_videos_all'],
+    queryFn: async () => {
+      log('[Learn] Fetching all knowledge videos for explore');
+      const { data, error } = await supabase
+        .from('knowledge_videos')
+        .select('*')
+        .eq('is_active', true)
+        .order('created_at', { ascending: false });
+
+      if (error) {
+        log('[Learn] Error fetching all knowledge videos:', error);
+        throw error;
+      }
+
+      log('[Learn] Fetched', data?.length, 'total knowledge videos');
+      return (data || []) as KnowledgeVideo[];
+    },
+  });
+
+  const onRefresh = useCallback(async () => {
+    setRefreshing(true);
+    await queryClient.invalidateQueries({ queryKey: ['knowledge_videos_all'] });
+    setRefreshing(false);
+  }, [queryClient]);
+
+  const allVideos = useMemo(() => allVideosQuery.data || [], [allVideosQuery.data]);
+
+  const filteredVideos = useMemo(() => {
+    return allVideos.filter((v) => {
+      const matchCat = categoryFilter === 'all' || v.category === categoryFilter;
+      if (!searchQuery.trim()) return matchCat;
+      const q = searchQuery.toLowerCase();
+      const matchText =
+        (v.title_en || '').toLowerCase().includes(q) ||
+        (v.title_zh || '').toLowerCase().includes(q) ||
+        (v.description_en || '').toLowerCase().includes(q) ||
+        (v.description_zh || '').toLowerCase().includes(q) ||
+        (v.tags || []).some((tag) => tag.toLowerCase().includes(q));
+      return matchCat && matchText;
+    });
+  }, [allVideos, searchQuery, categoryFilter]);
+
+  const isZh = language === 'zh_hant' || language === 'zh_hans';
+
+  const handleClearSearch = useCallback(() => {
+    setSearchQuery('');
+  }, []);
+
+  const renderVideoItem = useCallback(({ item }: { item: KnowledgeVideo }) => (
+    <MemoizedExploreVideoCard video={item} language={language} t={t} />
+  ), [language, t]);
+
+  const keyExtractor = useCallback((item: KnowledgeVideo) => item.id, []);
+
+  if (allVideosQuery.isLoading) {
+    return (
+      <View style={styles.center}>
+        <ActivityIndicator size="large" color={Colors.primary} />
+        <ScaledText size={14} color={Colors.textSecondary} style={styles.loadingText}>
+          {t('loading')}
+        </ScaledText>
+      </View>
+    );
+  }
+
+  return (
+    <View style={styles.exploreContainer}>
+      <View style={styles.searchContainer}>
+        <View style={styles.searchInputWrap}>
+          <Search size={18} color={Colors.disabled} style={styles.searchIcon} />
+          <TextInput
+            style={styles.searchInput}
+            placeholder={t('searchVideos')}
+            placeholderTextColor={Colors.disabled}
+            value={searchQuery}
+            onChangeText={setSearchQuery}
+            testID="explore-search-input"
+            returnKeyType="search"
+            autoCorrect={false}
+          />
+          {searchQuery.length > 0 && (
+            <TouchableOpacity onPress={handleClearSearch} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+              <X size={18} color={Colors.textSecondary} />
+            </TouchableOpacity>
+          )}
+        </View>
+      </View>
+
+      <View style={styles.chipBarContainer}>
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={styles.chipBarContent}
+        >
+          {CATEGORY_FILTERS.map((cat) => {
+            const isActive = categoryFilter === cat.key;
+            const catConfig = cat.key !== 'all' ? CATEGORY_CONFIG[cat.key as KnowledgeVideoCategory] : null;
+            return (
+              <TouchableOpacity
+                key={cat.key}
+                style={[
+                  styles.chip,
+                  isActive && styles.chipActive,
+                  isActive && catConfig && { backgroundColor: catConfig.bgColor, borderColor: catConfig.color },
+                ]}
+                onPress={() => setCategoryFilter(cat.key)}
+                activeOpacity={0.7}
+              >
+                <ScaledText
+                  size={13}
+                  weight={isActive ? '600' : '500'}
+                  color={isActive ? (catConfig ? catConfig.color : Colors.primary) : Colors.textSecondary}
+                >
+                  {isZh ? cat.zh : cat.en}
+                </ScaledText>
+              </TouchableOpacity>
+            );
+          })}
+        </ScrollView>
+      </View>
+
+      {filteredVideos.length === 0 ? (
+        <View style={styles.center}>
+          <View style={styles.emptyIconCircle}>
+            <Search size={28} color={Colors.disabled} />
+          </View>
+          <ScaledText size={15} weight="600" color={Colors.textSecondary} style={styles.emptyText}>
+            {t('noVideosFound')}
+          </ScaledText>
+          <ScaledText size={13} color={Colors.disabled} style={styles.emptySubtext}>
+            {t('exploreDescription')}
+          </ScaledText>
+        </View>
+      ) : (
+        <FlatList
+          data={filteredVideos}
+          keyExtractor={keyExtractor}
+          renderItem={renderVideoItem}
+          contentContainerStyle={styles.flatListContent}
+          showsVerticalScrollIndicator={false}
+          refreshControl={
+            <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={Colors.primary} />
+          }
+          ListFooterComponent={<CopyrightFooter />}
+        />
+      )}
+    </View>
+  );
+}
+
+export default function LearnScreen() {
+  const { t, patientId, language } = useApp();
+  const [activeTab, setActiveTab] = useState<TabType>('foryou');
+  const slideAnim = useRef(new Animated.Value(0)).current;
+
+  const today = useMemo(() => {
+    const d = new Date();
+    return d.toISOString().split('T')[0];
+  }, []);
+
+  const newCountQuery = useQuery({
+    queryKey: ['knowledge_videos_new_count', patientId],
+    queryFn: async () => {
+      const todayStr = new Date().toISOString().split('T')[0];
+      const { count, error } = await supabase
+        .from('knowledge_video_assignments')
+        .select('id', { count: 'exact', head: true })
+        .eq('patient_id', patientId!)
+        .eq('is_active', true)
+        .lte('start_date', todayStr)
+        .gte('end_date', todayStr)
+        .is('viewed_at', null);
+      if (error) throw error;
+      return count || 0;
+    },
+    enabled: !!patientId,
+  });
+
+  const newCount = newCountQuery.data || 0;
+
+  const switchTab = useCallback((tab: TabType) => {
+    setActiveTab(tab);
+    Animated.spring(slideAnim, {
+      toValue: tab === 'foryou' ? 0 : 1,
+      useNativeDriver: true,
+      tension: 80,
+      friction: 12,
+    }).start();
+  }, [slideAnim]);
+
+
   return (
     <SafeAreaView style={styles.safeArea}>
       <View style={styles.headerContainer}>
         <View style={styles.headerIconWrap}>
           <BookOpen size={22} color={Colors.primary} />
         </View>
-        <View>
+        <View style={styles.headerTextWrap}>
           <ScaledText size={22} weight="700" color={Colors.textPrimary}>
             {t('learn')}
           </ScaledText>
-          {newCount > 0 && (
-            <ScaledText size={13} color={Colors.textSecondary}>
-              {/* eslint-disable-next-line rork/general-no-raw-text */}
-              {newCount} {t('newBadge').toLowerCase()}
-            </ScaledText>
-          )}
         </View>
       </View>
 
-      {videosQuery.isLoading ? (
-        <View style={styles.center}>
-          <ActivityIndicator size="large" color={Colors.primary} />
-          <ScaledText size={14} color={Colors.textSecondary} style={styles.loadingText}>
-            {t('loading')}
-          </ScaledText>
-        </View>
-      ) : videos.length === 0 ? (
-        <View style={styles.center}>
-          <BookOpen size={48} color={Colors.disabled} />
-          <ScaledText size={15} color={Colors.textSecondary} style={styles.emptyText}>
-            {t('noKnowledgeVideos')}
-          </ScaledText>
-        </View>
-      ) : (
-        <ScrollView
-          style={styles.scrollView}
-          contentContainerStyle={styles.scrollContent}
-          showsVerticalScrollIndicator={false}
-          refreshControl={
-            <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={Colors.primary} />
-          }
+      <View style={styles.segmentedControl}>
+        <TouchableOpacity
+          style={[styles.segmentTab, activeTab === 'foryou' && styles.segmentTabActive]}
+          onPress={() => switchTab('foryou')}
+          activeOpacity={0.7}
+          testID="tab-foryou"
         >
-          {groupedVideos.map((group) => {
-            const catConfig = CATEGORY_CONFIG[group.category] || CATEGORY_CONFIG.other;
-            return (
-              <View key={group.category} style={styles.sectionContainer}>
-                <View style={styles.sectionHeader}>
-                  <View style={[styles.sectionDot, { backgroundColor: catConfig.color }]} />
-                  <ScaledText size={14} weight="600" color={catConfig.color}>
-                    {getCategoryLabel(group.category, t)}
-                  </ScaledText>
-                  <ScaledText size={12} color={Colors.textSecondary} style={styles.sectionCount}>
-                    {group.items.length}
-                  </ScaledText>
-                </View>
-                {group.items.map((assignment) => (
-                  <MemoizedVideoCard
-                    key={assignment.id}
-                    assignment={assignment}
-                    language={language}
-                    t={t}
-                    onMarkViewed={handleMarkViewed}
-                  />
-                ))}
-              </View>
-            );
-          })}
-          <CopyrightFooter />
-        </ScrollView>
-      )}
+          <Sparkles size={16} color={activeTab === 'foryou' ? Colors.primary : Colors.textSecondary} />
+          <ScaledText
+            size={14}
+            weight={activeTab === 'foryou' ? '700' : '500'}
+            color={activeTab === 'foryou' ? Colors.primary : Colors.textSecondary}
+          >
+            {t('forYouTab')}
+          </ScaledText>
+          {newCount > 0 && (
+            <View style={styles.tabCountBadge}>
+              <ScaledText size={10} weight="700" color="#fff">
+                {newCount > 99 ? '99+' : String(newCount)}
+              </ScaledText>
+            </View>
+          )}
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          style={[styles.segmentTab, activeTab === 'explore' && styles.segmentTabActive]}
+          onPress={() => switchTab('explore')}
+          activeOpacity={0.7}
+          testID="tab-explore"
+        >
+          <Compass size={16} color={activeTab === 'explore' ? Colors.primary : Colors.textSecondary} />
+          <ScaledText
+            size={14}
+            weight={activeTab === 'explore' ? '700' : '500'}
+            color={activeTab === 'explore' ? Colors.primary : Colors.textSecondary}
+          >
+            {t('exploreTab')}
+          </ScaledText>
+        </TouchableOpacity>
+      </View>
+
+      <View style={styles.tabContent}>
+        {activeTab === 'foryou' && patientId ? (
+          <ForYouTab patientId={patientId} language={language} t={t} today={today} />
+        ) : activeTab === 'explore' ? (
+          <ExploreTab language={language} t={t} />
+        ) : (
+          <View style={styles.center}>
+            <ScaledText size={14} color={Colors.textSecondary}>
+              {t('loading')}
+            </ScaledText>
+          </View>
+        )}
+      </View>
     </SafeAreaView>
   );
 }
@@ -373,7 +779,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingHorizontal: 20,
     paddingTop: 16,
-    paddingBottom: 12,
+    paddingBottom: 8,
     gap: 12,
   },
   headerIconWrap: {
@@ -383,6 +789,47 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.primaryLight,
     justifyContent: 'center',
     alignItems: 'center',
+  },
+  headerTextWrap: {
+    flex: 1,
+  },
+  segmentedControl: {
+    flexDirection: 'row',
+    marginHorizontal: 16,
+    marginTop: 4,
+    marginBottom: 8,
+    backgroundColor: Colors.card,
+    borderRadius: 12,
+    padding: 4,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 3,
+    elevation: 1,
+  },
+  segmentTab: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 10,
+    borderRadius: 10,
+    gap: 6,
+  },
+  segmentTabActive: {
+    backgroundColor: Colors.primaryLight,
+  },
+  tabCountBadge: {
+    backgroundColor: '#E74C3C',
+    minWidth: 18,
+    height: 18,
+    borderRadius: 9,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 5,
+  },
+  tabContent: {
+    flex: 1,
   },
   scrollView: {
     flex: 1,
@@ -400,8 +847,20 @@ const styles = StyleSheet.create({
   loadingText: {
     marginTop: 12,
   },
+  emptyIconCircle: {
+    width: 64,
+    height: 64,
+    borderRadius: 32,
+    backgroundColor: Colors.border,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 16,
+  },
   emptyText: {
-    marginTop: 16,
+    textAlign: 'center',
+  },
+  emptySubtext: {
+    marginTop: 6,
     textAlign: 'center',
   },
   sectionContainer: {
@@ -485,6 +944,9 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
+  playIconWrapExplore: {
+    backgroundColor: '#636E72',
+  },
   cardTitleContent: {
     flex: 1,
   },
@@ -532,5 +994,54 @@ const styles = StyleSheet.create({
     borderRadius: 6,
     borderWidth: 1,
     borderColor: Colors.border,
+  },
+  exploreContainer: {
+    flex: 1,
+  },
+  searchContainer: {
+    paddingHorizontal: 16,
+    paddingBottom: 8,
+  },
+  searchInputWrap: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: Colors.card,
+    borderRadius: 12,
+    paddingHorizontal: 12,
+    height: 44,
+    borderWidth: 1,
+    borderColor: Colors.border,
+  },
+  searchIcon: {
+    marginRight: 8,
+  },
+  searchInput: {
+    flex: 1,
+    fontSize: 15,
+    color: Colors.textPrimary,
+    paddingVertical: 0,
+  },
+  chipBarContainer: {
+    paddingBottom: 8,
+  },
+  chipBarContent: {
+    paddingHorizontal: 16,
+    gap: 8,
+  },
+  chip: {
+    paddingHorizontal: 14,
+    paddingVertical: 7,
+    borderRadius: 20,
+    backgroundColor: Colors.card,
+    borderWidth: 1,
+    borderColor: Colors.border,
+  },
+  chipActive: {
+    backgroundColor: Colors.primaryLight,
+    borderColor: Colors.primary,
+  },
+  flatListContent: {
+    paddingHorizontal: 16,
+    paddingBottom: 32,
   },
 });

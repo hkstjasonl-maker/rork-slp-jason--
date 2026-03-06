@@ -47,6 +47,7 @@ interface AssessmentLibraryRecord {
   description_zh: string | null;
   type: string | null;
   key: string | null;
+  reference: string | null;
 }
 
 interface ClinicalAssessmentSubmission {
@@ -139,6 +140,12 @@ function getAssessmentType(submission: ClinicalAssessmentSubmission): string {
   return submission.assessment_library?.type || 'patient_self_report';
 }
 
+function getAssessmentReference(submission: ClinicalAssessmentSubmission): string {
+  const key = resolveToolKey(submission);
+  if (key) return ASSESSMENT_TOOLS[key].reference || '';
+  return submission.assessment_library?.reference || '';
+}
+
 export default function AssessmentsScreen() {
   const { t, patientId, language } = useApp();
 
@@ -191,7 +198,7 @@ export default function AssessmentsScreen() {
       log('[Assessments] Fetching pending clinical assessments for:', patientId);
       const { data, error } = await supabase
         .from('assessment_submissions')
-        .select('*, assessment_library(id, name_en, name_zh, description_en, description_zh, type, key)')
+        .select('*, assessment_library(id, name_en, name_zh, description_en, description_zh, type, key, reference)')
         .eq('patient_id', patientId!)
         .eq('status', 'pending')
         .order('created_at', { ascending: false });
@@ -212,7 +219,7 @@ export default function AssessmentsScreen() {
       log('[Assessments] Fetching completed clinical assessments for:', patientId);
       const { data, error } = await supabase
         .from('assessment_submissions')
-        .select('*, assessment_library(id, name_en, name_zh, description_en, description_zh, type, key)')
+        .select('*, assessment_library(id, name_en, name_zh, description_en, description_zh, type, key, reference)')
         .eq('patient_id', patientId!)
         .eq('status', 'completed')
         .order('completed_at', { ascending: false })
@@ -330,6 +337,11 @@ export default function AssessmentsScreen() {
                             <Text size={12} color={Colors.textSecondary} numberOfLines={2} style={styles.descriptionText}>
                               {getAssessmentDescription(submission, language)}
                             </Text>
+                            {getAssessmentReference(submission) ? (
+                              <Text size={11} color="#999" style={styles.referenceText} numberOfLines={2}>
+                                {getAssessmentReference(submission)}
+                              </Text>
+                            ) : null}
                             <View style={styles.toolTypeBadge}>
                               <Text size={10} weight="600" color={isClinician ? '#B8860B' : Colors.primary}>
                                 {isClinician ? t('clinicianRated') : t('selfReport')}
@@ -487,6 +499,11 @@ export default function AssessmentsScreen() {
                             <Text size={15} weight="600" color={Colors.textPrimary} numberOfLines={1}>
                               {getAssessmentName(submission, language)}
                             </Text>
+                            {getAssessmentReference(submission) ? (
+                              <Text size={11} color="#999" style={styles.referenceText} numberOfLines={1}>
+                                {getAssessmentReference(submission)}
+                              </Text>
+                            ) : null}
                             <View style={styles.completedMeta}>
                               {submission.completed_at && (
                                 <Text size={12} color={Colors.textSecondary}>
@@ -664,6 +681,10 @@ const styles = StyleSheet.create({
     gap: 4,
   },
   descriptionText: {
+    marginTop: 2,
+  },
+  referenceText: {
+    fontStyle: 'italic',
     marginTop: 2,
   },
   toolTypeBadge: {

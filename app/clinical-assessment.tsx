@@ -31,7 +31,7 @@ import {
   FDA2Section,
   DToMsDimension,
 } from '@/constants/assessments';
-import { ArrowLeft, CheckCircle2, Info, ChevronDown, ChevronUp } from 'lucide-react-native';
+import { ArrowLeft, CheckCircle2, Info, ChevronDown, ChevronUp, BookOpen } from 'lucide-react-native';
 import { log } from '@/lib/logger';
 
 function txt(en: string, zh: string, language: Language | null): string {
@@ -637,6 +637,10 @@ export default function ClinicalAssessmentScreen() {
           contentContainerStyle={styles.scrollContent}
           showsVerticalScrollIndicator={false}
         >
+          {tool.reference ? (
+            <ReferenceBox reference={tool.reference} t={t} />
+          ) : null}
+
           <AssessmentBody
             tool={tool}
             answers={answers}
@@ -670,6 +674,30 @@ export default function ClinicalAssessmentScreen() {
         </ScrollView>
       </SafeAreaView>
     </View>
+  );
+}
+
+function ReferenceBox({ reference, t }: { reference: string; t: (key: string) => string }) {
+  const [expanded, setExpanded] = useState<boolean>(false);
+  return (
+    <TouchableOpacity
+      style={styles.referenceBox}
+      onPress={() => setExpanded(!expanded)}
+      activeOpacity={0.7}
+    >
+      <View style={styles.referenceBoxHeader}>
+        <BookOpen size={14} color={Colors.textSecondary} />
+        <Text size={13} weight="600" color={Colors.textSecondary} style={{ flex: 1 }}>
+          {t('reference')}
+        </Text>
+        {expanded ? <ChevronUp size={14} color={Colors.textSecondary} /> : <ChevronDown size={14} color={Colors.textSecondary} />}
+      </View>
+      {expanded && (
+        <Text size={12} color="#666" style={styles.referenceBoxText}>
+          {reference}
+        </Text>
+      )}
+    </TouchableOpacity>
   );
 }
 
@@ -1659,6 +1687,17 @@ function CompletionScreen({ tool, scoreResult, language, fadeAnim, scaleAnim, on
               </View>
             )}
 
+            {tool.reference ? (
+              <View style={styles.completionReferenceBox}>
+                <Text size={12} color={Colors.textSecondary} style={{ fontStyle: 'italic' as const }}>
+                  {t('assessmentAdministeredUsing')}
+                </Text>
+                <Text size={12} color="#666" style={{ marginTop: 4, lineHeight: 18 }}>
+                  {tool.reference}
+                </Text>
+              </View>
+            ) : null}
+
             {interpretation && (
               <TouchableOpacity
                 style={styles.interpretationToggle}
@@ -2127,6 +2166,32 @@ const styles = StyleSheet.create({
     paddingVertical: 16,
     paddingHorizontal: 60,
     marginTop: 8,
+  },
+  referenceBox: {
+    backgroundColor: '#f5f5f5',
+    borderRadius: 10,
+    padding: 12,
+    marginBottom: 14,
+    borderWidth: 1,
+    borderColor: '#e8e8e8',
+  },
+  referenceBoxHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  referenceBoxText: {
+    marginTop: 8,
+    lineHeight: 18,
+    fontStyle: 'italic',
+  },
+  completionReferenceBox: {
+    backgroundColor: '#f5f5f5',
+    borderRadius: 12,
+    padding: 14,
+    width: '100%',
+    borderWidth: 1,
+    borderColor: '#e8e8e8',
   },
   mcaSectionDesc: {
     marginBottom: 12,

@@ -7,7 +7,6 @@ import {
   SafeAreaView,
   ActivityIndicator,
   RefreshControl,
-  Linking,
 } from 'react-native';
 import { useRouter, useFocusEffect } from 'expo-router';
 import { useQuery } from '@tanstack/react-query';
@@ -185,7 +184,7 @@ export default function MySubmissionsScreen() {
                     </ScaledText>
                   </View>
                   {grouped.redoRequested.map((sub) => (
-                    <SubmissionCard key={sub.id} submission={sub} t={t} _language={language} />
+                    <SubmissionCard key={sub.id} submission={sub} t={t} language={language} />
                   ))}
                 </View>
               )}
@@ -199,7 +198,7 @@ export default function MySubmissionsScreen() {
                     </ScaledText>
                   </View>
                   {grouped.pendingItems.map((sub) => (
-                    <SubmissionCard key={sub.id} submission={sub} t={t} _language={language} />
+                    <SubmissionCard key={sub.id} submission={sub} t={t} language={language} />
                   ))}
                 </View>
               )}
@@ -213,7 +212,7 @@ export default function MySubmissionsScreen() {
                     </ScaledText>
                   </View>
                   {grouped.reviewedItems.map((sub) => (
-                    <SubmissionCard key={sub.id} submission={sub} t={t} _language={language} />
+                    <SubmissionCard key={sub.id} submission={sub} t={t} language={language} />
                   ))}
                 </View>
               )}
@@ -230,11 +229,11 @@ export default function MySubmissionsScreen() {
 function SubmissionCard({
   submission,
   t,
-  _language,
+  language,
 }: {
   submission: ExerciseVideoSubmission;
   t: (key: string) => string;
-  _language: string | null;
+  language: string | null;
 }) {
   const statusLabel = useMemo(() => {
     switch (submission.review_status) {
@@ -265,9 +264,24 @@ function SubmissionCard({
       </View>
 
       <View style={styles.cardMeta}>
-        <ScaledText size={12} color={Colors.textSecondary}>
-          {formatDate(submission.submission_date)}
-        </ScaledText>
+        <View style={styles.dateRow}>
+          <ScaledText size={11} weight="600" color={Colors.textSecondary}>
+            {language === 'zh_hant' || language === 'zh_hans' ? '提交時間：' : 'Submitted: '}
+          </ScaledText>
+          <ScaledText size={11} color={Colors.textSecondary}>
+            {submission.created_at ? new Date(submission.created_at).toLocaleString() : formatDate(submission.submission_date)}
+          </ScaledText>
+        </View>
+        {submission.reviewed_at && (
+          <View style={styles.dateRow}>
+            <ScaledText size={11} weight="600" color={Colors.primary}>
+              {language === 'zh_hant' || language === 'zh_hans' ? '審閱時間：' : 'Reviewed: '}
+            </ScaledText>
+            <ScaledText size={11} color={Colors.primary}>
+              {new Date(submission.reviewed_at).toLocaleString()}
+            </ScaledText>
+          </View>
+        )}
       </View>
 
       {submission.rating !== null && submission.rating !== undefined && (
@@ -295,22 +309,6 @@ function SubmissionCard({
         </View>
       )}
 
-      {submission.video_url && (
-        <TouchableOpacity
-          style={styles.viewVideoBtn}
-          onPress={() => {
-            if (submission.video_url) {
-              void Linking.openURL(submission.video_url);
-            }
-          }}
-          activeOpacity={0.7}
-        >
-          <Video size={14} color={Colors.primary} />
-          <ScaledText size={12} weight="600" color={Colors.primary}>
-            {String('View Video')}
-          </ScaledText>
-        </TouchableOpacity>
-      )}
     </View>
   );
 }
@@ -420,6 +418,12 @@ const styles = StyleSheet.create({
   },
   cardMeta: {
     marginTop: 8,
+    gap: 4,
+  },
+  dateRow: {
+    flexDirection: 'row' as const,
+    alignItems: 'center' as const,
+    gap: 2,
   },
   ratingRow: {
     flexDirection: 'row',
@@ -449,16 +453,5 @@ const styles = StyleSheet.create({
   notesText: {
     lineHeight: 20,
   },
-  viewVideoBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    marginTop: 10,
-    alignSelf: 'flex-start',
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: Colors.primary,
-  },
+
 });

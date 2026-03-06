@@ -40,6 +40,8 @@ import {
   Layers,
   Star,
   Flame,
+  Video,
+  MessageSquare,
 } from 'lucide-react-native';
 
 interface CategoryGroup {
@@ -440,6 +442,26 @@ export default function HomeScreen() {
     });
   }, [router]);
 
+  const submissionsQuery = useQuery({
+    queryKey: ['videoSubmissions', patientId],
+    queryFn: async () => {
+      if (!patientId) return [];
+      const { data, error } = await supabase
+        .from('exercise_video_submissions')
+        .select('*, exercise_review_requirements(*)')
+        .eq('patient_id', patientId!)
+        .order('created_at', { ascending: false })
+        .limit(100);
+      if (error) return [];
+      return (data || []) as any[];
+    },
+    enabled: !!patientId,
+    staleTime: 0,
+    refetchOnMount: 'always' as const,
+  });
+
+  const submissions = submissionsQuery.data || [];
+
   const { refetch: refetchProgram } = programQuery;
   const { refetch: refetchLogs } = todayLogsQuery;
 
@@ -449,11 +471,12 @@ export default function HomeScreen() {
     void refetchProgram();
     void refetchLogs();
     void refetchAllLogs();
+    void submissionsQuery.refetch();
     if (patientId) {
       void fetchAllReviewRequirements(patientId).then(setReviewRequirements);
       void fetchTodaySubmissionsForExercises(patientId).then(setTodaySubmissions);
     }
-  }, [refetchProgram, refetchLogs, refetchAllLogs, patientId]);
+  }, [refetchProgram, refetchLogs, refetchAllLogs, patientId, submissionsQuery]);
 
   if (programQuery.isLoading) {
     return (
@@ -666,6 +689,76 @@ export default function HomeScreen() {
               ))
             )}
           </View>
+
+          {submissions.length > 0 && (
+            <View style={styles.submissionsSection}>
+              <TouchableOpacity
+                style={styles.submissionsHeader}
+                onPress={() => router.push('/my-submissions')}
+                activeOpacity={0.7}
+              >
+                <View style={styles.submissionsHeaderLeft}>
+                  <Video size={20} color="#2563EB" />
+                  <ScaledText size={18} weight="bold" color={Colors.textPrimary}>
+                    {t('mySubmissions')}
+                  </ScaledText>
+                </View>
+                <ChevronRight size={20} color={Colors.textSecondary} />
+              </TouchableOpacity>
+
+              {submissions.slice(0, 3).map((sub: any) => {
+                const isRedo = sub.review_status === 'redo_requested';
+                const isReviewed = sub.review_status === 'reviewed';
+                const statusColor = isReviewed ? Colors.success : isRedo ? Colors.error : '#F59E0B';
+                const statusBg = isReviewed ? Colors.successLight : isRedo ? Colors.errorLight : '#FEF3C7';
+                const statusLabel = isReviewed ? t('reviewed') : isRedo ? t('redoRequested') : t('pending');
+
+                return (
+                  <TouchableOpacity
+                    key={sub.id}
+                    style={[styles.submissionCard, isRedo && styles.submissionCardRedo]}
+                    onPress={() => router.push('/my-submissions')}
+                    activeOpacity={0.7}
+                  >
+                    <View style={styles.submissionCardTop}>
+                      <ScaledText size={14} weight="600" color={Colors.textPrimary} numberOfLines={1} style={{ flex: 1 }}>
+                        {sub.exercise_title_en}
+                      </ScaledText>
+                      <View style={[styles.submissionStatusBadge, { backgroundColor: statusBg }]}>
+                        <ScaledText size={10} weight="600" color={statusColor}>
+                          {String(statusLabel)}
+                        </ScaledText>
+                      </View>
+                    </View>
+                    <ScaledText size={11} color={Colors.textSecondary}>
+                      {sub.created_at ? new Date(sub.created_at).toLocaleString() : sub.submission_date || ''}
+                    </ScaledText>
+                    {sub.reviewer_notes && (
+                      <View style={styles.submissionNotePreview}>
+                        <MessageSquare size={11} color={Colors.primary} />
+                        <ScaledText size={11} color={Colors.primary} numberOfLines={1} style={{ flex: 1 }}>
+                          {sub.reviewer_notes}
+                        </ScaledText>
+                      </View>
+                    )}
+                  </TouchableOpacity>
+                );
+              })}
+
+              {submissions.length > 3 && (
+                <TouchableOpacity
+                  style={styles.viewAllSubmissions}
+                  onPress={() => router.push('/my-submissions')}
+                  activeOpacity={0.7}
+                >
+                  <ScaledText size={13} weight="600" color={Colors.primary}>
+                    {language === 'zh_hant' || language === 'zh_hans' ? `查看全部 ${submissions.length} 項提交` : `View all ${submissions.length} submissions`}
+                  </ScaledText>
+                  <ChevronRight size={16} color={Colors.primary} />
+                </TouchableOpacity>
+              )}
+            </View>
+          )}
 
           <CopyrightFooter />
         </ScrollView>
@@ -1003,5 +1096,59 @@ const styles = StyleSheet.create({
     alignSelf: 'flex-start' as const,
     borderWidth: 1,
     borderColor: Colors.border,
+  },
+  submissionsSection: {
+    paddingHorizontal: 20,
+    marginTop: 8,
+    marginBottom: 16,
+  },
+  submissionsHeader: {
+    flexDirection: 'row' as const,
+    alignItems: 'center' as const,
+    justifyContent: 'space-between' as const,
+    marginBottom: 12,
+  },
+  submissionsHeaderLeft: {
+    flexDirection: 'row' as const,
+    alignItems: 'center' as const,
+    gap: 8,
+  },
+  submissionCard: {
+    backgroundColor: Colors.card,
+    borderRadius: 12,
+    padding: 14,
+    marginBottom: 8,
+    borderWidth: 1,
+    borderColor: Colors.border,
+    gap: 6,
+  },
+  submissionCardRedo: {
+    borderColor: Colors.error,
+    borderWidth: 1.5,
+    backgroundColor: '#FFF5F5',
+  },
+  submissionCardTop: {
+    flexDirection: 'row' as const,
+    alignItems: 'center' as const,
+    justifyContent: 'space-between' as const,
+    gap: 8,
+  },
+  submissionStatusBadge: {
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 6,
+  },
+  submissionNotePreview: {
+    flexDirection: 'row' as const,
+    alignItems: 'center' as const,
+    gap: 5,
+    marginTop: 2,
+  },
+  viewAllSubmissions: {
+    flexDirection: 'row' as const,
+    alignItems: 'center' as const,
+    justifyContent: 'center' as const,
+    gap: 4,
+    paddingVertical: 10,
   },
 });

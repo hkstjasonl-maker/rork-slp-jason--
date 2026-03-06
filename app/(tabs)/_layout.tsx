@@ -1,7 +1,7 @@
 import React from 'react';
 import { StyleSheet } from 'react-native';
 import { Tabs } from 'expo-router';
-import { Home, BarChart3, Settings, ClipboardCheck } from 'lucide-react-native';
+import { Home, BarChart3, Settings, ClipboardCheck, BookOpen } from 'lucide-react-native';
 import { useQuery } from '@tanstack/react-query';
 import { useApp } from '@/contexts/AppContext';
 import { supabase } from '@/lib/supabase';
@@ -24,7 +24,26 @@ export default function TabLayout() {
     enabled: !!patientId,
   });
 
+  const newVideosCountQuery = useQuery({
+    queryKey: ['knowledge_videos_new_count', patientId],
+    queryFn: async () => {
+      const today = new Date().toISOString().split('T')[0];
+      const { count, error } = await supabase
+        .from('knowledge_video_assignments')
+        .select('id', { count: 'exact', head: true })
+        .eq('patient_id', patientId!)
+        .eq('is_active', true)
+        .lte('start_date', today)
+        .gte('end_date', today)
+        .is('viewed_at', null);
+      if (error) throw error;
+      return count || 0;
+    },
+    enabled: !!patientId,
+  });
+
   const pendingCount = pendingCountQuery.data || 0;
+  const newVideosCount = newVideosCountQuery.data || 0;
 
   return (
     <Tabs
@@ -54,6 +73,15 @@ export default function TabLayout() {
         options={{
           title: t('progress'),
           tabBarIcon: ({ color, size }) => <BarChart3 size={size} color={color} />,
+        }}
+      />
+      <Tabs.Screen
+        name="learn"
+        options={{
+          title: t('learn'),
+          tabBarIcon: ({ color, size }) => <BookOpen size={size} color={color} />,
+          tabBarBadge: newVideosCount > 0 ? newVideosCount : undefined,
+          tabBarBadgeStyle: newVideosCount > 0 ? styles.badge : undefined,
         }}
       />
       <Tabs.Screen

@@ -93,6 +93,32 @@ export interface ExerciseCompliance {
   average_self_rating: number | null;
 }
 
+export type KnowledgeVideoCategory = 'educational' | 'condition_knowledge' | 'caregiver_guidance' | 'other';
+
+export interface KnowledgeVideo {
+  id: string;
+  title_en: string;
+  title_zh: string;
+  description_en: string;
+  description_zh: string;
+  category: KnowledgeVideoCategory;
+  vimeo_video_id: string | null;
+  youtube_video_id: string | null;
+  tags: string[] | null;
+}
+
+export interface KnowledgeVideoAssignment {
+  id: string;
+  video_id: string;
+  patient_id: string;
+  target_type: string;
+  start_date: string;
+  end_date: string;
+  is_active: boolean;
+  viewed_at: string | null;
+  knowledge_videos: KnowledgeVideo;
+}
+
 export const FONT_SCALES: Record<FontSizeLevel, number> = {
   small: 0.8,
   medium: 1.0,

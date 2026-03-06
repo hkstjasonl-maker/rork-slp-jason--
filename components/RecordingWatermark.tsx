@@ -29,16 +29,18 @@ export const RecordingWatermark = React.memo(RecordingWatermarkInner);
 const styles = StyleSheet.create({
   overlay: {
     position: 'absolute',
-    top: 12,
+    top: 32,
     left: 12,
+    backgroundColor: 'rgba(0, 0, 0, 0.65)',
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 4,
     zIndex: 20,
   },
   watermarkText: {
-    color: 'rgba(255, 255, 255, 0.25)',
+    color: '#FFFFFF',
     fontSize: 12,
-    fontWeight: '500' as const,
-    textShadowColor: 'rgba(0, 0, 0, 0.3)',
-    textShadowOffset: { width: 0, height: 1 },
-    textShadowRadius: 2,
+    fontWeight: '700' as const,
+    letterSpacing: 0.3,
   },
 });

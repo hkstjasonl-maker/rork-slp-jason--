@@ -16,6 +16,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import * as Haptics from 'expo-haptics';
 import { ArrowLeft, CheckCircle, Clock, Repeat, AlertCircle, Tag, Camera, X, Maximize2, SplitSquareHorizontal, Headphones, VideoOff } from 'lucide-react-native';
 import * as MediaLibrary from 'expo-media-library';
+import * as FileSystem from 'expo-file-system';
 
 import { useApp } from '@/contexts/AppContext';
 import { ScaledText } from '@/components/ScaledText';
@@ -104,43 +105,53 @@ const MemoLiveCamera = memo(LiveCamera, () => true);
 function SnapshotMirror() {
   const snapshotCameraRef = useRef<CameraView>(null);
   const [mirrorUri, setMirrorUri] = useState<string | null>(null);
-  const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const isMountedRef = useRef(true);
+  const isCapturingRef = useRef(false);
+  const prevUriRef = useRef<string | null>(null);
   const [permission] = useCameraPermissions();
 
   useEffect(() => {
     isMountedRef.current = true;
     return () => {
       isMountedRef.current = false;
-      if (intervalRef.current) clearInterval(intervalRef.current);
     };
   }, []);
 
   useEffect(() => {
     if (!permission?.granted) return;
 
-    const timeout = setTimeout(() => {
-      intervalRef.current = setInterval(async () => {
-        if (!snapshotCameraRef.current || !isMountedRef.current) return;
+    const captureLoop = async () => {
+      await new Promise(r => setTimeout(r, 500));
+
+      while (isMountedRef.current) {
+        if (!snapshotCameraRef.current || isCapturingRef.current) {
+          await new Promise(r => setTimeout(r, 50));
+          continue;
+        }
+
+        isCapturingRef.current = true;
         try {
           const photo = await snapshotCameraRef.current.takePictureAsync({
-            quality: 0.3,
+            quality: 0.1,
             skipProcessing: true,
             shutterSound: false,
           });
           if (isMountedRef.current && photo?.uri) {
+            const oldUri = prevUriRef.current;
+            prevUriRef.current = photo.uri;
             setMirrorUri(photo.uri);
+            if (oldUri && oldUri !== photo.uri && Platform.OS !== 'web') {
+              FileSystem.deleteAsync(oldUri, { idempotent: true }).catch(() => {});
+            }
           }
         } catch {
-          // camera busy, skip frame
+          await new Promise(r => setTimeout(r, 100));
         }
-      }, 250);
-    }, 600);
-
-    return () => {
-      clearTimeout(timeout);
-      if (intervalRef.current) clearInterval(intervalRef.current);
+        isCapturingRef.current = false;
+      }
     };
+
+    captureLoop();
   }, [permission?.granted]);
 
   return (
@@ -150,6 +161,8 @@ function SnapshotMirror() {
           source={{ uri: mirrorUri }}
           style={snapshotStyles.mirrorImage}
           resizeMode="cover"
+          // @ts-ignore - fadeDuration is Android-only, speeds up image swap
+          fadeDuration={0}
         />
       ) : (
         <View style={snapshotStyles.placeholder}>

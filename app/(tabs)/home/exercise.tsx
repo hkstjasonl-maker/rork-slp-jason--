@@ -17,7 +17,6 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import * as Haptics from 'expo-haptics';
 import { ArrowLeft, CheckCircle, Clock, Repeat, AlertCircle, Tag, Camera, X, Maximize2, SplitSquareHorizontal, Headphones, VideoOff, Coffee } from 'lucide-react-native';
 import * as MediaLibrary from 'expo-media-library';
-import { Video, ResizeMode } from 'expo-av';
 
 
 import { useApp } from '@/contexts/AppContext';
@@ -119,66 +118,12 @@ const MemoLiveCamera = memo(LiveCamera, () => true);
 
 
 function SplitVideoLayerInner({ vimeoId, youtubeId }: { vimeoId: string | null; youtubeId: string | null }) {
-  const [videoUrl, setVideoUrl] = React.useState<string | null>(null);
-  const [loading, setLoading] = React.useState(true);
-
-  React.useEffect(() => {
-    let cancelled = false;
-    setLoading(true);
-    setVideoUrl(null);
-
-    const fetchUrl = async () => {
-      if (vimeoId) {
-        try {
-          const response = await fetch(`https://player.vimeo.com/video/${vimeoId}/config`);
-          const config = await response.json();
-          let foundUrl: string | null = null;
-          const progressive = config?.request?.files?.progressive || [];
-          if (progressive.length > 0) {
-            const sorted = progressive
-              .filter((f: any) => !f.type || f.type === 'video/mp4')
-              .sort((a: any, b: any) => a.height - b.height);
-            const preferred = sorted.find((f: any) => f.height >= 360 && f.height <= 480) || sorted[0];
-            if (preferred?.url) {
-              foundUrl = preferred.url;
-            }
-          }
-          if (!foundUrl) {
-            const hlsCdns = config?.request?.files?.hls?.cdns || {};
-            const cdnKeys = Object.keys(hlsCdns);
-            if (cdnKeys.length > 0) {
-              const firstCdn = hlsCdns[cdnKeys[0]];
-              const hlsUrl = firstCdn?.url || firstCdn?.avc_url;
-              if (hlsUrl) {
-                foundUrl = hlsUrl;
-              }
-            }
-          }
-          if (!cancelled && foundUrl) {
-            setVideoUrl(foundUrl);
-          }
-        } catch (e) {
-          log('[SplitVideo] Failed to fetch Vimeo URL:', e);
-        }
-      }
-      if (!cancelled) setLoading(false);
-    };
-
-    if (vimeoId) {
-      void fetchUrl();
-    } else {
-      setLoading(false);
-    }
-
-    return () => { cancelled = true; };
-  }, [vimeoId]);
-
-  if (vimeoId && videoUrl) {
+  if (vimeoId) {
     if (Platform.OS === 'web') {
       const embedUrl = `https://player.vimeo.com/video/${vimeoId}?autoplay=0&quality=360p&dnt=1`;
       return (
         <View style={splitVideoStyles.container}>
-          {/* @ts-ignore - iframe is valid on web */}
+          {/* @ts-ignore */}
           <iframe
             src={embedUrl}
             style={{ width: '100%', height: '100%', border: 'none' }}
@@ -188,41 +133,13 @@ function SplitVideoLayerInner({ vimeoId, youtubeId }: { vimeoId: string | null; 
         </View>
       );
     }
-    return (
-      <View style={splitVideoStyles.container}>
-        <Video
-          source={{ uri: videoUrl }}
-          style={{ flex: 1 }}
-          resizeMode={ResizeMode.CONTAIN}
-          useNativeControls={true}
-          shouldPlay={false}
-          isMuted={false}
-        />
-      </View>
-    );
-  }
 
-  if (vimeoId && loading) {
-    return (
-      <View style={splitVideoStyles.loading}>
-        <ActivityIndicator size="small" color={Colors.primary} />
-      </View>
-    );
-  }
-
-  if (youtubeId) {
-    if (Platform.OS === 'web') {
-      return (
-        <View style={splitVideoStyles.container}>
-          <YouTubePlayer videoId={youtubeId} height={200} />
-        </View>
-      );
-    }
     const WebView = require('react-native-webview').WebView;
-    const ytHtml = `<!DOCTYPE html><html><head><meta name="viewport" content="width=device-width,initial-scale=1"><style>*{margin:0;padding:0}body{background:#000;height:100vh;display:flex;align-items:center;justify-content:center}iframe{width:100%;height:100%;border:none}</style></head><body><iframe src="https://www.youtube.com/embed/${youtubeId}?rel=0&modestbranding=1&playsinline=1" allow="autoplay;encrypted-media" allowfullscreen></iframe></body></html>`;
+    const videoHtml = `<!DOCTYPE html><html><head><meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1"><style>*{margin:0;padding:0;}body{background:#000;display:flex;align-items:center;justify-content:center;height:100vh;overflow:hidden;}iframe{width:100%;height:100%;border:none;}</style></head><body><iframe src="https://player.vimeo.com/video/${vimeoId}?autoplay=0&quality=360p&dnt=1&transparent=0" allow="autoplay; fullscreen" allowfullscreen></iframe></body></html>`;
+
     return (
       <WebView
-        source={{ html: ytHtml }}
+        source={{ html: videoHtml }}
         style={splitVideoStyles.container}
         allowsInlineMediaPlayback={true}
         mediaPlaybackRequiresUserAction={true}
@@ -230,6 +147,14 @@ function SplitVideoLayerInner({ vimeoId, youtubeId }: { vimeoId: string | null; 
         scrollEnabled={false}
         bounces={false}
       />
+    );
+  }
+
+  if (youtubeId) {
+    return (
+      <View style={splitVideoStyles.container}>
+        <YouTubePlayer videoId={youtubeId} height={200} />
+      </View>
     );
   }
 
@@ -970,20 +895,22 @@ export default function ExerciseScreen() {
                 <SplitVideoLayer vimeoId={vimeoId} youtubeId={youtubeId} />
               </View>
               <View style={styles.splitMirrorSection}>
-                <View style={[StyleSheet.absoluteFill, { transform: [{ scaleX: -1 }] }]}>
+                {hasCameraPermission ? (
                   <CameraView
                     ref={splitCameraRef}
                     style={StyleSheet.absoluteFill}
                     facing="front"
-                    mirror={false}
                     mode="video"
-                    videoQuality="720p"
                     onCameraReady={handleSplitCameraReady}
                   />
-                </View>
-                {!splitCameraReady && (
-                  <View style={{ ...StyleSheet.absoluteFillObject, justifyContent: 'center', alignItems: 'center', backgroundColor: 'rgba(0,0,0,0.6)' }}>
+                ) : (
+                  <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
                     <ActivityIndicator color={Colors.primary} />
+                  </View>
+                )}
+                {!splitCameraReady && hasCameraPermission && (
+                  <View style={styles.cameraLoading}>
+                    <ActivityIndicator size="large" color={Colors.primary} />
                   </View>
                 )}
                 <View style={styles.mirrorBadge}>

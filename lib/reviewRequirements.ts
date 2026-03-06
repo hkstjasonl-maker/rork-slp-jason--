@@ -1,6 +1,7 @@
 import { supabase } from '@/lib/supabase';
 import { log } from '@/lib/logger';
 import { ExerciseReviewRequirement, ExerciseVideoSubmission } from '@/types';
+import { File as ExpoFile } from 'expo-file-system';
 
 const DAY_NAMES = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'];
 
@@ -111,29 +112,36 @@ export async function uploadAndSubmitVideo(
 
     log('[ReviewReq] Starting upload for video URI:', videoUri);
 
-    const response = await fetch(videoUri);
-    if (!response.ok) {
-      log('[ReviewReq] Failed to fetch local video file, status:', response.status);
+    const file = new ExpoFile(videoUri);
+    if (!file.exists) {
+      log('[ReviewReq] Video file does not exist at URI:', videoUri);
       return false;
     }
+    log('[ReviewReq] File exists, size:', file.size);
 
-    const blob = await response.blob();
-    log('[ReviewReq] Blob size:', blob.size, 'type:', blob.type);
-
-    if (blob.size === 0) {
+    if (file.size === 0) {
       log('[ReviewReq] Video file is empty (0 bytes), aborting upload');
       return false;
     }
 
-    const contentType = detectContentType(videoUri, blob.type);
+    const bytes = await file.bytes();
+
+    if (!bytes || bytes.length === 0) {
+      log('[ReviewReq] Failed to read video file bytes');
+      return false;
+    }
+
+    log('[ReviewReq] Read bytes length:', bytes.length);
+
+    const contentType = detectContentType(videoUri);
     const extension = getFileExtension(contentType);
     const filePath = `${patientId}/${today}-${sanitizedTitle}-${timestamp}.${extension}`;
 
-    log('[ReviewReq] Uploading to:', filePath, 'contentType:', contentType, 'size:', blob.size);
+    log('[ReviewReq] Uploading to:', filePath, 'contentType:', contentType, 'size:', bytes.length);
 
     const { error: uploadError } = await supabase.storage
       .from('review-videos')
-      .upload(filePath, blob, {
+      .upload(filePath, bytes.buffer, {
         contentType,
         cacheControl: '3600',
         upsert: true,
@@ -169,7 +177,7 @@ export async function uploadAndSubmitVideo(
       return false;
     }
 
-    log('[ReviewReq] Submission successful, file:', filePath, 'size:', blob.size, 'contentType:', contentType);
+    log('[ReviewReq] Submission successful, file:', filePath, 'size:', bytes.length, 'contentType:', contentType);
     return true;
   } catch (e) {
     log('[ReviewReq] Submit exception:', e);

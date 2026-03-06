@@ -104,6 +104,7 @@ const LiveCamera = forwardRef<CameraView, { onCameraReady?: () => void }>(
           facing="front"
           mirror={false}
           mode="video"
+          videoQuality="720p"
           onCameraReady={onCameraReady}
         />
       </View>
@@ -883,6 +884,7 @@ export default function ExerciseScreen() {
                     facing="front"
                     mirror={false}
                     mode="video"
+                    videoQuality="720p"
                     onCameraReady={handleSplitCameraReady}
                   />
                 </View>

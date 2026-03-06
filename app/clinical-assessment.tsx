@@ -8,6 +8,7 @@ import {
   Animated,
   Alert,
   SafeAreaView,
+  TextInput,
 } from 'react-native';
 import { useLocalSearchParams, router } from 'expo-router';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
@@ -16,7 +17,7 @@ import { ScaledText } from '@/components/ScaledText';
 import { supabase } from '@/lib/supabase';
 import Colors from '@/constants/colors';
 import { Language } from '@/types';
-import { ASSESSMENT_TOOLS, AssessmentTool, ScaleLabel } from '@/constants/assessments';
+import { ASSESSMENT_TOOLS, AssessmentTool, ScaleLabel, MCASection, OHATItem, BeckmanStructure } from '@/constants/assessments';
 import { ArrowLeft, CheckCircle2, Info, ChevronDown, ChevronUp } from 'lucide-react-native';
 import { log } from '@/lib/logger';
 
@@ -163,6 +164,72 @@ function calculateScores(tool: AssessmentTool, answers: Record<string, number | 
       result.total_score = null;
       break;
     }
+    case 'categorical_risk_pathway': {
+      const sections = tool.mca_sections || [];
+      const oralSection = sections.find(s => s.section_id === 'oral_assessment');
+      let oralTotal = 0;
+      let hasAnySevere = false;
+      if (oralSection) {
+        for (const item of oralSection.items) {
+          const val = (answers[item.item_id] as number) ?? 0;
+          oralTotal += val;
+          if (val === 3) hasAnySevere = true;
+        }
+      }
+      const riskSection = sections.find(s => s.section_id === 'risk_screening');
+      let riskCount = 0;
+      if (riskSection) {
+        for (const item of riskSection.items) {
+          if (answers[item.item_id] === 'yes') riskCount++;
+        }
+      }
+      let pathway = 'A';
+      if (hasAnySevere || oralTotal >= 14) pathway = 'C';
+      else if (riskCount >= 2 || oralTotal >= 10) pathway = 'B';
+      result.total_score = oralTotal;
+      result.max_score = 21;
+      result.subscale_scores = {
+        risk_factor_count: riskCount,
+        oral_assessment_total: oralTotal,
+        pathway: pathway,
+      };
+      break;
+    }
+    case 'ohat_summation': {
+      const ohatItems = tool.ohat_items || [];
+      let total = 0;
+      for (const item of ohatItems) {
+        total += (answers[String(item.item_number)] as number) ?? 0;
+      }
+      result.total_score = total;
+      result.max_score = ohatItems.length * 3;
+      break;
+    }
+    case 'beckman_recording': {
+      const structures = tool.beckman_structures || [];
+      for (const structure of structures) {
+        const structureAnswers: Record<string, number | string> = {};
+        for (const area of structure.assessment_areas) {
+          for (const item of area.items) {
+            if (answers[item.item_id] !== undefined) {
+              structureAnswers[item.item_id] = answers[item.item_id];
+            }
+          }
+        }
+        result.subscale_scores[structure.structure_id] = JSON.stringify(structureAnswers);
+      }
+      if (tool.beckman_additional) {
+        const addAnswers: Record<string, number | string> = {};
+        for (const item of tool.beckman_additional.items) {
+          if (answers[item.item_id] !== undefined) {
+            addAnswers[item.item_id] = answers[item.item_id];
+          }
+        }
+        result.subscale_scores['functional_observations'] = JSON.stringify(addAnswers);
+      }
+      result.total_score = null;
+      break;
+    }
   }
 
   return result;
@@ -175,6 +242,22 @@ function getTotalItemCount(tool: AssessmentTool): number {
   }
   if (tool.scoring_method === 'dtoms_rating') {
     return (tool.dtoms_dimensions || []).length;
+  }
+  if (tool.scoring_method === 'categorical_risk_pathway') {
+    return (tool.mca_sections || []).reduce((sum, s) => sum + s.items.length, 0);
+  }
+  if (tool.scoring_method === 'ohat_summation') {
+    return (tool.ohat_items || []).length;
+  }
+  if (tool.scoring_method === 'beckman_recording') {
+    let count = 0;
+    for (const s of tool.beckman_structures || []) {
+      for (const a of s.assessment_areas) {
+        count += a.items.length;
+      }
+    }
+    if (tool.beckman_additional) count += tool.beckman_additional.items.length;
+    return count;
   }
   if (tool.domains) {
     return tool.domains.reduce((sum, d) => sum + d.items.length, 0) + (tool.severity_question ? 1 : 0);
@@ -417,6 +500,12 @@ const AssessmentBody = React.memo(function AssessmentBody({ tool, answers, langu
       return <FDA2Items tool={tool} answers={answers} language={language} onAnswer={onAnswer} />;
     case 'dtoms_rating':
       return <DToMsItems tool={tool} answers={answers} language={language} onAnswer={onAnswer} />;
+    case 'categorical_risk_pathway':
+      return <AllWalesMCAItems tool={tool} answers={answers} language={language} onAnswer={onAnswer} />;
+    case 'ohat_summation':
+      return <KoreanOHATItems tool={tool} answers={answers} language={language} onAnswer={onAnswer} />;
+    case 'beckman_recording':
+      return <BeckmanOMAItems tool={tool} answers={answers} language={language} onAnswer={onAnswer} />;
     default:
       return null;
   }
@@ -896,6 +985,345 @@ function DToMsItems({ tool, answers, language, onAnswer }: ItemProps) {
           </View>
         );
       })}
+    </View>
+  );
+}
+
+const BECKMAN_OBS_SCALE: Record<string, { en: string; zh: string }> = {
+  '1': { en: 'Within Normal Limits', zh: '正常範圍內' },
+  '2': { en: 'Mildly Impaired', zh: '輕度受損' },
+  '3': { en: 'Severely Impaired', zh: '嚴重受損' },
+};
+
+function AllWalesMCAItems({ tool, answers, language, onAnswer }: ItemProps) {
+  const sections = tool.mca_sections || [];
+
+  return (
+    <View>
+      {sections.map((section) => {
+        const sectionName = txt(section.name_en, section.name_zh, language);
+        const sectionDesc = txt(section.description_en, section.description_zh, language);
+
+        return (
+          <View key={section.section_id}>
+            <View style={styles.domainHeader}>
+              <View style={styles.domainHeaderLine} />
+              <ScaledText size={14} weight="bold" color={Colors.primary} style={styles.domainHeaderText}>
+                {sectionName}
+              </ScaledText>
+              <View style={styles.domainHeaderLine} />
+            </View>
+            <ScaledText size={12} color={Colors.textSecondary} style={styles.mcaSectionDesc}>
+              {sectionDesc}
+            </ScaledText>
+
+            {section.items.map((item) => {
+              const isAnswered = answers[item.item_id] !== undefined;
+
+              if (item.scores) {
+                const categoryText = txt(item.category_en || '', item.category_zh || '', language);
+                return (
+                  <View key={item.item_id} style={[styles.questionCard, isAnswered && styles.questionCardAnswered]}>
+                    <View style={styles.questionHeader}>
+                      <View style={styles.questionNumberBadge}>
+                        <ScaledText size={10} weight="bold" color={Colors.white}>{item.item_id}</ScaledText>
+                      </View>
+                      <ScaledText size={15} weight="600" color={Colors.textPrimary} style={styles.questionText}>
+                        {categoryText}
+                      </ScaledText>
+                    </View>
+                    <View style={styles.coastChoices}>
+                      {Object.entries(item.scores).map(([val, label]) => {
+                        const numVal = Number(val);
+                        const isSelected = answers[item.item_id] === numVal;
+                        const labelText = language === 'zh_hant' || language === 'zh_hans' ? label.zh : label.en;
+                        return (
+                          <TouchableOpacity
+                            key={val}
+                            style={[styles.coastChoice, isSelected && styles.coastChoiceSelected]}
+                            onPress={() => onAnswer(item.item_id, numVal)}
+                            activeOpacity={0.7}
+                          >
+                            <View style={[styles.coastChoiceNumber, isSelected && styles.coastChoiceNumberSelected]}>
+                              <ScaledText size={13} weight="bold" color={isSelected ? Colors.white : Colors.textSecondary}>
+                                {val}
+                              </ScaledText>
+                            </View>
+                            <ScaledText size={13} color={isSelected ? Colors.primary : Colors.textPrimary} weight={isSelected ? '600' : 'normal'} style={{ flex: 1 }}>
+                              {labelText}
+                            </ScaledText>
+                          </TouchableOpacity>
+                        );
+                      })}
+                    </View>
+                  </View>
+                );
+              }
+
+              if (item.response_type === 'text') {
+                const itemText = txt(item.text_en || '', item.text_zh || '', language);
+                return (
+                  <View key={item.item_id} style={[styles.questionCard, isAnswered && styles.questionCardAnswered]}>
+                    <View style={styles.questionHeader}>
+                      <View style={styles.questionNumberBadge}>
+                        <ScaledText size={10} weight="bold" color={Colors.white}>{item.item_id}</ScaledText>
+                      </View>
+                      <ScaledText size={14} weight="600" color={Colors.textPrimary} style={styles.questionText}>
+                        {itemText}
+                      </ScaledText>
+                    </View>
+                    <TextInput
+                      style={styles.mcaTextInput}
+                      value={String(answers[item.item_id] ?? '')}
+                      onChangeText={(text) => onAnswer(item.item_id, text)}
+                      placeholder={language === 'zh_hant' || language === 'zh_hans' ? '請輸入...' : 'Enter...'}
+                      placeholderTextColor={Colors.disabled}
+                    />
+                  </View>
+                );
+              }
+
+              const itemText = txt(item.text_en || '', item.text_zh || '', language);
+              const yesLabel = language === 'zh_hant' || language === 'zh_hans' ? '是' : 'Yes';
+              const noLabel = language === 'zh_hant' || language === 'zh_hans' ? '否' : 'No';
+              return (
+                <View key={item.item_id} style={[styles.questionCard, isAnswered && styles.questionCardAnswered]}>
+                  <View style={styles.questionHeader}>
+                    <View style={styles.questionNumberBadge}>
+                      <ScaledText size={10} weight="bold" color={Colors.white}>{item.item_id}</ScaledText>
+                    </View>
+                    <ScaledText size={14} weight="600" color={Colors.textPrimary} style={styles.questionText}>
+                      {itemText}
+                    </ScaledText>
+                  </View>
+                  <View style={styles.dhiRow}>
+                    <TouchableOpacity
+                      style={[styles.dhiButton, answers[item.item_id] === 'yes' && styles.dhiButtonSelected]}
+                      onPress={() => onAnswer(item.item_id, 'yes')}
+                      activeOpacity={0.7}
+                    >
+                      <ScaledText size={14} weight={answers[item.item_id] === 'yes' ? 'bold' : 'normal'} color={answers[item.item_id] === 'yes' ? Colors.white : Colors.textPrimary}>
+                        {yesLabel}
+                      </ScaledText>
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                      style={[styles.dhiButton, answers[item.item_id] === 'no' && styles.dhiButtonSelected]}
+                      onPress={() => onAnswer(item.item_id, 'no')}
+                      activeOpacity={0.7}
+                    >
+                      <ScaledText size={14} weight={answers[item.item_id] === 'no' ? 'bold' : 'normal'} color={answers[item.item_id] === 'no' ? Colors.white : Colors.textPrimary}>
+                        {noLabel}
+                      </ScaledText>
+                    </TouchableOpacity>
+                  </View>
+                </View>
+              );
+            })}
+          </View>
+        );
+      })}
+    </View>
+  );
+}
+
+function KoreanOHATItems({ tool, answers, language, onAnswer }: ItemProps) {
+  const items = tool.ohat_items || [];
+
+  return (
+    <View>
+      {items.map((item, index) => {
+        const key = String(item.item_number);
+        const isAnswered = answers[key] !== undefined;
+        const categoryText = txt(item.category_en, item.category_zh, language);
+
+        return (
+          <View key={key} style={[styles.questionCard, isAnswered && styles.questionCardAnswered]}>
+            <View style={styles.questionHeader}>
+              <View style={styles.questionNumberBadge}>
+                <ScaledText size={12} weight="bold" color={Colors.white}>{index + 1}</ScaledText>
+              </View>
+              <ScaledText size={15} weight="600" color={Colors.textPrimary} style={styles.questionText}>
+                {categoryText}
+              </ScaledText>
+            </View>
+            <View style={styles.coastChoices}>
+              {Object.entries(item.scores).map(([val, label]) => {
+                const numVal = Number(val);
+                const isSelected = answers[key] === numVal;
+                const labelText = language === 'zh_hant' || language === 'zh_hans' ? label.zh : label.en;
+                return (
+                  <TouchableOpacity
+                    key={val}
+                    style={[styles.coastChoice, isSelected && styles.coastChoiceSelected]}
+                    onPress={() => onAnswer(key, numVal)}
+                    activeOpacity={0.7}
+                  >
+                    <View style={[styles.coastChoiceNumber, isSelected && styles.coastChoiceNumberSelected]}>
+                      <ScaledText size={13} weight="bold" color={isSelected ? Colors.white : Colors.textSecondary}>
+                        {val}
+                      </ScaledText>
+                    </View>
+                    <ScaledText size={13} color={isSelected ? Colors.primary : Colors.textPrimary} weight={isSelected ? '600' : 'normal'} style={{ flex: 1 }}>
+                      {labelText}
+                    </ScaledText>
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
+          </View>
+        );
+      })}
+    </View>
+  );
+}
+
+function BeckmanOMAItems({ tool, answers, language, onAnswer }: ItemProps) {
+  const structures = tool.beckman_structures || [];
+  const additional = tool.beckman_additional;
+
+  const renderObservationItem = (itemId: string, itemText: string) => {
+    const isAnswered = answers[itemId] !== undefined;
+    return (
+      <View key={itemId} style={[styles.questionCard, isAnswered && styles.questionCardAnswered]}>
+        <ScaledText size={13} weight="600" color={Colors.textPrimary} style={{ marginBottom: 10 }}>
+          {itemText}
+        </ScaledText>
+        <View style={styles.scaleButtonsRow}>
+          {['1', '2', '3'].map((val) => {
+            const numVal = Number(val);
+            const isSelected = answers[itemId] === numVal;
+            const label = BECKMAN_OBS_SCALE[val];
+            const labelText = language === 'zh_hant' || language === 'zh_hans' ? label.zh : label.en;
+            return (
+              <TouchableOpacity
+                key={val}
+                style={[styles.scaleButton, isSelected && styles.scaleButtonSelected]}
+                onPress={() => onAnswer(itemId, numVal)}
+                activeOpacity={0.7}
+              >
+                <ScaledText size={13} weight={isSelected ? 'bold' : 'normal'} color={isSelected ? Colors.white : Colors.textPrimary}>
+                  {val}
+                </ScaledText>
+                <ScaledText size={8} color={isSelected ? 'rgba(255,255,255,0.85)' : Colors.textSecondary} numberOfLines={2} style={styles.scaleButtonLabel}>
+                  {labelText}
+                </ScaledText>
+              </TouchableOpacity>
+            );
+          })}
+        </View>
+      </View>
+    );
+  };
+
+  const renderScoredItem = (itemId: string, itemText: string, maxScore: number) => {
+    const isAnswered = answers[itemId] !== undefined;
+    if (maxScore > 6) {
+      return (
+        <View key={itemId} style={[styles.questionCard, isAnswered && styles.questionCardAnswered]}>
+          <ScaledText size={13} weight="600" color={Colors.textPrimary} style={{ marginBottom: 10 }}>
+            {itemText}
+          </ScaledText>
+          <View style={styles.beckmanNumericRow}>
+            <TextInput
+              style={styles.beckmanNumericInput}
+              value={answers[itemId] !== undefined ? String(answers[itemId]) : ''}
+              onChangeText={(text) => {
+                const num = Number(text);
+                if (!isNaN(num) && num >= 0 && num <= maxScore) {
+                  onAnswer(itemId, num);
+                } else if (text === '') {
+                  onAnswer(itemId, 0);
+                }
+              }}
+              keyboardType="numeric"
+              placeholder="0"
+              placeholderTextColor={Colors.disabled}
+              maxLength={String(maxScore).length}
+            />
+            <ScaledText size={12} color={Colors.textSecondary}>
+              {'/ '}{maxScore}
+            </ScaledText>
+          </View>
+        </View>
+      );
+    }
+    return (
+      <View key={itemId} style={[styles.questionCard, isAnswered && styles.questionCardAnswered]}>
+        <ScaledText size={13} weight="600" color={Colors.textPrimary} style={{ marginBottom: 10 }}>
+          {itemText}
+        </ScaledText>
+        <View style={styles.scaleButtonsRow}>
+          {Array.from({ length: maxScore + 1 }, (_, i) => i).map((val) => {
+            const isSelected = answers[itemId] === val;
+            return (
+              <TouchableOpacity
+                key={val}
+                style={[styles.scaleButton, isSelected && styles.scaleButtonSelected]}
+                onPress={() => onAnswer(itemId, val)}
+                activeOpacity={0.7}
+              >
+                <ScaledText size={13} weight={isSelected ? 'bold' : 'normal'} color={isSelected ? Colors.white : Colors.textPrimary}>
+                  {String(val)}
+                </ScaledText>
+              </TouchableOpacity>
+            );
+          })}
+        </View>
+      </View>
+    );
+  };
+
+  return (
+    <View>
+      {structures.map((structure) => {
+        const structureName = txt(structure.name_en, structure.name_zh, language);
+        return (
+          <View key={structure.structure_id}>
+            <View style={styles.beckmanStructureHeader}>
+              <ScaledText size={16} weight="bold" color={Colors.primary}>
+                {structureName}
+              </ScaledText>
+            </View>
+
+            {structure.assessment_areas.map((area) => {
+              const areaName = txt(area.name_en, area.name_zh, language);
+              return (
+                <View key={area.area_id}>
+                  <View style={styles.domainHeader}>
+                    <View style={styles.domainHeaderLine} />
+                    <ScaledText size={13} weight="600" color={Colors.secondary} style={styles.domainHeaderText}>
+                      {areaName}
+                    </ScaledText>
+                    <View style={styles.domainHeaderLine} />
+                  </View>
+
+                  {area.items.map((item) => {
+                    const itemText = txt(item.text_en, item.text_zh, language);
+                    if (item.max_score !== undefined) {
+                      return renderScoredItem(item.item_id, itemText, item.max_score);
+                    }
+                    return renderObservationItem(item.item_id, itemText);
+                  })}
+                </View>
+              );
+            })}
+          </View>
+        );
+      })}
+
+      {additional && (
+        <View>
+          <View style={styles.beckmanStructureHeader}>
+            <ScaledText size={16} weight="bold" color={Colors.primary}>
+              {txt(additional.name_en, additional.name_zh, language)}
+            </ScaledText>
+          </View>
+          {additional.items.map((item) => {
+            const itemText = txt(item.text_en, item.text_zh, language);
+            return renderObservationItem(item.item_id, itemText);
+          })}
+        </View>
+      )}
     </View>
   );
 }
@@ -1501,5 +1929,44 @@ const styles = StyleSheet.create({
     paddingVertical: 16,
     paddingHorizontal: 60,
     marginTop: 8,
+  },
+  mcaSectionDesc: {
+    marginBottom: 12,
+    paddingHorizontal: 4,
+  },
+  mcaTextInput: {
+    borderWidth: 1.5,
+    borderColor: Colors.border,
+    borderRadius: 10,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    fontSize: 14,
+    color: Colors.textPrimary,
+    backgroundColor: Colors.background,
+  },
+  beckmanStructureHeader: {
+    backgroundColor: Colors.primaryLight,
+    borderRadius: 12,
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    marginTop: 20,
+    marginBottom: 8,
+  },
+  beckmanNumericRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+  },
+  beckmanNumericInput: {
+    borderWidth: 1.5,
+    borderColor: Colors.border,
+    borderRadius: 10,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    fontSize: 16,
+    color: Colors.textPrimary,
+    backgroundColor: Colors.background,
+    minWidth: 60,
+    textAlign: 'center' as const,
   },
 });

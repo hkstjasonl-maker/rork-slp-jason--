@@ -51,6 +51,61 @@ export interface DToMsDimension {
   levels: { score: number; label_en: string; label_zh: string }[];
 }
 
+export interface MCASection {
+  section_id: string;
+  name_en: string;
+  name_zh: string;
+  description_en: string;
+  description_zh: string;
+  items: MCAItem[];
+}
+
+export interface MCAItem {
+  item_id: string;
+  text_en?: string;
+  text_zh?: string;
+  category_en?: string;
+  category_zh?: string;
+  response_type?: 'yes_no' | 'yes_no_detail' | 'text';
+  scores?: Record<string, { en: string; zh: string }>;
+}
+
+export interface OHATItem {
+  item_number: number;
+  category_en: string;
+  category_zh: string;
+  category_ko?: string;
+  scores: Record<string, { en: string; zh: string; ko?: string }>;
+}
+
+export interface BeckmanStructure {
+  structure_id: string;
+  name_en: string;
+  name_zh: string;
+  assessment_areas: BeckmanArea[];
+}
+
+export interface BeckmanArea {
+  area_id: string;
+  name_en: string;
+  name_zh: string;
+  items: BeckmanAreaItem[];
+}
+
+export interface BeckmanAreaItem {
+  item_id: string;
+  text_en: string;
+  text_zh: string;
+  max_score?: number;
+  score_note_en?: string;
+}
+
+export interface BeckmanAdditionalObs {
+  name_en: string;
+  name_zh: string;
+  items: { item_id: string; text_en: string; text_zh: string }[];
+}
+
 export interface AssessmentTool {
   id: string;
   name_en: string;
@@ -81,6 +136,11 @@ export interface AssessmentTool {
     scale_min: number;
     scale_max: number;
   };
+  mca_sections?: MCASection[];
+  risk_pathways?: Record<string, { en: string; zh: string }>;
+  ohat_items?: OHATItem[];
+  beckman_structures?: BeckmanStructure[];
+  beckman_additional?: BeckmanAdditionalObs;
 }
 
 export const ASSESSMENT_TOOLS: Record<string, AssessmentTool> = {
@@ -566,5 +626,253 @@ export const ASSESSMENT_TOOLS: Record<string, AssessmentTool> = {
         ],
       },
     ],
+  },
+  all_wales_mca: {
+    id: 'all_wales_mca',
+    name_en: 'All-Wales Mouth Care Assessment',
+    name_zh: '全威爾斯口腔護理評估',
+    description_en: 'A clinician-administered oral health assessment tool developed by NHS Wales for adult inpatients including ICU patients.',
+    description_zh: '由威爾斯國民保健署開發的臨床口腔健康評估工具，適用於成人住院患者（包括深切治療部患者）。',
+    reference: 'NHS Wales / Public Health Wales',
+    type: 'clinician_rated',
+    scoring_method: 'categorical_risk_pathway',
+    interpretation_en: 'Each category is scored 1-3. Higher total scores indicate higher risk. Patients with any item scoring 3 should be placed on the High Risk pathway.',
+    interpretation_zh: '每個類別評分為1-3。總分越高表示風險越高。任何單項評分為3的患者應被列入高風險路徑。',
+    risk_pathways: {
+      A: { en: 'Standard Mouth Care - No identified risk factors or oral problems', zh: '標準口腔護理 - 沒有識別到的風險因素或口腔問題' },
+      B: { en: 'Medium Risk Mouth Care - Some risk factors or mild oral problems', zh: '中等風險口腔護理 - 識別到一些風險因素或輕微口腔問題' },
+      C: { en: 'High Risk Mouth Care - Significant risk factors or oral problems', zh: '高風險口腔護理 - 存在重大風險因素或口腔問題' },
+    },
+    mca_sections: [
+      {
+        section_id: 'risk_screening',
+        name_en: 'Risk Factor Screening Questions',
+        name_zh: '風險因素篩查問題',
+        description_en: 'Five key screening questions to identify risk factors for oral health deterioration.',
+        description_zh: '五個關鍵篩查問題，以識別口腔健康惡化的風險因素。',
+        items: [
+          { item_id: 'rs1', text_en: 'Does the patient have their own teeth and/or dentures?', text_zh: '患者是否有自己的牙齒和/或義齒？', response_type: 'yes_no' },
+          { item_id: 'rs2', text_en: 'Is the patient nil by mouth (NBM) or on a modified diet?', text_zh: '患者是否禁食（NBM）或進食改良飲食？', response_type: 'yes_no' },
+          { item_id: 'rs3', text_en: 'Is the patient on oxygen therapy or receiving mouth-drying medications?', text_zh: '患者是否正在接受氧氣治療或服用導致口乾的藥物？', response_type: 'yes_no' },
+          { item_id: 'rs4', text_en: 'Does the patient require assistance with mouth care?', text_zh: '患者是否需要他人協助進行口腔護理？', response_type: 'yes_no' },
+          { item_id: 'rs5', text_en: 'Does the patient have any swallowing difficulties (dysphagia)?', text_zh: '患者是否有吞嚥困難？', response_type: 'yes_no' },
+        ],
+      },
+      {
+        section_id: 'oral_assessment',
+        name_en: 'Oral Cavity Assessment',
+        name_zh: '口腔評估',
+        description_en: 'Visual inspection of key oral structures. Each category is rated 1-3.',
+        description_zh: '對主要口腔結構進行目視檢查。每個類別按1-3分評分。',
+        items: [
+          { item_id: 'oa1', category_en: 'Lips', category_zh: '嘴唇', scores: { '1': { en: 'Smooth, pink, moist, intact', zh: '光滑、粉紅、濕潤、完整' }, '2': { en: 'Dry, cracked, or slightly swollen', zh: '乾燥、開裂或輕微腫脹' }, '3': { en: 'Ulcerated, bleeding, severely cracked or swollen', zh: '潰瘍、出血、嚴重開裂或腫脹' } } },
+          { item_id: 'oa2', category_en: 'Tongue', category_zh: '舌頭', scores: { '1': { en: 'Pink, moist, papillae present', zh: '粉紅、濕潤、有舌乳頭' }, '2': { en: 'Coated, dry, red, or slightly swollen', zh: '有舌苔、乾燥、發紅或輕微腫脹' }, '3': { en: 'Very coated, deeply fissured, ulcerated, or severely swollen', zh: '嚴重舌苔、深裂、潰瘍或嚴重腫脹' } } },
+          { item_id: 'oa3', category_en: 'Gums and Oral Mucosa', category_zh: '牙齦和口腔黏膜', scores: { '1': { en: 'Pink, moist, firm, intact', zh: '粉紅、濕潤、堅實、完整' }, '2': { en: 'Red, slightly swollen, dry, or minor coating', zh: '發紅、輕微腫脹、乾燥或少量覆蓋物' }, '3': { en: 'Very red, swollen, ulcerated, bleeding, or white/yellow patches', zh: '非常紅、腫脹、潰瘍、出血或白色/黃色斑塊' } } },
+          { item_id: 'oa4', category_en: 'Teeth / Dentures', category_zh: '牙齒/義齒', scores: { '1': { en: 'Clean, no visible plaque or debris', zh: '清潔、無可見菌斑或殘渣' }, '2': { en: 'Some plaque or debris visible', zh: '可見一些菌斑或殘渣' }, '3': { en: 'Heavy plaque, debris, broken or missing teeth', zh: '大量菌斑、殘渣、牙齒破損或缺失' } } },
+          { item_id: 'oa5', category_en: 'Saliva', category_zh: '唾液', scores: { '1': { en: 'Watery, normal flow', zh: '水樣、正常流量' }, '2': { en: 'Thick, ropy, or slightly reduced', zh: '黏稠、絲狀或略有減少' }, '3': { en: 'Absent, very thick, or excessive drooling', zh: '缺失、非常黏稠或過度流涎' } } },
+          { item_id: 'oa6', category_en: 'Palate (Hard and Soft)', category_zh: '顎（硬顎和軟顎）', scores: { '1': { en: 'Pink, moist, intact', zh: '粉紅、濕潤、完整' }, '2': { en: 'Dry, slightly reddened, or minor coating', zh: '乾燥、輕微發紅或少量覆蓋物' }, '3': { en: 'Ulcerated, bleeding, red, or significant coating/debris', zh: '潰瘍、出血、發紅或大量覆蓋物/殘渣' } } },
+          { item_id: 'oa7', category_en: 'Odour', category_zh: '氣味', scores: { '1': { en: 'No unpleasant odour', zh: '無不愉快氣味' }, '2': { en: 'Slightly unpleasant odour', zh: '輕微不愉快氣味' }, '3': { en: 'Strong, foul odour', zh: '強烈惡臭' } } },
+        ],
+      },
+      {
+        section_id: 'icu_additional',
+        name_en: 'ICU-Specific Additional Items',
+        name_zh: '深切治療部額外評估項目',
+        description_en: 'Additional items specifically relevant for ICU/intubated patients.',
+        description_zh: '專門針對深切治療部/插管患者的額外評估項目。',
+        items: [
+          { item_id: 'icu1', text_en: 'Is the patient intubated (endotracheal or tracheostomy)?', text_zh: '患者是否已插管（氣管內管或氣管切開）？', response_type: 'yes_no' },
+          { item_id: 'icu2', text_en: 'Is there visible secretion pooling in the oral cavity?', text_zh: '口腔中是否可見分泌物積聚？', response_type: 'yes_no' },
+          { item_id: 'icu3', text_en: 'Is there evidence of oral trauma from tubes, tapes, or bite blocks?', text_zh: '是否有因管道、膠帶或咬合塊造成的口腔外傷？', response_type: 'yes_no' },
+          { item_id: 'icu4', text_en: 'Is oral suctioning required before/during mouth care?', text_zh: '口腔護理前/期間是否需要口腔抽吸？', response_type: 'yes_no' },
+          { item_id: 'icu5', text_en: 'Position of endotracheal tube (ETT) secured', text_zh: '氣管內管（ETT）固定位置', response_type: 'text' },
+        ],
+      },
+    ],
+  },
+  korean_ohat_icu: {
+    id: 'korean_ohat_icu',
+    name_en: 'Korean Oral Health Assessment Tool for ICU',
+    name_zh: '韓國重症患者口腔健康評估工具',
+    description_en: 'An oral health assessment tool specifically developed for critically ill patients in ICU settings.',
+    description_zh: '一個專門為深切治療部重症患者開發的口腔健康評估工具。',
+    reference: 'Kim & Park (2018)',
+    type: 'clinician_rated',
+    scoring_method: 'ohat_summation',
+    total_min: 7,
+    total_max: 21,
+    interpretation_en: 'Lower total scores indicate better oral health. Scores should be assessed before and after oral nursing care to evaluate effectiveness.',
+    interpretation_zh: '總分越低表示口腔健康狀況越好。應在口腔護理前後評估分數，以評價介入措施的效果。',
+    ohat_items: [
+      { item_number: 1, category_en: 'Lips', category_zh: '嘴唇', category_ko: '입술', scores: { '1': { en: 'Smooth, pink, moist', zh: '光滑、粉紅、濕潤', ko: '매끄럽고, 분홍색, 촉촉함' }, '2': { en: 'Dry, chapped, or red at corners', zh: '乾燥、皸裂或口角發紅', ko: '건조, 갈라짐, 구석이 빨갛게 됨' }, '3': { en: 'Swollen, cracked, bleeding, or ulcerated', zh: '腫脹、開裂、出血或潰瘍', ko: '부어오름, 갈라짐, 출혈 또는 궤양' } } },
+      { item_number: 2, category_en: 'Tongue', category_zh: '舌頭', category_ko: '혀', scores: { '1': { en: 'Normal pink, moist, with papillae', zh: '正常粉紅、濕潤、有舌乳頭', ko: '정상 분홍색, 촉촉함, 유두 있음' }, '2': { en: 'Coated or loss of papillae, shiny or dry', zh: '有舌苔或舌乳頭消失、光滑或乾燥', ko: '설태 있음 또는 유두 소실, 매끄러운 외관 또는 건조' }, '3': { en: 'Fissured, blistered, ulcerated, thick coating, or severely swollen', zh: '裂紋、水泡、潰瘍、厚舌苔或嚴重腫脹', ko: '균열, 수포, 궤양, 두꺼운 설태 또는 심한 부종' } } },
+      { item_number: 3, category_en: 'Gums and Oral Mucosa', category_zh: '牙齦和口腔黏膜', category_ko: '잇몸과 구강점막', scores: { '1': { en: 'Pink, moist, smooth, no bleeding', zh: '粉紅、濕潤、光滑、無出血', ko: '분홍색, 촉촉함, 매끄러움, 출혈 없음' }, '2': { en: 'Reddened, slightly swollen, or dry', zh: '發紅、輕微腫脹或乾燥', ko: '발적, 약간 부어오름, 또는 건조' }, '3': { en: 'Swollen, bleeding, ulcerated, or white patches', zh: '腫脹、出血、潰瘍或出現白色斑塊', ko: '부어오름, 출혈, 궤양 또는 백색 반점' } } },
+      { item_number: 4, category_en: 'Teeth / Dentures', category_zh: '牙齒/義齒', category_ko: '치아/의치', scores: { '1': { en: 'Clean, no debris or plaque visible', zh: '清潔、無可見殘渣或菌斑', ko: '깨끗함, 이물질이나 치태 없음' }, '2': { en: 'Plaque or debris in localized areas', zh: '局部區域有菌斑或殘渣', ko: '국소 부위에 치태 또는 이물질' }, '3': { en: 'Generalized plaque or debris, broken teeth', zh: '全面性菌斑或殘渣、牙齒破損', ko: '전반적 치태 또는 이물질, 파손된 치아' } } },
+      { item_number: 5, category_en: 'Saliva', category_zh: '唾液', category_ko: '타액', scores: { '1': { en: 'Moist tissues, watery and free-flowing', zh: '組織濕潤、唾液水樣且流動順暢', ko: '촉촉한 조직, 물같고 자유롭게 흐르는 타액' }, '2': { en: 'Dry or sticky tissues, reduced saliva', zh: '組織乾燥或黏膩、唾液減少', ko: '건조하거나 끈적이는 조직, 타액 감소' }, '3': { en: 'Tissues parched and red, no saliva or thick ropy', zh: '組織乾裂發紅、無唾液或唾液黏稠', ko: '조직이 건조하고 붉음, 타액 없음 또는 점조성 타액' } } },
+      { item_number: 6, category_en: 'Oral Cleanliness / Debris', category_zh: '口腔清潔度/殘渣', category_ko: '구강 청결도/이물질', scores: { '1': { en: 'Clean oral cavity, no food particles', zh: '口腔清潔、無食物顆粒', ko: '깨끗한 구강, 음식물 잔여물 없음' }, '2': { en: 'Some food particles or secretions in localized areas', zh: '局部區域有食物顆粒或分泌物', ko: '일부 음식물 잔여물이 국소 부위에 있음' }, '3': { en: 'Copious debris or thick secretions throughout', zh: '口腔中大量殘渣或濃厚分泌物', ko: '구강 전체에 다량의 이물질 또는 두꺼운 분비물' } } },
+      { item_number: 7, category_en: 'Odour', category_zh: '氣味', category_ko: '구취', scores: { '1': { en: 'No abnormal odour', zh: '無異常氣味', ko: '비정상적 냄새 없음' }, '2': { en: 'Mildly unpleasant odour', zh: '輕微不愉快氣味', ko: '약간 불쾌한 냄새' }, '3': { en: 'Strong foul odour', zh: '強烈惡臭', ko: '강한 악취' } } },
+    ],
+  },
+  beckman_oma: {
+    id: 'beckman_oma',
+    name_en: 'Beckman Oral Motor Assessment',
+    name_zh: 'Beckman口腔動作評估',
+    description_en: 'A clinician-administered oral motor evaluation protocol. Assesses response to pressure, range of movement, strength, and control for lips, cheeks, jaw, and tongue. NOTE: Full scoring requires the proprietary manual.',
+    description_zh: '臨床口腔動作評估方案。評估嘴唇、面頰、下巴和舌頭的壓力反應、動作範圍、力量和控制。注意：完整評分需參考專有方案手冊。',
+    reference: 'Beckman DA (1986, rev. 2019)',
+    type: 'clinician_rated',
+    scoring_method: 'beckman_recording',
+    interpretation_en: 'Each structure is assessed across multiple dimensions. Lower scores indicate greater difficulty. Results guide targeted intervention planning.',
+    interpretation_zh: '每個結構在多個維度上進行評估。分數越低表示困難越大。結果指導有針對性的介入計劃。',
+    beckman_structures: [
+      {
+        structure_id: 'lips',
+        name_en: 'Lips',
+        name_zh: '嘴唇',
+        assessment_areas: [
+          {
+            area_id: 'lips_observation',
+            name_en: 'General Observations',
+            name_zh: '一般觀察',
+            items: [
+              { item_id: 'lips_obs1', text_en: 'Lip posture at rest (symmetry, closure, position)', text_zh: '靜態嘴唇姿勢（對稱性、閉合、位置）' },
+              { item_id: 'lips_obs2', text_en: 'Lip tone (normal, hypertonic, hypotonic)', text_zh: '嘴唇肌張力（正常、過高、過低）' },
+              { item_id: 'lips_obs3', text_en: 'Drooling presence and severity', text_zh: '流口水的存在及嚴重程度' },
+            ],
+          },
+          {
+            area_id: 'lips_range',
+            name_en: 'Range of Movement',
+            name_zh: '動作範圍',
+            items: [
+              { item_id: 'lips_r1', text_en: 'Upper lip - range of movement (protrusion, retraction, elevation)', text_zh: '上唇 - 動作範圍（前伸、縮回、上抬）', max_score: 3 },
+              { item_id: 'lips_r2', text_en: 'Lower lip - range of movement (protrusion, retraction, depression)', text_zh: '下唇 - 動作範圍（前伸、縮回、下壓）', max_score: 4 },
+              { item_id: 'lips_r3', text_en: 'Lip elongation (stretch bilaterally)', text_zh: '嘴唇伸展（雙側拉伸）', max_score: 2 },
+            ],
+          },
+          {
+            area_id: 'lips_strength',
+            name_en: 'Strength',
+            name_zh: '力量',
+            items: [
+              { item_id: 'lips_s1', text_en: 'Upper lip strength (resistance to downward pull)', text_zh: '上唇力量（抵抗向下拉力）', max_score: 6 },
+              { item_id: 'lips_s2', text_en: 'Lower lip strength (resistance to upward pull)', text_zh: '下唇力量（抵抗向上拉力）', max_score: 6 },
+              { item_id: 'lips_s3', text_en: 'Lip seal strength (resistance to lateral pull)', text_zh: '唇閉合力量（抵抗側向拉力）', max_score: 6 },
+            ],
+          },
+        ],
+      },
+      {
+        structure_id: 'cheeks',
+        name_en: 'Cheeks',
+        name_zh: '面頰',
+        assessment_areas: [
+          {
+            area_id: 'cheeks_observation',
+            name_en: 'General Observations',
+            name_zh: '一般觀察',
+            items: [
+              { item_id: 'cheeks_obs1', text_en: 'Cheek tone at rest (symmetry, tone)', text_zh: '靜態面頰肌張力（對稱性、張力）' },
+              { item_id: 'cheeks_obs2', text_en: 'Cheek puffing ability', text_zh: '鼓腮能力' },
+            ],
+          },
+          {
+            area_id: 'cheeks_range_strength',
+            name_en: 'Range of Movement and Strength',
+            name_zh: '動作範圍和力量',
+            items: [
+              { item_id: 'cheeks_rs1', text_en: 'Left cheek - range and strength (resistance to inward pressure)', text_zh: '左面頰 - 動作範圍和力量（抵抗向內壓力）' },
+              { item_id: 'cheeks_rs2', text_en: 'Right cheek - range and strength (resistance to inward pressure)', text_zh: '右面頰 - 動作範圍和力量（抵抗向內壓力）' },
+            ],
+          },
+        ],
+      },
+      {
+        structure_id: 'jaw',
+        name_en: 'Jaw',
+        name_zh: '下巴/下顎',
+        assessment_areas: [
+          {
+            area_id: 'jaw_observation',
+            name_en: 'General Observations',
+            name_zh: '一般觀察',
+            items: [
+              { item_id: 'jaw_obs1', text_en: 'Jaw posture at rest (open, closed, asymmetry)', text_zh: '靜態下顎姿勢（打開、閉合、不對稱）' },
+              { item_id: 'jaw_obs2', text_en: 'Jaw tone (normal, hypertonic, hypotonic)', text_zh: '下顎肌張力（正常、過高、過低）' },
+              { item_id: 'jaw_obs3', text_en: 'Jaw stability during function', text_zh: '功能中的下顎穩定性' },
+              { item_id: 'jaw_obs4', text_en: 'Presence of tonic bite reflex', text_zh: '緊咬反射的存在' },
+            ],
+          },
+          {
+            area_id: 'jaw_range_strength',
+            name_en: 'Range of Movement and Strength',
+            name_zh: '動作範圍和力量',
+            items: [
+              { item_id: 'jaw_rs1', text_en: 'Jaw opening - range of movement', text_zh: '下顎打開 - 動作範圍', max_score: 20 },
+              { item_id: 'jaw_rs2', text_en: 'Jaw closing - strength (left side)', text_zh: '下顎閉合 - 力量（左側）', max_score: 20 },
+              { item_id: 'jaw_rs3', text_en: 'Jaw closing - strength (right side)', text_zh: '下顎閉合 - 力量（右側）', max_score: 20 },
+              { item_id: 'jaw_rs4', text_en: 'Jaw lateralization - left', text_zh: '下顎側向運動 - 向左' },
+              { item_id: 'jaw_rs5', text_en: 'Jaw lateralization - right', text_zh: '下顎側向運動 - 向右' },
+            ],
+          },
+        ],
+      },
+      {
+        structure_id: 'tongue',
+        name_en: 'Tongue',
+        name_zh: '舌頭',
+        assessment_areas: [
+          {
+            area_id: 'tongue_observation',
+            name_en: 'General Observations',
+            name_zh: '一般觀察',
+            items: [
+              { item_id: 'tongue_obs1', text_en: 'Tongue posture at rest (position, symmetry)', text_zh: '靜態舌頭姿勢（位置、對稱性）' },
+              { item_id: 'tongue_obs2', text_en: 'Tongue tone (normal, hypertonic, hypotonic)', text_zh: '舌頭肌張力（正常、過高、過低）' },
+              { item_id: 'tongue_obs3', text_en: 'Presence of tongue thrust', text_zh: '舌頭前推的存在' },
+              { item_id: 'tongue_obs4', text_en: 'Fasciculations or atrophy noted', text_zh: '注意到的肌束顫動或萎縮' },
+            ],
+          },
+          {
+            area_id: 'tongue_movement',
+            name_en: 'Response to Pressure and Movement',
+            name_zh: '對壓力和動作的反應',
+            items: [
+              { item_id: 'tongue_m1', text_en: 'Tongue movement toward pressure - lateral to lower gum', text_zh: '舌頭對壓力的反應 - 側向至下牙齦' },
+              { item_id: 'tongue_m2', text_en: 'Tongue movement toward pressure - lateral to cheek', text_zh: '舌頭對壓力的反應 - 側向至面頰' },
+              { item_id: 'tongue_m3', text_en: 'Tongue protrusion', text_zh: '舌頭伸出' },
+              { item_id: 'tongue_m4', text_en: 'Tongue retraction', text_zh: '舌頭縮回' },
+              { item_id: 'tongue_m5', text_en: 'Tongue lateralization - left', text_zh: '舌頭側向運動 - 向左' },
+              { item_id: 'tongue_m6', text_en: 'Tongue lateralization - right', text_zh: '舌頭側向運動 - 向右' },
+              { item_id: 'tongue_m7', text_en: 'Tongue elevation (tip)', text_zh: '舌頭上抬（舌尖）' },
+              { item_id: 'tongue_m8', text_en: 'Tongue depression', text_zh: '舌頭下壓' },
+            ],
+          },
+          {
+            area_id: 'tongue_strength',
+            name_en: 'Strength',
+            name_zh: '力量',
+            items: [
+              { item_id: 'tongue_s1', text_en: 'Tongue protrusion strength', text_zh: '舌頭伸出力量' },
+              { item_id: 'tongue_s2', text_en: 'Tongue lateralization strength - left', text_zh: '舌頭側向力量 - 向左' },
+              { item_id: 'tongue_s3', text_en: 'Tongue lateralization strength - right', text_zh: '舌頭側向力量 - 向右' },
+              { item_id: 'tongue_s4', text_en: 'Tongue elevation strength', text_zh: '舌頭上抬力量' },
+            ],
+          },
+        ],
+      },
+    ],
+    beckman_additional: {
+      name_en: 'Functional Observations During Feeding',
+      name_zh: '進食期間的功能觀察',
+      items: [
+        { item_id: 'func1', text_en: 'Sucking pattern (rhythmic, weak, absent)', text_zh: '吸吮模式（有節奏、虛弱、缺失）' },
+        { item_id: 'func2', text_en: 'Chewing pattern (rotary, munching, absent)', text_zh: '咀嚼模式（旋轉、上下咀嚼、缺失）' },
+        { item_id: 'func3', text_en: 'Bolus formation and transport', text_zh: '食物團形成和輸送' },
+        { item_id: 'func4', text_en: 'Swallow initiation (timely, delayed)', text_zh: '吞嚥啟動（及時、延遲）' },
+        { item_id: 'func5', text_en: 'Oral residue after swallow', text_zh: '吞嚥後口腔殘留物' },
+        { item_id: 'func6', text_en: 'Cough/gag response during feeding', text_zh: '進食時的咳嗽/作嘔反應' },
+      ],
+    },
   },
 };

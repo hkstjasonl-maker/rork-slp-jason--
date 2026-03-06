@@ -73,7 +73,7 @@ export default function ProgressScreen() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from('exercise_programs')
-        .select('*, exercises(*, exercise_library:exercise_library_id(id, vimeo_video_id, youtube_video_id))')
+        .select('*, exercises(*)')
         .eq('patient_id', patientId!)
         .eq('is_active', true)
         .order('created_at', { ascending: false })

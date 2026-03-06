@@ -13,13 +13,9 @@ interface VimeoPlayerProps {
   lowQuality?: boolean;
 }
 
-async function getVimeoUrlFromConfig(vimeoId: string): Promise<string | null> {
+async function getVimeoHlsUrl(vimeoId: string): Promise<string | null> {
   try {
     const response = await fetch(`https://player.vimeo.com/video/${vimeoId}/config`);
-    if (!response.ok) {
-      log('[VimeoPlayer] Config response not ok:', response.status);
-      return null;
-    }
     const config = await response.json();
 
     const progressive = config?.request?.files?.progressive || [];
@@ -51,56 +47,6 @@ async function getVimeoUrlFromConfig(vimeoId: string): Promise<string | null> {
     log('[VimeoPlayer] Config fetch error:', error);
     return null;
   }
-}
-
-async function getVimeoUrlFromApi(vimeoId: string): Promise<string | null> {
-  const token = process.env.EXPO_PUBLIC_VIMEO_ACCESS_TOKEN;
-  if (!token) {
-    log('[VimeoPlayer] No Vimeo access token available for API fallback');
-    return null;
-  }
-  try {
-    const response = await fetch(`https://api.vimeo.com/videos/${vimeoId}`, {
-      headers: { Authorization: `bearer ${token}`, Accept: 'application/vnd.vimeo.*+json;version=3.4' },
-    });
-    if (!response.ok) {
-      log('[VimeoPlayer] API response not ok:', response.status);
-      return null;
-    }
-    const data = await response.json();
-    const files = data?.files || [];
-    if (files.length > 0) {
-      const mp4s = files
-        .filter((f: { type?: string }) => f.type === 'video/mp4')
-        .sort((a: { height: number }, b: { height: number }) => b.height - a.height);
-      const preferred = mp4s.find((f: { height: number }) => f.height <= 720) || mp4s[0];
-      if (preferred?.link) {
-        log('[VimeoPlayer] Using API file link, height:', preferred.height);
-        return preferred.link;
-      }
-    }
-    const hlsLink = data?.play?.hls?.link;
-    if (hlsLink) {
-      log('[VimeoPlayer] Using API HLS link');
-      return hlsLink;
-    }
-    log('[VimeoPlayer] No playback URL found in API response');
-    return null;
-  } catch (error) {
-    log('[VimeoPlayer] API fetch error:', error);
-    return null;
-  }
-}
-
-async function getVimeoHlsUrl(vimeoId: string): Promise<string | null> {
-  const configUrl = await getVimeoUrlFromConfig(vimeoId);
-  if (configUrl) return configUrl;
-
-  log('[VimeoPlayer] Config endpoint failed, trying API fallback');
-  const apiUrl = await getVimeoUrlFromApi(vimeoId);
-  if (apiUrl) return apiUrl;
-
-  return null;
 }
 
 function VimeoPlayerInner({ videoId, height, onEnd, lowQuality }: VimeoPlayerProps) {

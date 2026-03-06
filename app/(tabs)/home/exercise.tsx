@@ -89,19 +89,11 @@ function formatElapsed(seconds: number): string {
 }
 
 function getVimeoId(exercise: Exercise): string | null {
-  const direct = exercise.vimeo_video_id?.trim();
-  if (direct) return direct;
-  const lib = exercise.exercise_library?.vimeo_video_id?.trim();
-  if (lib) return lib;
-  return null;
+  return exercise.vimeo_video_id || null;
 }
 
 function getYouTubeId(exercise: Exercise): string | null {
-  const direct = exercise.youtube_video_id?.trim();
-  if (direct) return direct;
-  const lib = exercise.exercise_library?.youtube_video_id?.trim();
-  if (lib) return lib;
-  return null;
+  return exercise.youtube_video_id || null;
 }
 
 const LiveCamera = forwardRef<CameraView, { onCameraReady?: () => void; cameraMode?: 'picture' | 'video' }>(
@@ -406,15 +398,10 @@ export default function ExerciseScreen() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from('exercises')
-        .select('*, exercise_library:exercise_library_id(id, vimeo_video_id, youtube_video_id)')
+        .select('*')
         .eq('id', activeExerciseId)
         .single();
       if (error) throw error;
-      log('[Exercise] Raw data video fields:', JSON.stringify({
-        vimeo_video_id: data?.vimeo_video_id,
-        youtube_video_id: data?.youtube_video_id,
-        exercise_library: data?.exercise_library,
-      }));
       return data as Exercise;
     },
     enabled: !!activeExerciseId,

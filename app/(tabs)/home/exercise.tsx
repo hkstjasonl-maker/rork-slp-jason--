@@ -120,7 +120,7 @@ const MemoLiveCamera = memo(LiveCamera, () => true);
 function SplitVideoLayerInner({ vimeoId, youtubeId }: { vimeoId: string | null; youtubeId: string | null }) {
   if (vimeoId) {
     if (Platform.OS === 'web') {
-      const embedUrl = `https://player.vimeo.com/video/${vimeoId}?autoplay=0&quality=360p&dnt=1`;
+      const embedUrl = `https://player.vimeo.com/video/${vimeoId}?autoplay=0&quality=240p&dnt=1`;
       return (
         <View style={splitVideoStyles.container}>
           {/* @ts-ignore */}
@@ -135,7 +135,7 @@ function SplitVideoLayerInner({ vimeoId, youtubeId }: { vimeoId: string | null; 
     }
 
     const WebView = require('react-native-webview').WebView;
-    const videoHtml = `<!DOCTYPE html><html><head><meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1"><style>*{margin:0;padding:0;}body{background:#000;display:flex;align-items:center;justify-content:center;height:100vh;overflow:hidden;}iframe{width:100%;height:100%;border:none;}</style></head><body><iframe src="https://player.vimeo.com/video/${vimeoId}?autoplay=0&quality=360p&dnt=1&transparent=0" allow="autoplay; fullscreen" allowfullscreen></iframe></body></html>`;
+    const videoHtml = `<!DOCTYPE html><html><head><meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1"><style>*{margin:0;padding:0;}body{background:#000;display:flex;align-items:center;justify-content:center;height:100vh;overflow:hidden;}iframe{width:100%;height:100%;border:none;}</style></head><body><iframe src="https://player.vimeo.com/video/${vimeoId}?autoplay=0&quality=240p&dnt=1&transparent=0" allow="autoplay; fullscreen" allowfullscreen></iframe></body></html>`;
 
     return (
       <WebView

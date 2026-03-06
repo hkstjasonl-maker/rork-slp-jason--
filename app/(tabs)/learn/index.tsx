@@ -39,7 +39,10 @@ import {
   Sparkles,
   Compass,
   Inbox,
+  User,
+  Building2,
 } from 'lucide-react-native';
+import { Image } from 'react-native';
 
 type TabType = 'foryou' | 'explore';
 
@@ -79,6 +82,96 @@ function getVideoDescription(video: KnowledgeVideo, language: Language | null): 
     return video.description_zh || video.description_en;
   }
   return video.description_en || video.description_zh;
+}
+
+function getCreatorName(video: KnowledgeVideo, language: Language | null): string | null {
+  const isZh = language === 'zh_hant' || language === 'zh_hans';
+  if (isZh) return video.creator_name_zh || video.creator_name_en || null;
+  return video.creator_name_en || video.creator_name_zh || null;
+}
+
+function getProviderOrg(video: KnowledgeVideo, language: Language | null): string | null {
+  const isZh = language === 'zh_hant' || language === 'zh_hans';
+  if (isZh) return video.provider_org_zh || video.provider_org_en || null;
+  return video.provider_org_en || video.provider_org_zh || null;
+}
+
+function CreatorProviderLine({ video, language }: { video: KnowledgeVideo; language: Language | null }) {
+  const creator = getCreatorName(video, language);
+  const provider = getProviderOrg(video, language);
+  if (!creator && !provider) return null;
+
+  return (
+    <View style={styles.creatorRow}>
+      {video.provider_logo_url ? (
+        <Image source={{ uri: video.provider_logo_url }} style={styles.providerLogoSmall} />
+      ) : creator ? (
+        <User size={12} color={Colors.textSecondary} />
+      ) : (
+        <Building2 size={12} color={Colors.textSecondary} />
+      )}
+      <ScaledText size={12} color={Colors.textSecondary} numberOfLines={1} style={styles.creatorText}>
+        {creator && provider ? `${creator}  ·  ${provider}` : creator || provider}
+      </ScaledText>
+    </View>
+  );
+}
+
+function CreatorProviderDetail({ video, language }: { video: KnowledgeVideo; language: Language | null }) {
+  const isZh = language === 'zh_hant' || language === 'zh_hans';
+  const creator = getCreatorName(video, language);
+  const creatorAlt = isZh
+    ? (video.creator_name_en || null)
+    : (video.creator_name_zh || null);
+  const provider = getProviderOrg(video, language);
+  const providerAlt = isZh
+    ? (video.provider_org_en || null)
+    : (video.provider_org_zh || null);
+
+  if (!creator && !provider) return null;
+
+  return (
+    <View style={styles.creatorDetailContainer}>
+      {creator ? (
+        <View style={styles.creatorDetailRow}>
+          <User size={14} color={Colors.textSecondary} />
+          <View style={styles.creatorDetailText}>
+            <ScaledText size={13} weight="600" color={Colors.textPrimary}>
+              {/* eslint-disable-next-line rork/general-no-raw-text */}
+              {creator}
+            </ScaledText>
+            {creatorAlt ? (
+              <ScaledText size={11} color={Colors.textSecondary}>
+                {/* eslint-disable-next-line rork/general-no-raw-text */}
+                {creatorAlt}
+              </ScaledText>
+            ) : null}
+          </View>
+        </View>
+      ) : null}
+      {provider ? (
+        <View style={styles.creatorDetailRow}>
+          {video.provider_logo_url ? (
+            <Image source={{ uri: video.provider_logo_url }} style={styles.providerLogoLarge} />
+          ) : (
+            <Building2 size={14} color={Colors.textSecondary} />
+          )}
+          <View style={styles.creatorDetailText}>
+            <ScaledText size={13} weight="600" color={Colors.textPrimary}>
+              {/* eslint-disable-next-line rork/general-no-raw-text */}
+              {provider}
+            </ScaledText>
+            {providerAlt ? (
+              <ScaledText size={11} color={Colors.textSecondary}>
+                {/* eslint-disable-next-line rork/general-no-raw-text */}
+                {providerAlt}
+              </ScaledText>
+            ) : null}
+          </View>
+        </View>
+      ) : null}
+    </View>
+  );
 }
 
 function AssignedVideoCard({
@@ -161,6 +254,7 @@ function AssignedVideoCard({
               {/* eslint-disable-next-line rork/general-no-raw-text */}
               {title}
             </ScaledText>
+            {!expanded && <CreatorProviderLine video={video} language={language} />}
             {!expanded && description ? (
               <ScaledText size={13} color={Colors.textSecondary} numberOfLines={2} style={styles.descriptionPreview}>
                 {/* eslint-disable-next-line rork/general-no-raw-text */}
@@ -178,6 +272,7 @@ function AssignedVideoCard({
 
       {expanded && (
         <View style={styles.cardBody}>
+          <CreatorProviderDetail video={video} language={language} />
           {description ? (
             <ScaledText size={13} color={Colors.textSecondary} style={styles.descriptionFull}>
               {/* eslint-disable-next-line rork/general-no-raw-text */}
@@ -279,6 +374,7 @@ function ExploreVideoCard({
               {/* eslint-disable-next-line rork/general-no-raw-text */}
               {title}
             </ScaledText>
+            {!expanded && <CreatorProviderLine video={video} language={language} />}
             {!expanded && description ? (
               <ScaledText size={13} color={Colors.textSecondary} numberOfLines={2} style={styles.descriptionPreview}>
                 {/* eslint-disable-next-line rork/general-no-raw-text */}
@@ -296,6 +392,7 @@ function ExploreVideoCard({
 
       {expanded && (
         <View style={styles.cardBody}>
+          <CreatorProviderDetail video={video} language={language} />
           {description ? (
             <ScaledText size={13} color={Colors.textSecondary} style={styles.descriptionFull}>
               {/* eslint-disable-next-line rork/general-no-raw-text */}
@@ -994,6 +1091,39 @@ const styles = StyleSheet.create({
     borderRadius: 6,
     borderWidth: 1,
     borderColor: Colors.border,
+  },
+  creatorRow: {
+    flexDirection: 'row' as const,
+    alignItems: 'center' as const,
+    gap: 5,
+    marginTop: 3,
+  },
+  creatorText: {
+    flex: 1,
+  },
+  providerLogoSmall: {
+    width: 16,
+    height: 16,
+    borderRadius: 3,
+    resizeMode: 'contain' as const,
+  },
+  providerLogoLarge: {
+    width: 28,
+    height: 28,
+    borderRadius: 6,
+    resizeMode: 'contain' as const,
+  },
+  creatorDetailContainer: {
+    marginBottom: 10,
+    gap: 8,
+  },
+  creatorDetailRow: {
+    flexDirection: 'row' as const,
+    alignItems: 'center' as const,
+    gap: 8,
+  },
+  creatorDetailText: {
+    flex: 1,
   },
   exploreContainer: {
     flex: 1,

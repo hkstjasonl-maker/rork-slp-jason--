@@ -105,6 +105,11 @@ export interface KnowledgeVideo {
   vimeo_video_id: string | null;
   youtube_video_id: string | null;
   tags: string[] | null;
+  creator_name_en: string | null;
+  creator_name_zh: string | null;
+  provider_org_en: string | null;
+  provider_org_zh: string | null;
+  provider_logo_url: string | null;
   is_active?: boolean;
   created_at?: string;
 }

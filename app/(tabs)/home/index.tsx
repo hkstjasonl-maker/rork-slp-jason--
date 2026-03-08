@@ -18,7 +18,7 @@ import { AppTutorial } from '@/components/AppTutorial';
 import { supabase } from '@/lib/supabase';
 import Colors from '@/constants/colors';
 import { JASON_CARTOON } from '@/constants/images';
-import { Exercise, ExerciseProgram, ExerciseLog, Language, ExerciseReviewRequirement, FeedingSkillAssignment } from '@/types';
+import { Exercise, ExerciseProgram, ExerciseLog, Language, ExerciseReviewRequirement, FeedingSkillAssignment, ProgramObjective } from '@/types';
 import { getDosageProgressText, getExerciseDosage } from '@/lib/dosage';
 import { log } from '@/lib/logger';
 import {
@@ -52,6 +52,7 @@ import {
   MessageSquare,
   UtensilsCrossed,
   Eye,
+  Target,
 } from 'lucide-react-native';
 
 interface CategoryGroup {
@@ -484,6 +485,29 @@ export default function HomeScreen() {
     });
   }, [router]);
 
+  const objectivesQuery = useQuery({
+    queryKey: ['programObjectives', program?.id],
+    queryFn: async () => {
+      log('Fetching objectives for program:', program?.id);
+      const { data, error } = await supabase
+        .from('program_objectives')
+        .select('*')
+        .eq('program_id', program!.id)
+        .eq('is_active', true)
+        .order('sort_order', { ascending: true });
+      if (error) {
+        log('Objectives fetch error:', error);
+        return [];
+      }
+      return (data || []) as ProgramObjective[];
+    },
+    enabled: !!program?.id,
+    staleTime: 5 * 60 * 1000,
+  });
+
+  const objectives = objectivesQuery.data || [];
+  const [objectivesExpanded, setObjectivesExpanded] = useState<boolean>(false);
+
   const feedingSkillsQuery = useQuery({
     queryKey: ['feedingSkillAssignments', patientId],
     queryFn: async () => {
@@ -543,6 +567,7 @@ export default function HomeScreen() {
 
   const submissions = submissionsQuery.data || [];
 
+  const { refetch: refetchObjectives } = objectivesQuery;
   const { refetch: refetchProgram } = programQuery;
   const { refetch: refetchLogs } = todayLogsQuery;
   const { refetch: refetchAllLogs } = allLogsQuery;
@@ -563,7 +588,8 @@ export default function HomeScreen() {
     void refetchFeedingSkills();
     void refetchFeedingReviewReqs();
     void refetchFeedingTodaySubs();
-  }, [refetchProgram, refetchLogs, refetchAllLogs, refetchSubmissions, refetchReviewReqs, refetchTodaySubs, refetchFeedingSkills, refetchFeedingReviewReqs, refetchFeedingTodaySubs]);
+    void refetchObjectives();
+  }, [refetchProgram, refetchLogs, refetchAllLogs, refetchSubmissions, refetchReviewReqs, refetchTodaySubs, refetchFeedingSkills, refetchFeedingReviewReqs, refetchFeedingTodaySubs, refetchObjectives]);
 
   if (programQuery.isLoading) {
     return (
@@ -651,6 +677,51 @@ export default function HomeScreen() {
                 </ScaledText>
               </View>
             </View>
+            {objectives.length > 0 && (
+              <View style={styles.objectivesSection}>
+                <TouchableOpacity
+                  style={styles.objectivesToggle}
+                  onPress={() => setObjectivesExpanded(!objectivesExpanded)}
+                  activeOpacity={0.7}
+                >
+                  <View style={styles.objectivesToggleLeft}>
+                    <Target size={16} color="#8B5CF6" />
+                    <ScaledText size={14} weight="600" color="#8B5CF6">
+                      {t('trainingObjectives')}
+                    </ScaledText>
+                  </View>
+                  {objectivesExpanded ? (
+                    <ChevronUp size={16} color="#8B5CF6" />
+                  ) : (
+                    <ChevronDown size={16} color="#8B5CF6" />
+                  )}
+                </TouchableOpacity>
+                {objectivesExpanded && (
+                  <View style={styles.objectivesList}>
+                    {objectives.map((obj, idx) => {
+                      const lang = language || 'en';
+                      const text = lang === 'zh_hant'
+                        ? (obj.objective_zh_hant || obj.objective_en)
+                        : lang === 'zh_hans'
+                          ? (obj.objective_zh_hans || obj.objective_en)
+                          : obj.objective_en;
+                      return (
+                        <View key={obj.id} style={styles.objectiveItem}>
+                          <View style={styles.objectiveBullet}>
+                            <ScaledText size={11} weight="bold" color="#8B5CF6">
+                              {idx + 1}
+                            </ScaledText>
+                          </View>
+                          <ScaledText size={14} color={Colors.textPrimary} style={styles.objectiveText}>
+                            {text}
+                          </ScaledText>
+                        </View>
+                      );
+                    })}
+                  </View>
+                )}
+              </View>
+            )}
           </View>
 
           {(starInfo.totalStars > 0 || starInfo.currentStreak > 0) && (
@@ -1503,5 +1574,43 @@ const styles = StyleSheet.create({
     paddingHorizontal: 8,
     paddingVertical: 2,
     borderRadius: 6,
+  },
+  objectivesSection: {
+    marginTop: 14,
+    paddingTop: 14,
+    borderTopWidth: 1,
+    borderTopColor: Colors.border,
+  },
+  objectivesToggle: {
+    flexDirection: 'row' as const,
+    alignItems: 'center' as const,
+    justifyContent: 'space-between' as const,
+  },
+  objectivesToggleLeft: {
+    flexDirection: 'row' as const,
+    alignItems: 'center' as const,
+    gap: 6,
+  },
+  objectivesList: {
+    marginTop: 12,
+    gap: 10,
+  },
+  objectiveItem: {
+    flexDirection: 'row' as const,
+    alignItems: 'flex-start' as const,
+    gap: 10,
+  },
+  objectiveBullet: {
+    width: 22,
+    height: 22,
+    borderRadius: 11,
+    backgroundColor: '#F3EAFF',
+    justifyContent: 'center' as const,
+    alignItems: 'center' as const,
+    marginTop: 1,
+  },
+  objectiveText: {
+    flex: 1,
+    lineHeight: 22,
   },
 });

@@ -76,25 +76,24 @@ function VimeoPlayerInner({ videoId, height, onEnd, lowQuality }: VimeoPlayerPro
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
 <style>
 *{margin:0;padding:0;box-sizing:border-box;-webkit-touch-callout:none;-webkit-user-select:none;}
-html,body{width:100%;height:100%;background:#000;overflow:hidden;touch-action:none;}
+html,body{width:100%;height:100%;background:#000;overflow:hidden;}
 #w{position:relative;width:100%;height:100%;}
 iframe{width:100%;height:100%;border:none;pointer-events:none !important;}
-#sh{position:absolute;top:0;left:0;right:0;bottom:0;z-index:9999;
+#sh{position:absolute;top:0;left:0;width:100%;height:100%;z-index:9999;
 display:flex;align-items:center;justify-content:center;
-touch-action:manipulation;-webkit-tap-highlight-color:transparent;cursor:pointer;-webkit-user-select:none;user-select:none;}
+-webkit-tap-highlight-color:rgba(0,0,0,0);}
 #pb{width:52px;height:52px;border-radius:50%;background:rgba(0,0,0,0.5);
 display:flex;align-items:center;justify-content:center;
 transition:opacity 0.4s ease;opacity:0.9;}
-#pb.h{opacity:0;pointer-events:none;}
+#pb.h{opacity:0;}
 #pb svg{width:22px;height:22px;}
 ${FULLSCREEN_PREVENTION_CSS}
 </style>
 </head><body>
 <div id="w">
 <iframe id="vf" src="${embedUrl}" allow="autoplay; encrypted-media" sandbox="allow-scripts allow-same-origin allow-popups" allowfullscreen="false" webkitallowfullscreen="false"></iframe>
-<div id="sh">
-<div id="pb"><svg viewBox="0 0 24 24"><polygon points="6,3 20,12 6,21" fill="#fff"/></svg></div>
-</div>
+<div id="sh"></div>
+<div id="pb" style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);z-index:10000;"><svg viewBox="0 0 24 24"><polygon points="6,3 20,12 6,21" fill="#fff"/></svg></div>
 </div>
 <script>
 (function(){
@@ -106,22 +105,20 @@ var playI='<svg viewBox="0 0 24 24"><polygon points="6,3 20,12 6,21" fill="#fff"
 var pauseI='<svg viewBox="0 0 24 24"><rect x="5" y="3" width="4" height="18" rx="1" fill="#fff"/><rect x="15" y="3" width="4" height="18" rx="1" fill="#fff"/></svg>';
 
 function ic(p){pb.innerHTML=p?pauseI:playI;}
-function show(){pb.classList.remove('h');clearTimeout(ft);if(pl)ft=setTimeout(function(){pb.classList.add('h');},1800);}
+function showBtn(){pb.classList.remove('h');clearTimeout(ft);if(pl)ft=setTimeout(function(){pb.classList.add('h');},1800);}
 function cmd(m){try{vf.contentWindow.postMessage(JSON.stringify(m),'*');}catch(e){}}
 
-document.addEventListener('touchstart',function(e){
+function blockMulti(e){
   if(e.touches&&e.touches.length>1){
-    e.preventDefault();e.stopPropagation();
+    e.preventDefault();e.stopPropagation();e.stopImmediatePropagation();
   }
-},{passive:false,capture:true});
-document.addEventListener('touchmove',function(e){
-  if(e.touches&&e.touches.length>1){
-    e.preventDefault();e.stopPropagation();
-  }
-},{passive:false,capture:true});
+}
+document.addEventListener('touchstart',blockMulti,{passive:false,capture:true});
+document.addEventListener('touchmove',blockMulti,{passive:false,capture:true});
+document.addEventListener('touchend',blockMulti,{passive:false,capture:true});
 ['gesturestart','gesturechange','gestureend'].forEach(function(n){
   document.addEventListener(n,function(e){
-    e.preventDefault();e.stopPropagation();
+    e.preventDefault();e.stopPropagation();e.stopImmediatePropagation();
   },{passive:false,capture:true});
 });
 
@@ -131,27 +128,34 @@ function toggle(){
   else{cmd({method:'play'});}
 }
 
-var pStart=0,pX=0,pY=0,handled=false;
-sh.addEventListener('pointerdown',function(e){
-  handled=false;
-  pStart=Date.now();
-  pX=e.clientX;
-  pY=e.clientY;
-},{passive:true});
-sh.addEventListener('pointerup',function(e){
-  if(handled)return;
-  var dt=Date.now()-pStart;
-  if(dt>600)return;
-  if(Math.abs(e.clientX-pX)>20||Math.abs(e.clientY-pY)>20)return;
-  handled=true;
+var tX=0,tY=0,tT=0;
+function onTapStart(e){
+  if(e.touches&&e.touches.length===1){
+    tX=e.touches[0].clientX;
+    tY=e.touches[0].clientY;
+    tT=Date.now();
+  }
+}
+function onTapEnd(e){
+  if(Date.now()-tT>500)return;
+  var cx,cy;
+  if(e.changedTouches&&e.changedTouches.length>0){
+    cx=e.changedTouches[0].clientX;
+    cy=e.changedTouches[0].clientY;
+  } else return;
+  if(Math.abs(cx-tX)>15||Math.abs(cy-tY)>15)return;
+  e.preventDefault();
   toggle();
-  show();
-},{passive:true});
-sh.addEventListener('click',function(e){
-  if(handled){handled=false;return;}
-  toggle();
-  show();
-});
+  showBtn();
+}
+
+sh.addEventListener('touchstart',onTapStart,{passive:true});
+sh.addEventListener('touchend',onTapEnd,{passive:false});
+pb.addEventListener('touchstart',onTapStart,{passive:true});
+pb.addEventListener('touchend',onTapEnd,{passive:false});
+
+sh.onclick=function(){toggle();showBtn();};
+pb.onclick=function(){toggle();showBtn();};
 
 window.addEventListener('message',function(e){
   try{
@@ -162,10 +166,10 @@ window.addEventListener('message',function(e){
       cmd({method:'addEventListener',value:'pause'});
       cmd({method:'addEventListener',value:'ended'});
     }
-    if(d.event==='play'){pl=true;ic(true);show();}
-    if(d.event==='pause'){pl=false;ic(false);show();}
+    if(d.event==='play'){pl=true;ic(true);showBtn();}
+    if(d.event==='pause'){pl=false;ic(false);showBtn();}
     if(d.event==='ended'){
-      pl=false;ic(false);show();
+      pl=false;ic(false);showBtn();
       window.ReactNativeWebView&&window.ReactNativeWebView.postMessage(JSON.stringify({type:'videoEnded'}));
     }
   }catch(x){}

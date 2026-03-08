@@ -11,6 +11,7 @@ import {
   Animated,
   Alert,
   Modal,
+  useWindowDimensions,
 } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
@@ -307,6 +308,8 @@ export default function ExerciseScreen() {
   const splitCameraRef = useRef<CameraView>(null);
   const [splitCameraReady, setSplitCameraReady] = useState(false);
   const [cameraMode, setCameraMode] = useState<'picture' | 'video'>('picture');
+  const { width: screenWidth } = useWindowDimensions();
+  const isTablet = screenWidth >= 768;
 
 
   const hasCameraPermission = cameraPermission?.granted === true;
@@ -944,11 +947,11 @@ export default function ExerciseScreen() {
 
         <View style={{ flex: 1 }}>
           {mediaMode === 'split' && (
-            <View style={{ flex: 1 }}>
-              <View style={styles.splitVideoSection}>
+            <View style={isTablet ? styles.splitContainerTablet : { flex: 1 }}>
+              <View style={isTablet ? styles.splitVideoSectionTablet : styles.splitVideoSection}>
                 <SplitVideoLayer vimeoId={vimeoId} youtubeId={youtubeId} />
               </View>
-              <View style={styles.splitMirrorSection}>
+              <View style={isTablet ? styles.splitMirrorSectionTablet : styles.splitMirrorSection}>
                 {hasCameraPermission ? (
                   <CameraView
                     ref={splitCameraRef}
@@ -1471,6 +1474,26 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     backgroundColor: 'rgba(0,0,0,0.6)',
+  },
+  splitContainerTablet: {
+    flex: 1,
+    flexDirection: 'row' as const,
+    gap: 6,
+    paddingHorizontal: 16,
+  },
+  splitVideoSectionTablet: {
+    flex: 1,
+    borderRadius: 12,
+    overflow: 'hidden',
+    backgroundColor: '#000',
+    position: 'relative' as const,
+  },
+  splitMirrorSectionTablet: {
+    flex: 1,
+    borderRadius: 12,
+    overflow: 'hidden',
+    backgroundColor: '#000',
+    position: 'relative' as const,
   },
   splitVideoSection: {
     height: 200,

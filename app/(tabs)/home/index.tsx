@@ -746,8 +746,15 @@ export default function HomeScreen() {
           )}
 
           <View style={styles.exercisesSection}>
-            <View style={styles.sectionTitleRow}>
-              <Layers size={20} color={Colors.primary} />
+            <View style={styles.sectionDivider}>
+              <View style={[styles.sectionDividerLine, { backgroundColor: Colors.primary }]} />
+              <View style={[styles.sectionDividerDot, { backgroundColor: Colors.primary }]} />
+              <View style={[styles.sectionDividerLine, { backgroundColor: Colors.primary }]} />
+            </View>
+            <View style={[styles.sectionTitleRow, styles.exercisesSectionTitle]}>
+              <View style={[styles.sectionIconWrap, { backgroundColor: Colors.primaryLight }]}>
+                <Layers size={18} color={Colors.primary} />
+              </View>
               <ScaledText size={18} weight="bold" color={Colors.textPrimary}>
                 {t('exercises')}
               </ScaledText>
@@ -779,13 +786,20 @@ export default function HomeScreen() {
 
           {feedingSkills.length > 0 && (
             <View style={styles.feedingSkillsSection}>
+              <View style={styles.sectionDivider}>
+                <View style={[styles.sectionDividerLine, { backgroundColor: '#E67E22' }]} />
+                <View style={[styles.sectionDividerDot, { backgroundColor: '#E67E22' }]} />
+                <View style={[styles.sectionDividerLine, { backgroundColor: '#E67E22' }]} />
+              </View>
               <TouchableOpacity
                 style={styles.feedingSkillsHeader}
                 onPress={() => setFeedingSkillsExpanded(prev => !prev)}
                 activeOpacity={0.7}
               >
                 <View style={styles.feedingSkillsHeaderLeft}>
-                  <UtensilsCrossed size={20} color="#E67E22" />
+                  <View style={[styles.sectionIconWrap, { backgroundColor: '#FEF3E2' }]}>
+                    <UtensilsCrossed size={18} color="#E67E22" />
+                  </View>
                   <ScaledText size={18} weight="bold" color={Colors.textPrimary}>
                     {t('feedingSkills')}
                   </ScaledText>
@@ -898,13 +912,20 @@ export default function HomeScreen() {
 
           {submissions.length > 0 && (
             <View style={styles.submissionsSection}>
+              <View style={styles.sectionDivider}>
+                <View style={[styles.sectionDividerLine, { backgroundColor: '#2563EB' }]} />
+                <View style={[styles.sectionDividerDot, { backgroundColor: '#2563EB' }]} />
+                <View style={[styles.sectionDividerLine, { backgroundColor: '#2563EB' }]} />
+              </View>
               <TouchableOpacity
                 style={styles.submissionsHeader}
                 onPress={() => setSubmissionsExpanded(prev => !prev)}
                 activeOpacity={0.7}
               >
                 <View style={styles.submissionsHeaderLeft}>
-                  <Video size={20} color="#2563EB" />
+                  <View style={[styles.sectionIconWrap, { backgroundColor: '#EBF5FF' }]}>
+                    <Video size={18} color="#2563EB" />
+                  </View>
                   <ScaledText size={18} weight="bold" color={Colors.textPrimary}>
                     {t('mySubmissions')}
                   </ScaledText>
@@ -1126,10 +1147,38 @@ const styles = StyleSheet.create({
   exercisesSection: {
     paddingHorizontal: 20,
   },
-  sectionTitleRow: {
+  sectionDivider: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
+    marginBottom: 16,
+    paddingHorizontal: 4,
+  },
+  sectionDividerLine: {
+    flex: 1,
+    height: 1,
+    opacity: 0.3,
+  },
+  sectionDividerDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    opacity: 0.5,
+  },
+  sectionIconWrap: {
+    width: 34,
+    height: 34,
+    borderRadius: 10,
+    justifyContent: 'center' as const,
+    alignItems: 'center' as const,
+  },
+  sectionTitleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    marginBottom: 16,
+  },
+  exercisesSectionTitle: {
     marginBottom: 16,
   },
   emptyCard: {
@@ -1319,7 +1368,7 @@ const styles = StyleSheet.create({
   },
   submissionsSection: {
     paddingHorizontal: 20,
-    marginTop: 8,
+    marginTop: 16,
     marginBottom: 16,
   },
   submissionsHeader: {
@@ -1349,6 +1398,8 @@ const styles = StyleSheet.create({
     marginBottom: 8,
     borderWidth: 1,
     borderColor: Colors.border,
+    borderLeftWidth: 3,
+    borderLeftColor: '#2563EB',
     gap: 6,
   },
   submissionCardRedo: {
@@ -1382,7 +1433,7 @@ const styles = StyleSheet.create({
   },
   feedingSkillsSection: {
     paddingHorizontal: 20,
-    marginTop: 8,
+    marginTop: 16,
     marginBottom: 16,
   },
   feedingSkillsHeader: {
@@ -1412,6 +1463,8 @@ const styles = StyleSheet.create({
     marginBottom: 8,
     borderWidth: 1,
     borderColor: Colors.border,
+    borderLeftWidth: 3,
+    borderLeftColor: '#E67E22',
   },
   feedingSkillCardContent: {
     flexDirection: 'row' as const,

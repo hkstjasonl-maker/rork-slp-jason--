@@ -9,6 +9,7 @@ import {
   Platform,
   Animated,
   Alert,
+  useWindowDimensions,
 } from 'react-native';
 import { useLocalSearchParams, useRouter, Stack } from 'expo-router';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
@@ -166,6 +167,8 @@ export default function FeedingSkillPlayerScreen() {
 
   const [cameraPermission, requestCameraPermission] = useCameraPermissions();
   const [micPermission, requestMicPermission] = useMicrophonePermissions();
+  const { width: screenWidth } = useWindowDimensions();
+  const isTablet = screenWidth >= 768;
 
   const hasCameraPermission = cameraPermission?.granted === true;
 
@@ -567,11 +570,11 @@ export default function FeedingSkillPlayerScreen() {
 
         <View style={{ flex: 1 }}>
           {mediaMode === 'split' && (
-            <View style={{ flex: 1 }}>
-              <View style={styles.splitVideoSection}>
+            <View style={isTablet ? styles.splitContainerTablet : { flex: 1 }}>
+              <View style={isTablet ? styles.splitVideoSectionTablet : styles.splitVideoSection}>
                 <SplitVideoLayer vimeoId={vimeoId} youtubeId={youtubeId} />
               </View>
-              <View style={styles.splitMirrorSection}>
+              <View style={isTablet ? styles.splitMirrorSectionTablet : styles.splitMirrorSection}>
                 {hasCameraPermission ? (
                   <CameraView
                     ref={splitCameraRef}
@@ -688,6 +691,39 @@ export default function FeedingSkillPlayerScreen() {
           {isInMirror && toastMessage && (
             <View style={[styles.toast, toastType === 'error' ? styles.toastError : styles.toastSuccess]}>
               <ScaledText size={13} weight="600" color={Colors.white}>{toastMessage || ''}</ScaledText>
+            </View>
+          )}
+
+          {isInMirror && !isRecording && reviewRequirement && canSubmitVideo && lastRecordedUri && !submissionSuccess && (
+            <View style={styles.mirrorSubmitContainer}>
+              <TouchableOpacity
+                style={styles.mirrorSubmitButton}
+                onPress={handleSubmitVideo}
+                disabled={isSubmitting}
+                activeOpacity={0.8}
+                testID="mirror-submit-review-button"
+              >
+                {isSubmitting ? (
+                  <ActivityIndicator color={Colors.white} />
+                ) : (
+                  <>
+                    <Camera size={18} color={Colors.white} />
+                    <ScaledText size={14} weight="600" color={Colors.white}>
+                      {t('submitVideoForReview')}
+                    </ScaledText>
+                  </>
+                )}
+              </TouchableOpacity>
+            </View>
+          )}
+
+          {isInMirror && submissionSuccess && (
+            <View style={styles.mirrorSubmitContainer}>
+              <View style={styles.mirrorSuccessBanner}>
+                <ScaledText size={13} weight="600" color={Colors.success}>
+                  {t('videoSubmitted')}
+                </ScaledText>
+              </View>
             </View>
           )}
 
@@ -947,6 +983,26 @@ const styles = StyleSheet.create({
     borderRadius: 14,
     backgroundColor: Colors.primaryDark,
   },
+  splitContainerTablet: {
+    flex: 1,
+    flexDirection: 'row' as const,
+    gap: 6,
+    paddingHorizontal: 16,
+  },
+  splitVideoSectionTablet: {
+    flex: 1,
+    borderRadius: 12,
+    overflow: 'hidden',
+    backgroundColor: '#000',
+    position: 'relative' as const,
+  },
+  splitMirrorSectionTablet: {
+    flex: 1,
+    borderRadius: 12,
+    overflow: 'hidden',
+    backgroundColor: '#000',
+    position: 'relative' as const,
+  },
   splitVideoSection: {
     height: 200,
     marginHorizontal: 16,
@@ -1089,6 +1145,33 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     backgroundColor: 'rgba(0,0,0,0.5)',
     zIndex: 30,
+  },
+  mirrorSubmitContainer: {
+    paddingHorizontal: 16,
+    paddingVertical: 6,
+    alignItems: 'center' as const,
+  },
+  mirrorSubmitButton: {
+    flexDirection: 'row' as const,
+    alignItems: 'center' as const,
+    justifyContent: 'center' as const,
+    gap: 8,
+    paddingVertical: 12,
+    paddingHorizontal: 20,
+    borderRadius: 14,
+    backgroundColor: '#2563EB',
+    width: '100%' as const,
+    shadowColor: '#2563EB',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.25,
+    shadowRadius: 10,
+    elevation: 5,
+  },
+  mirrorSuccessBanner: {
+    paddingVertical: 8,
+    paddingHorizontal: 16,
+    borderRadius: 12,
+    backgroundColor: Colors.successLight,
   },
   submitReviewButton: {
     flexDirection: 'row',

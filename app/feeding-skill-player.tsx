@@ -171,6 +171,7 @@ export default function FeedingSkillPlayerScreen() {
   const [micPermission, requestMicPermission] = useMicrophonePermissions();
   const { width: screenWidth } = useWindowDimensions();
   const isTablet = screenWidth >= 768;
+  const videoHeight = isTablet ? Math.round(screenWidth * 0.56) : 220;
 
   const hasCameraPermission = cameraPermission?.granted === true;
 
@@ -816,13 +817,13 @@ export default function FeedingSkillPlayerScreen() {
               showsVerticalScrollIndicator={false}
             >
               <View style={styles.videoContainer}>
-                <VideoProtectionOverlay patientName={patientName ?? ''} height={220}>
+                <VideoProtectionOverlay patientName={patientName ?? ''} height={videoHeight}>
                   {vimeoId ? (
-                    <VimeoPlayer videoId={vimeoId} height={220} />
+                    <VimeoPlayer videoId={vimeoId} height={videoHeight} />
                   ) : youtubeId ? (
-                    <YouTubePlayer videoId={youtubeId} height={220} />
+                    <YouTubePlayer videoId={youtubeId} height={videoHeight} />
                   ) : (
-                    <View style={styles.noVideo}>
+                    <View style={[styles.noVideo, { height: videoHeight }]}>
                       <VideoOff size={32} color="#666" />
                       <ScaledText size={14} color="#999" style={{ marginTop: 8 }}>Video unavailable</ScaledText>
                     </View>
@@ -978,7 +979,6 @@ const styles = StyleSheet.create({
     marginTop: 16,
   },
   noVideo: {
-    height: 220,
     borderRadius: 12,
     backgroundColor: '#000',
     justifyContent: 'center',

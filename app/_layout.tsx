@@ -1,6 +1,7 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { Stack } from "expo-router";
 import * as SplashScreen from "expo-splash-screen";
+import * as ScreenOrientation from 'expo-screen-orientation';
 import React, { useEffect } from "react";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { AppProvider, useApp } from "@/contexts/AppContext";
@@ -43,6 +44,7 @@ function NotificationLayer({ children }: { children: React.ReactNode }) {
 export default function RootLayout() {
   useEffect(() => {
     void SplashScreen.hideAsync();
+    ScreenOrientation.lockAsync(ScreenOrientation.OrientationLock.PORTRAIT_UP).catch(() => {});
   }, []);
 
   return (

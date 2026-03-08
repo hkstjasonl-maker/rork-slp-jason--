@@ -335,6 +335,18 @@ export default function HomeScreen() {
 
   const program = programQuery.data;
   const exercises = useMemo(() => program?.exercises || [], [program?.exercises]);
+
+  const submissionTitleMap = useMemo(() => {
+    const map: Record<string, string> = {};
+    if (language !== 'zh_hant' && language !== 'zh_hans') return map;
+    for (const ex of exercises) {
+      const translated = language === 'zh_hant' ? ex.title_zh_hant : ex.title_zh_hans;
+      if (translated) {
+        map[ex.title_en] = translated;
+      }
+    }
+    return map;
+  }, [exercises, language]);
   const isExpired = program ? new Date(program.expiry_date) < new Date() : false;
 
   const categoryGroups = useMemo<CategoryGroup[]>(() => {
@@ -753,7 +765,7 @@ export default function HomeScreen() {
                       >
                         <View style={styles.submissionCardTop}>
                           <ScaledText size={14} weight="600" color={Colors.textPrimary} numberOfLines={1} style={{ flex: 1 }}>
-                            {sub.exercise_title_en}
+                            {submissionTitleMap[sub.exercise_title_en] || sub.exercise_title_en}
                           </ScaledText>
                           <View style={[styles.submissionStatusBadge, { backgroundColor: statusBg }]}>
                             <ScaledText size={10} weight="600" color={statusColor}>

@@ -16,7 +16,9 @@ import { ScaledText } from '@/components/ScaledText';
 import { CopyrightFooter } from '@/components/CopyrightFooter';
 import Colors from '@/constants/colors';
 import { fetchPatientSubmissions } from '@/lib/reviewRequirements';
-import { ExerciseVideoSubmission, ReviewStatus } from '@/types';
+import { supabase } from '@/lib/supabase';
+import { log } from '@/lib/logger';
+import { ExerciseVideoSubmission, ReviewStatus, Exercise } from '@/types';
 
 function getStatusColor(status: ReviewStatus): string {
   switch (status) {
@@ -82,6 +84,45 @@ export default function MySubmissionsScreen() {
     enabled: !!patientId,
     staleTime: 30 * 1000,
   });
+
+  const exercisesQuery = useQuery({
+    queryKey: ['patientExercisesForTitles', patientId],
+    queryFn: async () => {
+      if (!patientId) return [];
+      try {
+        const { data, error } = await supabase
+          .from('exercise_programs')
+          .select('exercises(title_en, title_zh_hant, title_zh_hans)')
+          .eq('patient_id', patientId)
+          .eq('is_active', true)
+          .limit(1)
+          .maybeSingle();
+        if (error) {
+          log('[MySubmissions] Error fetching exercises for titles:', error);
+          return [];
+        }
+        return (data?.exercises || []) as Pick<Exercise, 'title_en' | 'title_zh_hant' | 'title_zh_hans'>[];
+      } catch (e) {
+        log('[MySubmissions] Exception fetching exercises for titles:', e);
+        return [];
+      }
+    },
+    enabled: !!patientId && (language === 'zh_hant' || language === 'zh_hans'),
+    staleTime: 5 * 60 * 1000,
+  });
+
+  const titleMap = useMemo(() => {
+    const map: Record<string, string> = {};
+    if (language !== 'zh_hant' && language !== 'zh_hans') return map;
+    const exercises = exercisesQuery.data || [];
+    for (const ex of exercises) {
+      const translated = language === 'zh_hant' ? ex.title_zh_hant : ex.title_zh_hans;
+      if (translated) {
+        map[ex.title_en] = translated;
+      }
+    }
+    return map;
+  }, [exercisesQuery.data, language]);
 
   useFocusEffect(
     React.useCallback(() => {
@@ -183,7 +224,7 @@ export default function MySubmissionsScreen() {
                     </ScaledText>
                   </View>
                   {grouped.redoRequested.map((sub) => (
-                    <SubmissionCard key={sub.id} submission={sub} t={t} language={language} />
+                    <SubmissionCard key={sub.id} submission={sub} t={t} language={language} titleMap={titleMap} />
                   ))}
                 </View>
               )}
@@ -197,7 +238,7 @@ export default function MySubmissionsScreen() {
                     </ScaledText>
                   </View>
                   {grouped.pendingItems.map((sub) => (
-                    <SubmissionCard key={sub.id} submission={sub} t={t} language={language} />
+                    <SubmissionCard key={sub.id} submission={sub} t={t} language={language} titleMap={titleMap} />
                   ))}
                 </View>
               )}
@@ -211,7 +252,7 @@ export default function MySubmissionsScreen() {
                     </ScaledText>
                   </View>
                   {grouped.reviewedItems.map((sub) => (
-                    <SubmissionCard key={sub.id} submission={sub} t={t} language={language} />
+                    <SubmissionCard key={sub.id} submission={sub} t={t} language={language} titleMap={titleMap} />
                   ))}
                 </View>
               )}
@@ -229,10 +270,12 @@ function SubmissionCard({
   submission,
   t,
   language,
+  titleMap,
 }: {
   submission: ExerciseVideoSubmission;
   t: (key: string) => string;
   language: string | null;
+  titleMap: Record<string, string>;
 }) {
   const statusLabel = useMemo(() => {
     switch (submission.review_status) {
@@ -251,7 +294,7 @@ function SubmissionCard({
         <View style={styles.cardTitleRow}>
           <Video size={16} color={Colors.primary} />
           <ScaledText size={15} weight="600" color={Colors.textPrimary} numberOfLines={2} style={styles.cardTitle}>
-            {submission.exercise_title_en}
+            {titleMap[submission.exercise_title_en] || submission.exercise_title_en}
           </ScaledText>
         </View>
         <View style={[styles.statusBadge, { backgroundColor: getStatusBgColor(submission.review_status) }]}>

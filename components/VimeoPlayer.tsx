@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { View, StyleSheet, Platform, ActivityIndicator, PanResponder, GestureResponderEvent } from 'react-native';
+import { View, StyleSheet, Platform, ActivityIndicator } from 'react-native';
 import { VideoOff } from 'lucide-react-native';
 import { ScaledText } from '@/components/ScaledText';
 import Colors from '@/constants/colors';
@@ -16,27 +16,6 @@ interface VimeoPlayerProps {
 function VimeoPlayerInner({ videoId, height, onEnd, lowQuality }: VimeoPlayerProps) {
   const [loading, setLoading] = useState(true);
   const webViewRef = useRef<any>(null);
-  const touchBlocker = useRef(
-    PanResponder.create({
-      onStartShouldSetPanResponder: (evt: GestureResponderEvent) => {
-        return (evt.nativeEvent.touches?.length ?? 0) > 1;
-      },
-      onStartShouldSetPanResponderCapture: (evt: GestureResponderEvent) => {
-        return (evt.nativeEvent.touches?.length ?? 0) > 1;
-      },
-      onMoveShouldSetPanResponder: (evt: GestureResponderEvent) => {
-        return (evt.nativeEvent.touches?.length ?? 0) > 1;
-      },
-      onMoveShouldSetPanResponderCapture: (evt: GestureResponderEvent) => {
-        return (evt.nativeEvent.touches?.length ?? 0) > 1;
-      },
-      onPanResponderGrant: () => {},
-      onPanResponderMove: () => {},
-      onPanResponderRelease: () => {},
-      onPanResponderTerminate: () => {},
-      onPanResponderTerminationRequest: () => false,
-    })
-  ).current;
 
   useEffect(() => {
     if (!videoId || videoId.trim() === '') {
@@ -201,7 +180,6 @@ window.addEventListener('message',function(e){
         injectedJavaScriptBeforeContentLoaded={INJECTED_JS_BEFORE_LOAD}
         setSupportMultipleWindows={false}
       />
-      <View style={styles.nativeTouchBlocker} {...touchBlocker.panHandlers} />
     </View>
   );
 }
@@ -227,13 +205,5 @@ const styles = StyleSheet.create({
   unavailableLabel: {
     marginTop: 8,
   },
-  nativeTouchBlocker: {
-    position: 'absolute' as const,
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    zIndex: 999,
-    backgroundColor: 'transparent',
-  },
+
 });

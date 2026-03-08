@@ -1692,7 +1692,7 @@ function CompletionScreen({ tool, scoreResult, language, fadeAnim, scaleAnim, on
                 <Text size={12} color={Colors.textSecondary} style={{ fontStyle: 'italic' as const }}>
                   {t('assessmentAdministeredUsing')}
                 </Text>
-                <Text size={12} color="#666" style={{ marginTop: 4, lineHeight: 18 }}>
+                <Text size={12} color="#666" style={{ marginTop: 4, lineHeight: 18, paddingLeft: 28 }}>
                   {tool.reference}
                 </Text>
               </View>
@@ -2184,6 +2184,7 @@ const styles = StyleSheet.create({
     marginTop: 8,
     lineHeight: 18,
     fontStyle: 'italic',
+    paddingLeft: 28,
   },
   completionReferenceBox: {
     backgroundColor: '#f5f5f5',

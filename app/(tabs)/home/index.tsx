@@ -893,11 +893,9 @@ export default function HomeScreen() {
                     const video = assignment.feeding_skill_videos;
                     if (!video) return null;
                     const lang = language || 'en';
-                    const title = lang === 'zh_hant'
-                      ? (video.title_zh_hant || video.title_en)
-                      : lang === 'zh_hans'
-                        ? (video.title_zh_hans || video.title_en)
-                        : video.title_en;
+                    const title = (lang === 'zh_hant' || lang === 'zh_hans')
+                      ? (video.title_zh || video.title_en)
+                      : video.title_en;
                     const isViewed = !!assignment.viewed_at;
                     const feedReq = feedingReviewRequirements.find(r => r.feeding_skill_video_id === assignment.video_id);
                     const feedSubCount = feedingTodaySubmissions[assignment.video_id] || 0;

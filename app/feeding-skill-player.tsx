@@ -48,22 +48,20 @@ function formatElapsed(seconds: number): string {
   return `${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
 }
 
-function getFeedingTitle(video: { title_en: string; title_zh_hant?: string | null; title_zh_hans?: string | null }, language: Language | null): string {
+function getFeedingTitle(video: { title_en: string; title_zh?: string | null }, language: Language | null): string {
   const lang = language || 'en';
-  switch (lang) {
-    case 'zh_hant': return video.title_zh_hant || video.title_en;
-    case 'zh_hans': return video.title_zh_hans || video.title_en;
-    default: return video.title_en;
+  if (lang === 'zh_hant' || lang === 'zh_hans') {
+    return video.title_zh || video.title_en;
   }
+  return video.title_en;
 }
 
-function getFeedingDescription(video: { description_en?: string | null; description_zh_hant?: string | null; description_zh_hans?: string | null }, language: Language | null): string | null {
+function getFeedingDescription(video: { description_en?: string | null; description_zh?: string | null }, language: Language | null): string | null {
   const lang = language || 'en';
-  switch (lang) {
-    case 'zh_hant': return video.description_zh_hant || video.description_en || null;
-    case 'zh_hans': return video.description_zh_hans || video.description_en || null;
-    default: return video.description_en || null;
+  if (lang === 'zh_hant' || lang === 'zh_hans') {
+    return video.description_zh || video.description_en || null;
   }
+  return video.description_en || null;
 }
 
 const LiveCamera = forwardRef<CameraView, { onCameraReady?: () => void; cameraMode?: 'picture' | 'video' }>(

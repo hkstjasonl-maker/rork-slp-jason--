@@ -92,11 +92,13 @@ function formatElapsed(seconds: number): string {
 }
 
 function getVimeoId(exercise: Exercise): string | null {
-  return exercise.vimeo_video_id || null;
+  const id = exercise.vimeo_video_id;
+  return (id && typeof id === 'string' && id.trim().length > 0) ? id.trim() : null;
 }
 
 function getYouTubeId(exercise: Exercise): string | null {
-  return exercise.youtube_video_id || null;
+  const id = exercise.youtube_video_id;
+  return (id && typeof id === 'string' && id.trim().length > 0) ? id.trim() : null;
 }
 
 const LiveCamera = forwardRef<CameraView, { onCameraReady?: () => void; cameraMode?: 'picture' | 'video' }>(

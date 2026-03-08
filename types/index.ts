@@ -196,11 +196,9 @@ export interface Organisation {
 export interface FeedingSkillVideo {
   id: string;
   title_en: string;
-  title_zh_hant: string | null;
-  title_zh_hans: string | null;
+  title_zh: string | null;
   description_en: string | null;
-  description_zh_hant: string | null;
-  description_zh_hans: string | null;
+  description_zh: string | null;
   category: string | null;
   vimeo_video_id: string | null;
   youtube_video_id: string | null;

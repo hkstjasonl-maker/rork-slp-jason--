@@ -27,6 +27,12 @@ import {
   isTodayAllowed,
   getNextAllowedDay,
 } from '@/lib/reviewRequirements';
+import {
+  fetchAllFeedingReviewRequirements,
+  fetchTodayFeedingSubmissions,
+  isTodayAllowed as isFeedingTodayAllowed,
+  getNextAllowedDay as getFeedingNextAllowedDay,
+} from '@/lib/feedingSkillReview';
 import { calculateStars, getStarsForSession } from '@/lib/stars';
 import {
   Play,
@@ -501,6 +507,23 @@ export default function HomeScreen() {
 
   const feedingSkills = feedingSkillsQuery.data || [];
 
+  const feedingReviewReqQuery = useQuery({
+    queryKey: ['feedingReviewRequirements', patientId],
+    queryFn: () => fetchAllFeedingReviewRequirements(patientId!),
+    enabled: !!patientId,
+    staleTime: 2 * 60 * 1000,
+  });
+
+  const feedingTodaySubsQuery = useQuery({
+    queryKey: ['feedingTodaySubmissions', patientId],
+    queryFn: () => fetchTodayFeedingSubmissions(patientId!),
+    enabled: !!patientId,
+    staleTime: 30 * 1000,
+  });
+
+  const feedingReviewRequirements = feedingReviewReqQuery.data || [];
+  const feedingTodaySubmissions = feedingTodaySubsQuery.data || {};
+
   const submissionsQuery = useQuery({
     queryKey: ['videoSubmissions', patientId],
     queryFn: async () => {
@@ -527,6 +550,8 @@ export default function HomeScreen() {
   const { refetch: refetchReviewReqs } = reviewReqQuery;
   const { refetch: refetchTodaySubs } = todaySubsQuery;
   const { refetch: refetchFeedingSkills } = feedingSkillsQuery;
+  const { refetch: refetchFeedingReviewReqs } = feedingReviewReqQuery;
+  const { refetch: refetchFeedingTodaySubs } = feedingTodaySubsQuery;
 
   const onRefresh = useCallback(() => {
     void refetchProgram();
@@ -536,7 +561,9 @@ export default function HomeScreen() {
     void refetchReviewReqs();
     void refetchTodaySubs();
     void refetchFeedingSkills();
-  }, [refetchProgram, refetchLogs, refetchAllLogs, refetchSubmissions, refetchReviewReqs, refetchTodaySubs, refetchFeedingSkills]);
+    void refetchFeedingReviewReqs();
+    void refetchFeedingTodaySubs();
+  }, [refetchProgram, refetchLogs, refetchAllLogs, refetchSubmissions, refetchReviewReqs, refetchTodaySubs, refetchFeedingSkills, refetchFeedingReviewReqs, refetchFeedingTodaySubs]);
 
   if (programQuery.isLoading) {
     return (
@@ -787,6 +814,8 @@ export default function HomeScreen() {
                         ? (video.title_zh_hans || video.title_en)
                         : video.title_en;
                     const isViewed = !!assignment.viewed_at;
+                    const feedReq = feedingReviewRequirements.find(r => r.feeding_skill_video_id === assignment.feeding_skill_video_id);
+                    const feedSubCount = feedingTodaySubmissions[assignment.feeding_skill_video_id] || 0;
 
                     return (
                       <TouchableOpacity
@@ -824,6 +853,38 @@ export default function HomeScreen() {
                                 </View>
                               )}
                             </View>
+                            {(() => {
+                              if (!feedReq) return null;
+                              if (feedSubCount > 0 && feedSubCount >= feedReq.max_submissions) {
+                                return (
+                                  <View style={styles.reviewBadgeSubmitted}>
+                                    <ScaledText size={11} weight="600" color={Colors.success}>
+                                      {t('feedingSkillSubmittedToday')}
+                                    </ScaledText>
+                                  </View>
+                                );
+                              }
+                              if (isFeedingTodayAllowed(feedReq.allowed_days)) {
+                                return (
+                                  <View style={styles.reviewBadgeRequired}>
+                                    <ScaledText size={11} weight="600" color="#2563EB">
+                                      {t('feedingSkillVideoRequired')}
+                                    </ScaledText>
+                                  </View>
+                                );
+                              }
+                              const nextDay = getFeedingNextAllowedDay(feedReq.allowed_days);
+                              if (nextDay) {
+                                return (
+                                  <View style={styles.reviewBadgeNext}>
+                                    <ScaledText size={11} weight="600" color={Colors.textSecondary}>
+                                      {String(`${t('feedingSkillNextSubmission')}${t(nextDay)}`)}
+                                    </ScaledText>
+                                  </View>
+                                );
+                              }
+                              return null;
+                            })()}
                           </View>
                           <ChevronRight size={20} color={Colors.disabled} />
                         </View>

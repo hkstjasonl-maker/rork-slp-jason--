@@ -218,6 +218,33 @@ export interface FeedingSkillAssignment {
   feeding_skill_videos: FeedingSkillVideo;
 }
 
+export interface FeedingSkillReviewRequirement {
+  id: string;
+  feeding_skill_video_id: string;
+  patient_id: string;
+  max_submissions: number;
+  allowed_days: string[];
+  is_active: boolean;
+  notes: string | null;
+  created_at?: string;
+}
+
+export interface FeedingSkillVideoSubmission {
+  id: string;
+  requirement_id: string;
+  patient_id: string;
+  feeding_skill_video_id: string;
+  video_title_en: string;
+  video_url: string;
+  submission_date: string;
+  review_status: ReviewStatus;
+  reviewer_notes: string | null;
+  rating: number | null;
+  reviewed_at: string | null;
+  created_at?: string;
+  feeding_skill_review_requirements?: FeedingSkillReviewRequirement;
+}
+
 export const FONT_SCALES: Record<FontSizeLevel, number> = {
   small: 0.8,
   medium: 1.0,

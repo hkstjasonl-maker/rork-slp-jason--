@@ -1,5 +1,5 @@
 import React, { useMemo } from 'react';
-import { View, Text, StyleSheet, Platform, PanResponder } from 'react-native';
+import { View, Text, StyleSheet, Platform } from 'react-native';
 
 interface VideoProtectionOverlayProps {
   patientName: string;
@@ -16,28 +16,8 @@ function VideoProtectionOverlayInner({ patientName, children, height }: VideoPro
     return `${patientName} · ${yyyy}-${mm}-${dd}`;
   }, [patientName]);
 
-  const pinchBlocker = useMemo(() => PanResponder.create({
-    onStartShouldSetPanResponderCapture: (evt) => {
-      return (evt.nativeEvent.touches?.length ?? 0) > 1;
-    },
-    onMoveShouldSetPanResponderCapture: (evt) => {
-      return (evt.nativeEvent.touches?.length ?? 0) > 1;
-    },
-    onStartShouldSetPanResponder: (evt) => {
-      return (evt.nativeEvent.touches?.length ?? 0) > 1;
-    },
-    onMoveShouldSetPanResponder: (evt) => {
-      return (evt.nativeEvent.touches?.length ?? 0) > 1;
-    },
-    onPanResponderTerminationRequest: () => false,
-    onPanResponderGrant: () => {},
-    onPanResponderMove: () => {},
-    onPanResponderRelease: () => {},
-    onPanResponderTerminate: () => {},
-  }), []);
-
   return (
-    <View style={[styles.wrapper, height ? { height } : undefined]} {...pinchBlocker.panHandlers}>
+    <View style={[styles.wrapper, height ? { height } : undefined]}>
       {children}
       <View style={styles.overlay} pointerEvents="none">
         <View style={styles.watermarkBox}>

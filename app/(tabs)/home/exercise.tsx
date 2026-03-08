@@ -16,7 +16,7 @@ import {
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import * as Haptics from 'expo-haptics';
-import { ArrowLeft, CheckCircle, Clock, Repeat, AlertCircle, Tag, Camera, X, Maximize2, SplitSquareHorizontal, Headphones, VideoOff, Coffee } from 'lucide-react-native';
+import { ArrowLeft, CheckCircle, Clock, Repeat, AlertCircle, Tag, Camera, X, Maximize2, SplitSquareHorizontal, Headphones, VideoOff, Coffee, Play, Pause } from 'lucide-react-native';
 import * as MediaLibrary from 'expo-media-library';
 
 
@@ -122,6 +122,61 @@ const MemoLiveCamera = memo(LiveCamera, (prev, next) => prev.cameraMode === next
 
 
 function SplitVideoLayerInner({ vimeoId, youtubeId }: { vimeoId: string | null; youtubeId: string | null }) {
+  const [isPlaying, setIsPlaying] = useState(false);
+  const webViewRef = useRef<any>(null);
+
+  const togglePlayPause = useCallback(() => {
+    const nextPlaying = !isPlaying;
+    setIsPlaying(nextPlaying);
+    if (Platform.OS !== 'web') {
+      void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    }
+
+    if (vimeoId) {
+      const method = nextPlaying ? 'play' : 'pause';
+      if (Platform.OS === 'web') {
+        try {
+          const iframe = document.querySelector('#split-vimeo-iframe') as HTMLIFrameElement | null;
+          if (iframe?.contentWindow) {
+            iframe.contentWindow.postMessage(JSON.stringify({ method }), '*');
+          }
+        } catch (e) {
+          log('[SplitVideo] Web postMessage error:', e);
+        }
+      } else if (webViewRef.current) {
+        const js = `try{document.querySelector('iframe').contentWindow.postMessage(JSON.stringify({method:'${method}'}),'*');}catch(e){}`;
+        webViewRef.current.injectJavaScript(js + ';true;');
+      }
+    } else if (youtubeId) {
+      if (Platform.OS === 'web') {
+        try {
+          const iframe = document.querySelector('#split-yt-iframe') as HTMLIFrameElement | null;
+          if (iframe?.contentWindow) {
+            const cmd = nextPlaying ? 'playVideo' : 'pauseVideo';
+            iframe.contentWindow.postMessage(JSON.stringify({ event: 'command', func: cmd, args: [] }), '*');
+          }
+        } catch (e) {
+          log('[SplitVideo] YT Web postMessage error:', e);
+        }
+      }
+    }
+  }, [isPlaying, vimeoId, youtubeId]);
+
+  const playPauseButton = (
+    <TouchableOpacity
+      style={splitVideoStyles.playPauseButton}
+      onPress={togglePlayPause}
+      activeOpacity={0.7}
+      testID="split-video-play-pause"
+    >
+      {isPlaying ? (
+        <Pause size={18} color="#fff" />
+      ) : (
+        <Play size={18} color="#fff" />
+      )}
+    </TouchableOpacity>
+  );
+
   if (vimeoId) {
     if (Platform.OS === 'web') {
       const embedUrl = `https://player.vimeo.com/video/${vimeoId}?autoplay=0&quality=240p&dnt=1&fullscreen=0&playsinline=1`;
@@ -129,11 +184,14 @@ function SplitVideoLayerInner({ vimeoId, youtubeId }: { vimeoId: string | null; 
         <View style={splitVideoStyles.container}>
           {/* @ts-ignore */}
           <iframe
+            id="split-vimeo-iframe"
             src={embedUrl}
             style={{ width: '100%', height: '100%', border: 'none' }}
             allow="autoplay; encrypted-media"
             allowFullScreen={false}
           />
+          <View style={splitVideoStyles.touchBlocker} />
+          {playPauseButton}
         </View>
       );
     }
@@ -144,10 +202,11 @@ function SplitVideoLayerInner({ vimeoId, youtubeId }: { vimeoId: string | null; 
     return (
       <View style={splitVideoStyles.container}>
         <WebView
+          ref={webViewRef}
           source={{ html: videoHtml }}
           style={splitVideoStyles.webview}
           allowsInlineMediaPlayback={true}
-          mediaPlaybackRequiresUserAction={true}
+          mediaPlaybackRequiresUserAction={false}
           allowsAirPlayForMediaPlayback={false}
           allowsFullscreenVideo={false}
           allowsLinkPreview={false}
@@ -160,14 +219,33 @@ function SplitVideoLayerInner({ vimeoId, youtubeId }: { vimeoId: string | null; 
           setSupportMultipleWindows={false}
         />
         <View style={splitVideoStyles.touchBlocker} />
+        {playPauseButton}
       </View>
     );
   }
 
   if (youtubeId) {
+    if (Platform.OS === 'web') {
+      const embedUrl = `https://www.youtube.com/embed/${youtubeId}?enablejsapi=1&autoplay=0&controls=0&modestbranding=1&playsinline=1&rel=0`;
+      return (
+        <View style={splitVideoStyles.container}>
+          {/* @ts-ignore */}
+          <iframe
+            id="split-yt-iframe"
+            src={embedUrl}
+            style={{ width: '100%', height: '100%', border: 'none' }}
+            allow="autoplay; encrypted-media"
+            allowFullScreen={false}
+          />
+          <View style={splitVideoStyles.touchBlocker} />
+          {playPauseButton}
+        </View>
+      );
+    }
     return (
       <View style={splitVideoStyles.container}>
         <YouTubePlayer videoId={youtubeId} height={200} />
+        {playPauseButton}
       </View>
     );
   }
@@ -200,6 +278,20 @@ const splitVideoStyles = StyleSheet.create({
     bottom: 0,
     zIndex: 999,
     backgroundColor: 'rgba(0,0,0,0.005)',
+  },
+  playPauseButton: {
+    position: 'absolute' as const,
+    top: 8,
+    right: 8,
+    zIndex: 1100,
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: 'rgba(0,0,0,0.6)',
+    justifyContent: 'center' as const,
+    alignItems: 'center' as const,
+    borderWidth: 1.5,
+    borderColor: 'rgba(255,255,255,0.3)',
   },
   loading: {
     flex: 1,

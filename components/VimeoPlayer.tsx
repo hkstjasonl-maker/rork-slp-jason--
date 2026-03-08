@@ -131,34 +131,24 @@ function toggle(){
   else{cmd({method:'play'});}
 }
 
-var tapStart=0,tapX=0,tapY=0,tapped=false;
-sh.addEventListener('touchstart',function(e){
-  if(e.touches.length===1){
-    tapped=false;
-    tapStart=Date.now();
-    tapX=e.touches[0].clientX;
-    tapY=e.touches[0].clientY;
-  }
+var pStart=0,pX=0,pY=0,handled=false;
+sh.addEventListener('pointerdown',function(e){
+  handled=false;
+  pStart=Date.now();
+  pX=e.clientX;
+  pY=e.clientY;
 },{passive:true});
-sh.addEventListener('touchend',function(e){
-  if(tapped)return;
-  var dt=Date.now()-tapStart;
+sh.addEventListener('pointerup',function(e){
+  if(handled)return;
+  var dt=Date.now()-pStart;
   if(dt>600)return;
-  var cx=e.changedTouches[0].clientX;
-  var cy=e.changedTouches[0].clientY;
-  if(Math.abs(cx-tapX)>20||Math.abs(cy-tapY)>20)return;
-  tapped=true;
+  if(Math.abs(e.clientX-pX)>20||Math.abs(e.clientY-pY)>20)return;
+  handled=true;
   toggle();
   show();
 },{passive:true});
 sh.addEventListener('click',function(e){
-  e.preventDefault();
-  toggle();
-  show();
-});
-sh.addEventListener('pointerup',function(e){
-  if(tapped)return;
-  tapped=true;
+  if(handled){handled=false;return;}
   toggle();
   show();
 });

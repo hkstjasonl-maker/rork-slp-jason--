@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from 'react';
-import { View, StyleSheet, Platform, ActivityIndicator } from 'react-native';
+import React, { useState, useEffect, useRef } from 'react';
+import { View, StyleSheet, Platform, ActivityIndicator, PanResponder, GestureResponderEvent } from 'react-native';
 import { VideoOff } from 'lucide-react-native';
 import { ScaledText } from '@/components/ScaledText';
 import Colors from '@/constants/colors';
@@ -12,8 +12,19 @@ interface VimeoPlayerProps {
   lowQuality?: boolean;
 }
 
+const pinchBlockerRef = PanResponder.create({
+  onStartShouldSetPanResponderCapture: (e: GestureResponderEvent) =>
+    (e.nativeEvent.touches?.length ?? 0) >= 2,
+  onMoveShouldSetPanResponderCapture: (e: GestureResponderEvent) =>
+    (e.nativeEvent.touches?.length ?? 0) >= 2,
+  onPanResponderGrant: () => {},
+  onPanResponderMove: () => {},
+  onPanResponderRelease: () => {},
+});
+
 function VimeoPlayerInner({ videoId, height, onEnd, lowQuality }: VimeoPlayerProps) {
   const [loading, setLoading] = useState(true);
+  const pinchBlocker = useRef(pinchBlockerRef).current;
 
   useEffect(() => {
     if (!videoId || videoId.trim() === '') {
@@ -72,15 +83,21 @@ function VimeoPlayerInner({ videoId, height, onEnd, lowQuality }: VimeoPlayerPro
 <html><head>
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
 <style>
-*{margin:0;padding:0;box-sizing:border-box;}
-html,body{width:100%;height:100%;background:#000;overflow:hidden;touch-action:manipulation;}
+*{margin:0;padding:0;box-sizing:border-box;-webkit-touch-callout:none;}
+html,body{width:100%;height:100%;background:#000;overflow:hidden;touch-action:manipulation;-webkit-user-select:none;}
 iframe{width:100%;height:100%;border:none;}
 </style>
 </head><body>
-<iframe src="${embedUrl}" allow="autoplay; encrypted-media; picture-in-picture"></iframe>
+<iframe src="${embedUrl}" sandbox="allow-scripts allow-same-origin allow-popups" allow="autoplay; encrypted-media"></iframe>
 <script>
-document.addEventListener('touchstart',function(e){if(e.touches.length>1){e.preventDefault();}},{passive:false});
-document.addEventListener('gesturestart',function(e){e.preventDefault();},{passive:false});
+(function(){
+var bmt=function(e){if(e.touches&&e.touches.length>1){e.preventDefault();e.stopPropagation();e.stopImmediatePropagation();}};
+document.addEventListener('touchstart',bmt,{passive:false,capture:true});
+document.addEventListener('touchmove',bmt,{passive:false,capture:true});
+document.addEventListener('gesturestart',function(e){e.preventDefault();e.stopPropagation();},{passive:false,capture:true});
+document.addEventListener('gesturechange',function(e){e.preventDefault();e.stopPropagation();},{passive:false,capture:true});
+document.addEventListener('gestureend',function(e){e.preventDefault();e.stopPropagation();},{passive:false,capture:true});
+})();
 </script>
 </body></html>`;
 
@@ -96,12 +113,14 @@ document.addEventListener('gesturestart',function(e){e.preventDefault();},{passi
   };
 
   return (
-    <View style={[styles.container, { height }]}>
+    <View style={[styles.container, { height }]} {...pinchBlocker.panHandlers}>
       <WebView
         source={{ html }}
         style={styles.video}
         allowsInlineMediaPlayback={true}
         allowsFullscreenVideo={false}
+        allowsAirPlayForMediaPlayback={false}
+        allowsLinkPreview={false}
         mediaPlaybackRequiresUserAction={false}
         javaScriptEnabled={true}
         scrollEnabled={false}

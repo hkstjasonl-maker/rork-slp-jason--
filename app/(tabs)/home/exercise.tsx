@@ -30,6 +30,7 @@ import { SelfRatingModal } from '@/components/SelfRatingModal';
 import { CopyrightFooter } from '@/components/CopyrightFooter';
 import { RestTimer } from '@/components/RestTimer';
 import { RecordingWatermark } from '@/components/RecordingWatermark';
+import { VideoProtectionOverlay } from '@/components/VideoProtectionOverlay';
 import { supabase } from '@/lib/supabase';
 import { getStarsForSession, calculateStars } from '@/lib/stars';
 import { getExerciseDosage } from '@/lib/dosage';
@@ -136,7 +137,7 @@ function SplitVideoLayerInner({ vimeoId, youtubeId }: { vimeoId: string | null; 
     }
 
     const WebView = require('react-native-webview').WebView;
-    const videoHtml = `<!DOCTYPE html><html><head><meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no"><style>*{margin:0;padding:0;}html,body{background:#000;display:flex;align-items:center;justify-content:center;height:100vh;overflow:hidden;touch-action:manipulation;}iframe{width:100%;height:100%;border:none;}</style></head><body><iframe src="https://player.vimeo.com/video/${vimeoId}?autoplay=0&quality=240p&dnt=1&transparent=0&fullscreen=0" allow="autoplay; encrypted-media"></iframe><script>document.addEventListener('touchstart',function(e){if(e.touches.length>1){e.preventDefault();}},{passive:false});document.addEventListener('gesturestart',function(e){e.preventDefault();},{passive:false});</script></body></html>`;
+    const videoHtml = `<!DOCTYPE html><html><head><meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no"><style>*{margin:0;padding:0;-webkit-touch-callout:none;}html,body{background:#000;display:flex;align-items:center;justify-content:center;height:100vh;overflow:hidden;touch-action:manipulation;-webkit-user-select:none;}iframe{width:100%;height:100%;border:none;}</style></head><body><iframe src="https://player.vimeo.com/video/${vimeoId}?autoplay=0&quality=240p&dnt=1&transparent=0&fullscreen=0" sandbox="allow-scripts allow-same-origin allow-popups" allow="autoplay; encrypted-media"></iframe><script>(function(){var bmt=function(e){if(e.touches&&e.touches.length>1){e.preventDefault();e.stopPropagation();e.stopImmediatePropagation();}};document.addEventListener('touchstart',bmt,{passive:false,capture:true});document.addEventListener('touchmove',bmt,{passive:false,capture:true});document.addEventListener('gesturestart',function(e){e.preventDefault();e.stopPropagation();},{passive:false,capture:true});document.addEventListener('gesturechange',function(e){e.preventDefault();e.stopPropagation();},{passive:false,capture:true});document.addEventListener('gestureend',function(e){e.preventDefault();e.stopPropagation();},{passive:false,capture:true});})();</script></body></html>`;
 
     return (
       <WebView
@@ -145,7 +146,8 @@ function SplitVideoLayerInner({ vimeoId, youtubeId }: { vimeoId: string | null; 
         allowsInlineMediaPlayback={true}
         mediaPlaybackRequiresUserAction={true}
         allowsAirPlayForMediaPlayback={false}
-      allowsFullscreenVideo={false}
+        allowsFullscreenVideo={false}
+        allowsLinkPreview={false}
         javaScriptEnabled={true}
         scrollEnabled={false}
         bounces={false}
@@ -1187,9 +1189,9 @@ export default function ExerciseScreen() {
               showsVerticalScrollIndicator={false}
             >
               <View style={styles.videoSection}>
-                <View style={styles.videoPlayerWrapper}>
+                <VideoProtectionOverlay patientName={patientName ?? ''} height={220}>
                   <ExerciseVideoPlayer exercise={exercise} height={220} />
-                </View>
+                </VideoProtectionOverlay>
                 <Animated.View
                   style={[
                     styles.slpBubbleRow,

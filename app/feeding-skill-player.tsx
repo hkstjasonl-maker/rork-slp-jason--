@@ -26,6 +26,7 @@ import { VimeoPlayer } from '@/components/VimeoPlayer';
 import { YouTubePlayer } from '@/components/YouTubePlayer';
 import { CopyrightFooter } from '@/components/CopyrightFooter';
 import { RecordingWatermark } from '@/components/RecordingWatermark';
+import { VideoProtectionOverlay } from '@/components/VideoProtectionOverlay';
 import Colors from '@/constants/colors';
 import { FeedingSkillAssignment, FeedingSkillReviewRequirement, Language } from '@/types';
 import { log } from '@/lib/logger';
@@ -100,13 +101,15 @@ function SplitVideoLayerInner({ vimeoId, youtubeId }: { vimeoId: string | null; 
       );
     }
     const WebView = require('react-native-webview').WebView;
-    const videoHtml = `<!DOCTYPE html><html><head><meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no"><style>*{margin:0;padding:0;}html,body{background:#000;display:flex;align-items:center;justify-content:center;height:100vh;overflow:hidden;touch-action:manipulation;}iframe{width:100%;height:100%;border:none;}</style></head><body><iframe src="https://player.vimeo.com/video/${vimeoId}?autoplay=0&quality=240p&dnt=1&transparent=0&fullscreen=0" allow="autoplay; encrypted-media"></iframe><script>document.addEventListener('touchstart',function(e){if(e.touches.length>1){e.preventDefault();}},{passive:false});document.addEventListener('gesturestart',function(e){e.preventDefault();},{passive:false});</script></body></html>`;
+    const videoHtml = `<!DOCTYPE html><html><head><meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no"><style>*{margin:0;padding:0;-webkit-touch-callout:none;}html,body{background:#000;display:flex;align-items:center;justify-content:center;height:100vh;overflow:hidden;touch-action:manipulation;-webkit-user-select:none;}iframe{width:100%;height:100%;border:none;}</style></head><body><iframe src="https://player.vimeo.com/video/${vimeoId}?autoplay=0&quality=240p&dnt=1&transparent=0&fullscreen=0" sandbox="allow-scripts allow-same-origin allow-popups" allow="autoplay; encrypted-media"></iframe><script>(function(){var bmt=function(e){if(e.touches&&e.touches.length>1){e.preventDefault();e.stopPropagation();e.stopImmediatePropagation();}};document.addEventListener('touchstart',bmt,{passive:false,capture:true});document.addEventListener('touchmove',bmt,{passive:false,capture:true});document.addEventListener('gesturestart',function(e){e.preventDefault();e.stopPropagation();},{passive:false,capture:true});document.addEventListener('gesturechange',function(e){e.preventDefault();e.stopPropagation();},{passive:false,capture:true});document.addEventListener('gestureend',function(e){e.preventDefault();e.stopPropagation();},{passive:false,capture:true});})();</script></body></html>`;
     return (
       <WebView
         source={{ html: videoHtml }}
         style={splitStyles.container}
         allowsInlineMediaPlayback={true}
         allowsFullscreenVideo={false}
+        allowsAirPlayForMediaPlayback={false}
+        allowsLinkPreview={false}
         mediaPlaybackRequiresUserAction={true}
         javaScriptEnabled={true}
         scrollEnabled={false}
@@ -778,16 +781,18 @@ export default function FeedingSkillPlayerScreen() {
               showsVerticalScrollIndicator={false}
             >
               <View style={styles.videoContainer}>
-                {vimeoId ? (
-                  <VimeoPlayer videoId={vimeoId} height={220} />
-                ) : youtubeId ? (
-                  <YouTubePlayer videoId={youtubeId} height={220} />
-                ) : (
-                  <View style={styles.noVideo}>
-                    <VideoOff size={32} color="#666" />
-                    <ScaledText size={14} color="#999" style={{ marginTop: 8 }}>Video unavailable</ScaledText>
-                  </View>
-                )}
+                <VideoProtectionOverlay patientName={patientName ?? ''} height={220}>
+                  {vimeoId ? (
+                    <VimeoPlayer videoId={vimeoId} height={220} />
+                  ) : youtubeId ? (
+                    <YouTubePlayer videoId={youtubeId} height={220} />
+                  ) : (
+                    <View style={styles.noVideo}>
+                      <VideoOff size={32} color="#666" />
+                      <ScaledText size={14} color="#999" style={{ marginTop: 8 }}>Video unavailable</ScaledText>
+                    </View>
+                  )}
+                </VideoProtectionOverlay>
               </View>
 
               <View style={styles.infoSection}>

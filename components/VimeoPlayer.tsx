@@ -1,9 +1,10 @@
-import React, { useState, useEffect, useRef } from 'react';
-import { View, StyleSheet, Platform, ActivityIndicator, PanResponder, GestureResponderEvent } from 'react-native';
+import React, { useState, useEffect } from 'react';
+import { View, StyleSheet, Platform, ActivityIndicator } from 'react-native';
 import { VideoOff } from 'lucide-react-native';
 import { ScaledText } from '@/components/ScaledText';
 import Colors from '@/constants/colors';
 import { log } from '@/lib/logger';
+import { FULLSCREEN_PREVENTION_CSS, FULLSCREEN_PREVENTION_JS, INJECTED_JS_BEFORE_LOAD } from '@/lib/fullscreenPrevention';
 
 interface VimeoPlayerProps {
   videoId: string;
@@ -12,19 +13,8 @@ interface VimeoPlayerProps {
   lowQuality?: boolean;
 }
 
-const pinchBlockerRef = PanResponder.create({
-  onStartShouldSetPanResponderCapture: (e: GestureResponderEvent) =>
-    (e.nativeEvent.touches?.length ?? 0) >= 2,
-  onMoveShouldSetPanResponderCapture: (e: GestureResponderEvent) =>
-    (e.nativeEvent.touches?.length ?? 0) >= 2,
-  onPanResponderGrant: () => {},
-  onPanResponderMove: () => {},
-  onPanResponderRelease: () => {},
-});
-
 function VimeoPlayerInner({ videoId, height, onEnd, lowQuality }: VimeoPlayerProps) {
   const [loading, setLoading] = useState(true);
-  const pinchBlocker = useRef(pinchBlockerRef).current;
 
   useEffect(() => {
     if (!videoId || videoId.trim() === '') {
@@ -57,7 +47,7 @@ function VimeoPlayerInner({ videoId, height, onEnd, lowQuality }: VimeoPlayerPro
   }
 
   const quality = lowQuality ? '360p' : '720p';
-  const embedUrl = `https://player.vimeo.com/video/${videoId}?autoplay=0&quality=${quality}&dnt=1&fullscreen=0`;
+  const embedUrl = `https://player.vimeo.com/video/${videoId}?autoplay=0&quality=${quality}&dnt=1&fullscreen=0&playsinline=1`;
 
   if (Platform.OS === 'web') {
     return (
@@ -71,7 +61,8 @@ function VimeoPlayerInner({ videoId, height, onEnd, lowQuality }: VimeoPlayerPro
             border: 'none',
             borderRadius: 12,
           }}
-          allow="autoplay; picture-in-picture; encrypted-media"
+          allow="autoplay; encrypted-media"
+          allowFullScreen={false}
         />
       </View>
     );
@@ -85,20 +76,12 @@ function VimeoPlayerInner({ videoId, height, onEnd, lowQuality }: VimeoPlayerPro
 <style>
 *{margin:0;padding:0;box-sizing:border-box;-webkit-touch-callout:none;}
 html,body{width:100%;height:100%;background:#000;overflow:hidden;touch-action:manipulation;-webkit-user-select:none;}
-iframe{width:100%;height:100%;border:none;}
+iframe{width:100%;height:100%;border:none;pointer-events:auto;}
+${FULLSCREEN_PREVENTION_CSS}
 </style>
 </head><body>
-<iframe src="${embedUrl}" sandbox="allow-scripts allow-same-origin allow-popups" allow="autoplay; encrypted-media"></iframe>
-<script>
-(function(){
-var bmt=function(e){if(e.touches&&e.touches.length>1){e.preventDefault();e.stopPropagation();e.stopImmediatePropagation();}};
-document.addEventListener('touchstart',bmt,{passive:false,capture:true});
-document.addEventListener('touchmove',bmt,{passive:false,capture:true});
-document.addEventListener('gesturestart',function(e){e.preventDefault();e.stopPropagation();},{passive:false,capture:true});
-document.addEventListener('gesturechange',function(e){e.preventDefault();e.stopPropagation();},{passive:false,capture:true});
-document.addEventListener('gestureend',function(e){e.preventDefault();e.stopPropagation();},{passive:false,capture:true});
-})();
-</script>
+<iframe src="${embedUrl}" sandbox="allow-scripts allow-same-origin" allow="autoplay; encrypted-media"></iframe>
+<script>${FULLSCREEN_PREVENTION_JS}</script>
 </body></html>`;
 
   const handleMessage = (event: { nativeEvent: { data: string } }) => {
@@ -113,7 +96,7 @@ document.addEventListener('gestureend',function(e){e.preventDefault();e.stopProp
   };
 
   return (
-    <View style={[styles.container, { height }]} {...pinchBlocker.panHandlers}>
+    <View style={[styles.container, { height }]}>
       <WebView
         source={{ html }}
         style={styles.video}
@@ -127,6 +110,7 @@ document.addEventListener('gestureend',function(e){e.preventDefault();e.stopProp
         bounces={false}
         onMessage={handleMessage}
         scalesPageToFit={false}
+        injectedJavaScriptBeforeContentLoaded={INJECTED_JS_BEFORE_LOAD}
       />
     </View>
   );

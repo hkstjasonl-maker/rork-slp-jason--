@@ -38,6 +38,7 @@ import Colors from '@/constants/colors';
 import { JASON_CARTOON } from '@/constants/images';
 import { Exercise, ExerciseLog, Language, ExerciseReviewRequirement } from '@/types';
 import { log } from '@/lib/logger';
+import { FULLSCREEN_PREVENTION_CSS, FULLSCREEN_PREVENTION_JS, INJECTED_JS_BEFORE_LOAD } from '@/lib/fullscreenPrevention';
 import {
   fetchReviewRequirement,
   countTodaySubmissions,
@@ -123,21 +124,22 @@ const MemoLiveCamera = memo(LiveCamera, (prev, next) => prev.cameraMode === next
 function SplitVideoLayerInner({ vimeoId, youtubeId }: { vimeoId: string | null; youtubeId: string | null }) {
   if (vimeoId) {
     if (Platform.OS === 'web') {
-      const embedUrl = `https://player.vimeo.com/video/${vimeoId}?autoplay=0&quality=240p&dnt=1`;
+      const embedUrl = `https://player.vimeo.com/video/${vimeoId}?autoplay=0&quality=240p&dnt=1&fullscreen=0&playsinline=1`;
       return (
         <View style={splitVideoStyles.container}>
           {/* @ts-ignore */}
           <iframe
             src={embedUrl}
             style={{ width: '100%', height: '100%', border: 'none' }}
-            allow="autoplay; picture-in-picture; encrypted-media"
+            allow="autoplay; encrypted-media"
+            allowFullScreen={false}
           />
         </View>
       );
     }
 
     const WebView = require('react-native-webview').WebView;
-    const videoHtml = `<!DOCTYPE html><html><head><meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no"><style>*{margin:0;padding:0;-webkit-touch-callout:none;}html,body{background:#000;display:flex;align-items:center;justify-content:center;height:100vh;overflow:hidden;touch-action:manipulation;-webkit-user-select:none;}iframe{width:100%;height:100%;border:none;}</style></head><body><iframe src="https://player.vimeo.com/video/${vimeoId}?autoplay=0&quality=240p&dnt=1&transparent=0&fullscreen=0" sandbox="allow-scripts allow-same-origin allow-popups" allow="autoplay; encrypted-media"></iframe><script>(function(){var bmt=function(e){if(e.touches&&e.touches.length>1){e.preventDefault();e.stopPropagation();e.stopImmediatePropagation();}};document.addEventListener('touchstart',bmt,{passive:false,capture:true});document.addEventListener('touchmove',bmt,{passive:false,capture:true});document.addEventListener('gesturestart',function(e){e.preventDefault();e.stopPropagation();},{passive:false,capture:true});document.addEventListener('gesturechange',function(e){e.preventDefault();e.stopPropagation();},{passive:false,capture:true});document.addEventListener('gestureend',function(e){e.preventDefault();e.stopPropagation();},{passive:false,capture:true});})();</script></body></html>`;
+    const videoHtml = `<!DOCTYPE html><html><head><meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no"><style>*{margin:0;padding:0;-webkit-touch-callout:none;}html,body{background:#000;display:flex;align-items:center;justify-content:center;height:100vh;overflow:hidden;touch-action:manipulation;-webkit-user-select:none;}iframe{width:100%;height:100%;border:none;}${FULLSCREEN_PREVENTION_CSS}</style></head><body><iframe src="https://player.vimeo.com/video/${vimeoId}?autoplay=0&quality=240p&dnt=1&transparent=0&fullscreen=0&playsinline=1" sandbox="allow-scripts allow-same-origin" allow="autoplay; encrypted-media"></iframe><script>${FULLSCREEN_PREVENTION_JS}</script></body></html>`;
 
     return (
       <WebView
@@ -151,6 +153,8 @@ function SplitVideoLayerInner({ vimeoId, youtubeId }: { vimeoId: string | null; 
         javaScriptEnabled={true}
         scrollEnabled={false}
         bounces={false}
+        scalesPageToFit={false}
+        injectedJavaScriptBeforeContentLoaded={INJECTED_JS_BEFORE_LOAD}
       />
     );
   }

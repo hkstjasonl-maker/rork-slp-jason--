@@ -139,23 +139,28 @@ function SplitVideoLayerInner({ vimeoId, youtubeId }: { vimeoId: string | null; 
     }
 
     const WebView = require('react-native-webview').WebView;
-    const videoHtml = `<!DOCTYPE html><html><head><meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no"><style>*{margin:0;padding:0;-webkit-touch-callout:none;}html,body{background:#000;display:flex;align-items:center;justify-content:center;height:100vh;overflow:hidden;touch-action:manipulation;-webkit-user-select:none;}iframe{width:100%;height:100%;border:none;}${FULLSCREEN_PREVENTION_CSS}</style></head><body><iframe src="https://player.vimeo.com/video/${vimeoId}?autoplay=0&quality=240p&dnt=1&transparent=0&fullscreen=0&playsinline=1" sandbox="allow-scripts allow-same-origin" allow="autoplay; encrypted-media"></iframe><script>${FULLSCREEN_PREVENTION_JS}</script></body></html>`;
+    const videoHtml = `<!DOCTYPE html><html><head><meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no"><style>*{margin:0;padding:0;-webkit-touch-callout:none;-webkit-user-select:none;}html,body{background:#000;display:flex;align-items:center;justify-content:center;height:100vh;overflow:hidden;touch-action:none;-webkit-user-select:none;}iframe{width:100%;height:100%;border:none;pointer-events:none !important;}${FULLSCREEN_PREVENTION_CSS}</style></head><body><iframe src="https://player.vimeo.com/video/${vimeoId}?autoplay=0&quality=240p&dnt=1&transparent=0&fullscreen=0&playsinline=1" sandbox="allow-scripts allow-same-origin" allow="autoplay; encrypted-media" allowfullscreen="false" webkitallowfullscreen="false"></iframe><script>${FULLSCREEN_PREVENTION_JS}</script></body></html>`;
 
     return (
-      <WebView
-        source={{ html: videoHtml }}
-        style={splitVideoStyles.container}
-        allowsInlineMediaPlayback={true}
-        mediaPlaybackRequiresUserAction={true}
-        allowsAirPlayForMediaPlayback={false}
-        allowsFullscreenVideo={false}
-        allowsLinkPreview={false}
-        javaScriptEnabled={true}
-        scrollEnabled={false}
-        bounces={false}
-        scalesPageToFit={false}
-        injectedJavaScriptBeforeContentLoaded={INJECTED_JS_BEFORE_LOAD}
-      />
+      <View style={splitVideoStyles.container}>
+        <WebView
+          source={{ html: videoHtml }}
+          style={splitVideoStyles.webview}
+          allowsInlineMediaPlayback={true}
+          mediaPlaybackRequiresUserAction={true}
+          allowsAirPlayForMediaPlayback={false}
+          allowsFullscreenVideo={false}
+          allowsLinkPreview={false}
+          allowsPictureInPictureMediaPlayback={false}
+          javaScriptEnabled={true}
+          scrollEnabled={false}
+          bounces={false}
+          scalesPageToFit={false}
+          injectedJavaScriptBeforeContentLoaded={INJECTED_JS_BEFORE_LOAD}
+          setSupportMultipleWindows={false}
+        />
+        <View style={splitVideoStyles.touchBlocker} />
+      </View>
     );
   }
 
@@ -181,6 +186,20 @@ const splitVideoStyles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#000',
+    position: 'relative' as const,
+  },
+  webview: {
+    flex: 1,
+    backgroundColor: '#000',
+  },
+  touchBlocker: {
+    position: 'absolute' as const,
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    zIndex: 999,
+    backgroundColor: 'rgba(0,0,0,0.005)',
   },
   loading: {
     flex: 1,

@@ -37,6 +37,24 @@ function VimeoPlayerInner({ videoId, height, onEnd, lowQuality }: VimeoPlayerPro
     `);
   }, []);
 
+  const handleMessage = useCallback((event: { nativeEvent: { data: string } }) => {
+    try {
+      const data = JSON.parse(event.nativeEvent.data);
+      if (data.type === 'ready') {
+        isReadyRef.current = true;
+      } else if (data.type === 'play') {
+        isPlayingRef.current = true;
+      } else if (data.type === 'pause') {
+        isPlayingRef.current = false;
+      } else if (data.type === 'videoEnded') {
+        isPlayingRef.current = false;
+        if (onEnd) onEnd();
+      }
+    } catch (e) {
+      log('[VimeoPlayer] Message parse error:', e);
+    }
+  }, [onEnd]);
+
   useEffect(() => {
     if (!videoId || videoId.trim() === '') {
       setLoading(false);
@@ -164,24 +182,6 @@ window.addEventListener('message',function(e){
 })();
 </script>
 </body></html>`;
-
-  const handleMessage = useCallback((event: { nativeEvent: { data: string } }) => {
-    try {
-      const data = JSON.parse(event.nativeEvent.data);
-      if (data.type === 'ready') {
-        isReadyRef.current = true;
-      } else if (data.type === 'play') {
-        isPlayingRef.current = true;
-      } else if (data.type === 'pause') {
-        isPlayingRef.current = false;
-      } else if (data.type === 'videoEnded') {
-        isPlayingRef.current = false;
-        if (onEnd) onEnd();
-      }
-    } catch (e) {
-      log('[VimeoPlayer] Message parse error:', e);
-    }
-  }, [onEnd]);
 
   return (
     <View style={[styles.container, { height }]}>

@@ -25,6 +25,7 @@ function RootLayoutNav() {
       <Stack.Screen name="clinical-assessment" options={{ headerShown: false, presentation: 'card' }} />
       <Stack.Screen name="partners" options={{ headerShown: false, presentation: 'card' }} />
       <Stack.Screen name="my-submissions" options={{ headerShown: false, presentation: 'card' }} />
+      <Stack.Screen name="feeding-skill-player" options={{ headerShown: false, presentation: 'card' }} />
     </Stack>
   );
 }

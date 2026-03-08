@@ -18,7 +18,7 @@ import { AppTutorial } from '@/components/AppTutorial';
 import { supabase } from '@/lib/supabase';
 import Colors from '@/constants/colors';
 import { JASON_CARTOON } from '@/constants/images';
-import { Exercise, ExerciseProgram, ExerciseLog, Language, ExerciseReviewRequirement } from '@/types';
+import { Exercise, ExerciseProgram, ExerciseLog, Language, ExerciseReviewRequirement, FeedingSkillAssignment } from '@/types';
 import { getDosageProgressText, getExerciseDosage } from '@/lib/dosage';
 import { log } from '@/lib/logger';
 import {
@@ -44,6 +44,8 @@ import {
   Flame,
   Video,
   MessageSquare,
+  UtensilsCrossed,
+  Eye,
 } from 'lucide-react-native';
 
 interface CategoryGroup {
@@ -67,7 +69,7 @@ const CATEGORY_ICONS: Record<string, string> = {
 };
 
 function getCategoryIcon(category: string): string {
-  const key = category.toLowerCase().replace(/[\s\-\/]+/g, '_');
+  const key = category.toLowerCase().replace(/[\s\-/]+/g, '_');
   return CATEGORY_ICONS[key] || '📋';
 }
 
@@ -413,6 +415,7 @@ export default function HomeScreen() {
   const [showTutorial, setShowTutorial] = useState(false);
   const [remarksExpanded, setRemarksExpanded] = useState(false);
   const [submissionsExpanded, setSubmissionsExpanded] = useState<boolean>(false);
+  const [feedingSkillsExpanded, setFeedingSkillsExpanded] = useState<boolean>(true);
 
   const reviewReqQuery = useQuery({
     queryKey: ['reviewRequirements', patientId],
@@ -475,6 +478,29 @@ export default function HomeScreen() {
     });
   }, [router]);
 
+  const feedingSkillsQuery = useQuery({
+    queryKey: ['feedingSkillAssignments', patientId],
+    queryFn: async () => {
+      const today = new Date().toISOString().split('T')[0];
+      const { data, error } = await supabase
+        .from('feeding_skill_assignments')
+        .select('*, feeding_skill_videos(*)')
+        .eq('patient_id', patientId!)
+        .eq('is_active', true)
+        .lte('start_date', today)
+        .gte('end_date', today);
+      if (error) {
+        log('Feeding skills fetch error:', error);
+        return [];
+      }
+      return (data || []) as FeedingSkillAssignment[];
+    },
+    enabled: !!patientId,
+    staleTime: 5 * 60 * 1000,
+  });
+
+  const feedingSkills = feedingSkillsQuery.data || [];
+
   const submissionsQuery = useQuery({
     queryKey: ['videoSubmissions', patientId],
     queryFn: async () => {
@@ -500,6 +526,7 @@ export default function HomeScreen() {
   const { refetch: refetchSubmissions } = submissionsQuery;
   const { refetch: refetchReviewReqs } = reviewReqQuery;
   const { refetch: refetchTodaySubs } = todaySubsQuery;
+  const { refetch: refetchFeedingSkills } = feedingSkillsQuery;
 
   const onRefresh = useCallback(() => {
     void refetchProgram();
@@ -508,7 +535,8 @@ export default function HomeScreen() {
     void refetchSubmissions();
     void refetchReviewReqs();
     void refetchTodaySubs();
-  }, [refetchProgram, refetchLogs, refetchAllLogs, refetchSubmissions, refetchReviewReqs, refetchTodaySubs]);
+    void refetchFeedingSkills();
+  }, [refetchProgram, refetchLogs, refetchAllLogs, refetchSubmissions, refetchReviewReqs, refetchTodaySubs, refetchFeedingSkills]);
 
   if (programQuery.isLoading) {
     return (
@@ -721,6 +749,91 @@ export default function HomeScreen() {
               ))
             )}
           </View>
+
+          {feedingSkills.length > 0 && (
+            <View style={styles.feedingSkillsSection}>
+              <TouchableOpacity
+                style={styles.feedingSkillsHeader}
+                onPress={() => setFeedingSkillsExpanded(prev => !prev)}
+                activeOpacity={0.7}
+              >
+                <View style={styles.feedingSkillsHeaderLeft}>
+                  <UtensilsCrossed size={20} color="#E67E22" />
+                  <ScaledText size={18} weight="bold" color={Colors.textPrimary}>
+                    {t('feedingSkills')}
+                  </ScaledText>
+                  <View style={styles.feedingSkillsCountBadge}>
+                    <ScaledText size={11} weight="600" color={Colors.white}>
+                      {feedingSkills.length}
+                    </ScaledText>
+                  </View>
+                </View>
+                {feedingSkillsExpanded ? (
+                  <ChevronUp size={20} color={Colors.textSecondary} />
+                ) : (
+                  <ChevronDown size={20} color={Colors.textSecondary} />
+                )}
+              </TouchableOpacity>
+
+              {feedingSkillsExpanded && (
+                <>
+                  {feedingSkills.map((assignment) => {
+                    const video = assignment.feeding_skill_videos;
+                    if (!video) return null;
+                    const lang = language || 'en';
+                    const title = lang === 'zh_hant'
+                      ? (video.title_zh_hant || video.title_en)
+                      : lang === 'zh_hans'
+                        ? (video.title_zh_hans || video.title_en)
+                        : video.title_en;
+                    const isViewed = !!assignment.viewed_at;
+
+                    return (
+                      <TouchableOpacity
+                        key={assignment.id}
+                        style={styles.feedingSkillCard}
+                        onPress={() => router.push({
+                          pathname: '/feeding-skill-player' as any,
+                          params: { assignmentId: assignment.id },
+                        })}
+                        activeOpacity={0.7}
+                        testID={`feeding-skill-card-${assignment.id}`}
+                      >
+                        <View style={styles.feedingSkillCardContent}>
+                          <View style={styles.feedingSkillIconWrap}>
+                            <Play size={18} color={Colors.white} />
+                          </View>
+                          <View style={styles.feedingSkillInfo}>
+                            <ScaledText size={15} weight="600" color={Colors.textPrimary} numberOfLines={2}>
+                              {title}
+                            </ScaledText>
+                            <View style={styles.feedingSkillMeta}>
+                              {video.category && (
+                                <View style={styles.feedingSkillCategoryBadge}>
+                                  <ScaledText size={10} weight="600" color="#E67E22">
+                                    {video.category}
+                                  </ScaledText>
+                                </View>
+                              )}
+                              {isViewed && (
+                                <View style={styles.feedingSkillViewedBadge}>
+                                  <Eye size={10} color={Colors.success} />
+                                  <ScaledText size={10} weight="600" color={Colors.success}>
+                                    {t('feedingSkillViewed')}
+                                  </ScaledText>
+                                </View>
+                              )}
+                            </View>
+                          </View>
+                          <ChevronRight size={20} color={Colors.disabled} />
+                        </View>
+                      </TouchableOpacity>
+                    );
+                  })}
+                </>
+              )}
+            </View>
+          )}
 
           {submissions.length > 0 && (
             <View style={styles.submissionsSection}>
@@ -1205,5 +1318,76 @@ const styles = StyleSheet.create({
     justifyContent: 'center' as const,
     gap: 4,
     paddingVertical: 10,
+  },
+  feedingSkillsSection: {
+    paddingHorizontal: 20,
+    marginTop: 8,
+    marginBottom: 16,
+  },
+  feedingSkillsHeader: {
+    flexDirection: 'row' as const,
+    alignItems: 'center' as const,
+    justifyContent: 'space-between' as const,
+    marginBottom: 12,
+  },
+  feedingSkillsHeaderLeft: {
+    flexDirection: 'row' as const,
+    alignItems: 'center' as const,
+    gap: 8,
+  },
+  feedingSkillsCountBadge: {
+    backgroundColor: '#E67E22',
+    borderRadius: 10,
+    minWidth: 20,
+    height: 20,
+    alignItems: 'center' as const,
+    justifyContent: 'center' as const,
+    paddingHorizontal: 5,
+  },
+  feedingSkillCard: {
+    backgroundColor: Colors.card,
+    borderRadius: 12,
+    padding: 14,
+    marginBottom: 8,
+    borderWidth: 1,
+    borderColor: Colors.border,
+  },
+  feedingSkillCardContent: {
+    flexDirection: 'row' as const,
+    alignItems: 'center' as const,
+    gap: 12,
+  },
+  feedingSkillIconWrap: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: '#E67E22',
+    justifyContent: 'center' as const,
+    alignItems: 'center' as const,
+  },
+  feedingSkillInfo: {
+    flex: 1,
+    gap: 6,
+  },
+  feedingSkillMeta: {
+    flexDirection: 'row' as const,
+    alignItems: 'center' as const,
+    gap: 8,
+    flexWrap: 'wrap' as const,
+  },
+  feedingSkillCategoryBadge: {
+    backgroundColor: '#FEF3E2',
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 6,
+  },
+  feedingSkillViewedBadge: {
+    flexDirection: 'row' as const,
+    alignItems: 'center' as const,
+    gap: 3,
+    backgroundColor: Colors.successLight,
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 6,
   },
 });

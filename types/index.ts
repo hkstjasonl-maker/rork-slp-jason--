@@ -193,6 +193,31 @@ export interface Organisation {
   is_active: boolean;
 }
 
+export interface FeedingSkillVideo {
+  id: string;
+  title_en: string;
+  title_zh_hant: string | null;
+  title_zh_hans: string | null;
+  description_en: string | null;
+  description_zh_hant: string | null;
+  description_zh_hans: string | null;
+  category: string | null;
+  vimeo_video_id: string | null;
+  youtube_video_id: string | null;
+  is_active: boolean;
+}
+
+export interface FeedingSkillAssignment {
+  id: string;
+  feeding_skill_video_id: string;
+  patient_id: string;
+  start_date: string;
+  end_date: string;
+  is_active: boolean;
+  viewed_at: string | null;
+  feeding_skill_videos: FeedingSkillVideo;
+}
+
 export const FONT_SCALES: Record<FontSizeLevel, number> = {
   small: 0.8,
   medium: 1.0,

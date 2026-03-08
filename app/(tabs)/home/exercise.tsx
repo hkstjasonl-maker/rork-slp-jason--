@@ -1477,7 +1477,7 @@ const styles = StyleSheet.create({
   },
   splitContainerTablet: {
     flex: 1,
-    flexDirection: 'row' as const,
+    flexDirection: 'column' as const,
     gap: 6,
     paddingHorizontal: 16,
   },

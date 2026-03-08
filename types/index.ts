@@ -209,7 +209,7 @@ export interface FeedingSkillVideo {
 
 export interface FeedingSkillAssignment {
   id: string;
-  feeding_skill_video_id: string;
+  video_id: string;
   patient_id: string;
   start_date: string;
   end_date: string;

@@ -828,8 +828,8 @@ export default function HomeScreen() {
                         ? (video.title_zh_hans || video.title_en)
                         : video.title_en;
                     const isViewed = !!assignment.viewed_at;
-                    const feedReq = feedingReviewRequirements.find(r => r.feeding_skill_video_id === assignment.feeding_skill_video_id);
-                    const feedSubCount = feedingTodaySubmissions[assignment.feeding_skill_video_id] || 0;
+                    const feedReq = feedingReviewRequirements.find(r => r.feeding_skill_video_id === assignment.video_id);
+                    const feedSubCount = feedingTodaySubmissions[assignment.video_id] || 0;
 
                     return (
                       <TouchableOpacity

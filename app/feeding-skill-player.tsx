@@ -268,7 +268,7 @@ export default function FeedingSkillPlayerScreen() {
   useEffect(() => {
     if (!patientId || !assignmentQuery.data?.feeding_skill_videos) return;
     const checkReviewReq = async () => {
-      const videoId = assignmentQuery.data!.feeding_skill_video_id;
+      const videoId = assignmentQuery.data!.video_id;
       const req = await fetchFeedingSkillReviewRequirement(patientId, videoId);
       setReviewRequirement(req);
       if (req) {
@@ -532,7 +532,7 @@ export default function FeedingSkillPlayerScreen() {
         lastRecordedUri,
         patientId,
         reviewRequirement?.id ?? null,
-        assignment!.feeding_skill_video_id,
+        assignment!.video_id,
         video.title_en
       );
       if (result.success) {

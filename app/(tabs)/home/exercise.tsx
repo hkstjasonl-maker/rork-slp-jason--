@@ -972,7 +972,7 @@ export default function ExerciseScreen() {
                     {t('mirrorMode')}
                   </ScaledText>
                 </View>
-                <RecordingWatermark exerciseName={exerciseTitle} visible={true} />
+                <RecordingWatermark exerciseName={exerciseTitle} patientName={patientName ?? undefined} visible={true} />
                 {isRecording && (
                   <View style={styles.recordingIndicator}>
                     <Animated.View style={[styles.recordingDot, { opacity: recordPulse }]} />
@@ -1041,7 +1041,7 @@ export default function ExerciseScreen() {
                 </ScaledText>
               </View>
 
-              <RecordingWatermark exerciseName={exerciseTitle} visible={true} />
+              <RecordingWatermark exerciseName={exerciseTitle} patientName={patientName ?? undefined} visible={true} />
 
               {isRecording && (
                 <View style={styles.recordingIndicator}>

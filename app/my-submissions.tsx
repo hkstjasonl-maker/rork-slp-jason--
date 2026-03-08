@@ -10,15 +10,28 @@ import {
 } from 'react-native';
 import { useRouter, useFocusEffect } from 'expo-router';
 import { useQuery } from '@tanstack/react-query';
-import { ArrowLeft, Video, Clock, Star, AlertTriangle, CheckCircle2, MessageSquare } from 'lucide-react-native';
+import { ArrowLeft, Video, Clock, Star, AlertTriangle, CheckCircle2, MessageSquare, Utensils } from 'lucide-react-native';
 import { useApp } from '@/contexts/AppContext';
 import { ScaledText } from '@/components/ScaledText';
 import { CopyrightFooter } from '@/components/CopyrightFooter';
 import Colors from '@/constants/colors';
 import { fetchPatientSubmissions } from '@/lib/reviewRequirements';
+import { fetchPatientFeedingSubmissions } from '@/lib/feedingSkillReview';
 import { supabase } from '@/lib/supabase';
 import { log } from '@/lib/logger';
-import { ExerciseVideoSubmission, ReviewStatus, Exercise } from '@/types';
+import { ReviewStatus, Exercise } from '@/types';
+
+type UnifiedSubmission = {
+  id: string;
+  title: string;
+  review_status: ReviewStatus;
+  reviewer_notes: string | null;
+  rating: number | null;
+  reviewed_at: string | null;
+  submission_date: string;
+  created_at?: string;
+  source: 'exercise' | 'feeding';
+};
 
 function getStatusColor(status: ReviewStatus): string {
   switch (status) {
@@ -75,11 +88,21 @@ export default function MySubmissionsScreen() {
   const router = useRouter();
   const { t, patientId, language } = useApp();
 
-  const submissionsQuery = useQuery({
+  const exerciseSubmissionsQuery = useQuery({
     queryKey: ['videoSubmissions', patientId],
     queryFn: async () => {
       if (!patientId) return [];
       return fetchPatientSubmissions(patientId);
+    },
+    enabled: !!patientId,
+    staleTime: 30 * 1000,
+  });
+
+  const feedingSubmissionsQuery = useQuery({
+    queryKey: ['feedingVideoSubmissions', patientId],
+    queryFn: async () => {
+      if (!patientId) return [];
+      return fetchPatientFeedingSubmissions(patientId);
     },
     enabled: !!patientId,
     staleTime: 30 * 1000,
@@ -126,17 +149,48 @@ export default function MySubmissionsScreen() {
 
   useFocusEffect(
     React.useCallback(() => {
-      void submissionsQuery.refetch();
+      void exerciseSubmissionsQuery.refetch();
+      void feedingSubmissionsQuery.refetch();
       // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [])
   );
 
-  const submissions = submissionsQuery.data || [];
+  const submissions = useMemo(() => {
+    const exerciseSubs: UnifiedSubmission[] = (exerciseSubmissionsQuery.data || []).map((s) => ({
+      id: s.id,
+      title: s.exercise_title_en,
+      review_status: s.review_status,
+      reviewer_notes: s.reviewer_notes,
+      rating: s.rating,
+      reviewed_at: s.reviewed_at,
+      submission_date: s.submission_date,
+      created_at: s.created_at,
+      source: 'exercise' as const,
+    }));
+    const feedingSubs: UnifiedSubmission[] = (feedingSubmissionsQuery.data || []).map((s) => ({
+      id: s.id,
+      title: s.video_title_en,
+      review_status: s.review_status,
+      reviewer_notes: s.reviewer_notes,
+      rating: s.rating,
+      reviewed_at: s.reviewed_at,
+      submission_date: s.submission_date,
+      created_at: s.created_at,
+      source: 'feeding' as const,
+    }));
+    const all = [...exerciseSubs, ...feedingSubs];
+    all.sort((a, b) => {
+      const dateA = a.created_at ? new Date(a.created_at).getTime() : 0;
+      const dateB = b.created_at ? new Date(b.created_at).getTime() : 0;
+      return dateB - dateA;
+    });
+    return all;
+  }, [exerciseSubmissionsQuery.data, feedingSubmissionsQuery.data]);
 
   const grouped = useMemo(() => {
-    const redoRequested: ExerciseVideoSubmission[] = [];
-    const pendingItems: ExerciseVideoSubmission[] = [];
-    const reviewedItems: ExerciseVideoSubmission[] = [];
+    const redoRequested: UnifiedSubmission[] = [];
+    const pendingItems: UnifiedSubmission[] = [];
+    const reviewedItems: UnifiedSubmission[] = [];
 
     submissions.forEach((s) => {
       switch (s.review_status) {
@@ -153,10 +207,12 @@ export default function MySubmissionsScreen() {
     });
 
     return { redoRequested, pendingItems, reviewedItems };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [submissionsQuery.data]);
+  }, [submissions]);
 
-  if (submissionsQuery.isLoading) {
+  const isLoading = exerciseSubmissionsQuery.isLoading || feedingSubmissionsQuery.isLoading;
+  const isFetching = (exerciseSubmissionsQuery.isFetching && !exerciseSubmissionsQuery.isLoading) || (feedingSubmissionsQuery.isFetching && !feedingSubmissionsQuery.isLoading);
+
+  if (isLoading) {
     return (
       <View style={styles.root}>
         <SafeAreaView style={styles.container}>
@@ -200,8 +256,11 @@ export default function MySubmissionsScreen() {
           showsVerticalScrollIndicator={false}
           refreshControl={
             <RefreshControl
-              refreshing={submissionsQuery.isFetching && !submissionsQuery.isLoading}
-              onRefresh={() => submissionsQuery.refetch()}
+              refreshing={isFetching}
+              onRefresh={() => {
+                void exerciseSubmissionsQuery.refetch();
+                void feedingSubmissionsQuery.refetch();
+              }}
               tintColor={Colors.primary}
             />
           }
@@ -272,7 +331,7 @@ function SubmissionCard({
   language,
   titleMap,
 }: {
-  submission: ExerciseVideoSubmission;
+  submission: UnifiedSubmission;
   t: (key: string) => string;
   language: string | null;
   titleMap: Record<string, string>;
@@ -287,15 +346,27 @@ function SubmissionCard({
   }, [submission.review_status, t]);
 
   const isRedo = submission.review_status === 'redo_requested';
+  const isFeeding = submission.source === 'feeding';
 
   return (
     <View style={[styles.card, isRedo && styles.cardRedo]}>
       <View style={styles.cardHeader}>
         <View style={styles.cardTitleRow}>
-          <Video size={16} color={Colors.primary} />
+          {isFeeding ? (
+            <Utensils size={16} color="#E67E22" />
+          ) : (
+            <Video size={16} color={Colors.primary} />
+          )}
           <ScaledText size={15} weight="600" color={Colors.textPrimary} numberOfLines={2} style={styles.cardTitle}>
-            {titleMap[submission.exercise_title_en] || submission.exercise_title_en}
+            {titleMap[submission.title] || submission.title}
           </ScaledText>
+          {isFeeding && (
+            <View style={styles.sourceBadge}>
+              <ScaledText size={9} weight="700" color="#E67E22">
+                {language === 'zh_hant' || language === 'zh_hans' ? '餵食' : 'Feeding'}
+              </ScaledText>
+            </View>
+          )}
         </View>
         <View style={[styles.statusBadge, { backgroundColor: getStatusBgColor(submission.review_status) }]}>
           {getStatusIcon(submission.review_status)}
@@ -495,5 +566,12 @@ const styles = StyleSheet.create({
   notesText: {
     lineHeight: 20,
   },
-
+  sourceBadge: {
+    backgroundColor: '#FEF3E2',
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 6,
+    borderWidth: 1,
+    borderColor: '#F5D5A0',
+  },
 });

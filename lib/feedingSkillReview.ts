@@ -220,6 +220,28 @@ export async function fetchAllFeedingReviewRequirements(
   }
 }
 
+export async function fetchPatientFeedingSubmissions(
+  patientId: string
+): Promise<import('@/types').FeedingSkillVideoSubmission[]> {
+  try {
+    const { data, error } = await supabase
+      .from('feeding_skill_video_submissions')
+      .select('*, feeding_skill_review_requirements(*)')
+      .eq('patient_id', patientId)
+      .order('created_at', { ascending: false })
+      .limit(100);
+
+    if (error) {
+      log('[FeedingReview] Fetch submissions error:', error);
+      return [];
+    }
+    return (data || []) as import('@/types').FeedingSkillVideoSubmission[];
+  } catch (e) {
+    log('[FeedingReview] Fetch submissions exception:', e);
+    return [];
+  }
+}
+
 export async function fetchTodayFeedingSubmissions(
   patientId: string
 ): Promise<Record<string, number>> {

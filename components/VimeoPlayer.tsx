@@ -1,10 +1,10 @@
-import React, { useState, useEffect } from 'react';
-import { View, StyleSheet, Platform, ActivityIndicator } from 'react-native';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
+import { View, StyleSheet, Platform, ActivityIndicator, PanResponder, GestureResponderEvent, PanResponderGestureState } from 'react-native';
 import { VideoOff } from 'lucide-react-native';
 import { ScaledText } from '@/components/ScaledText';
 import Colors from '@/constants/colors';
 import { log } from '@/lib/logger';
-import { FULLSCREEN_PREVENTION_CSS } from '@/lib/fullscreenPrevention';
+import { FULLSCREEN_PREVENTION_CSS, INJECTED_JS_BEFORE_LOAD } from '@/lib/fullscreenPrevention';
 
 interface VimeoPlayerProps {
   videoId: string;
@@ -15,6 +15,47 @@ interface VimeoPlayerProps {
 
 function VimeoPlayerInner({ videoId, height, onEnd, lowQuality }: VimeoPlayerProps) {
   const [loading, setLoading] = useState(true);
+  const webViewRef = useRef<any>(null);
+  const tapStartTime = useRef<number>(0);
+  const tapStartPos = useRef<{ x: number; y: number }>({ x: 0, y: 0 });
+
+  const handleTap = useCallback(() => {
+    if (webViewRef.current) {
+      webViewRef.current.injectJavaScript(`
+        (function(){
+          var sh = document.getElementById('sh');
+          if (sh) sh.click();
+        })();
+        true;
+      `);
+    }
+  }, []);
+
+  const touchBlocker = useRef(
+    PanResponder.create({
+      onStartShouldSetPanResponder: () => true,
+      onStartShouldSetPanResponderCapture: () => true,
+      onMoveShouldSetPanResponder: () => true,
+      onMoveShouldSetPanResponderCapture: () => true,
+      onPanResponderGrant: (evt: GestureResponderEvent) => {
+        tapStartTime.current = Date.now();
+        tapStartPos.current = {
+          x: evt.nativeEvent.pageX,
+          y: evt.nativeEvent.pageY,
+        };
+      },
+      onPanResponderMove: () => {},
+      onPanResponderRelease: (evt: GestureResponderEvent, gestureState: PanResponderGestureState) => {
+        const elapsed = Date.now() - tapStartTime.current;
+        const dist = Math.sqrt(gestureState.dx * gestureState.dx + gestureState.dy * gestureState.dy);
+        if (elapsed < 300 && dist < 15 && evt.nativeEvent.touches.length <= 1) {
+          handleTap();
+        }
+      },
+      onPanResponderTerminate: () => {},
+      onPanResponderTerminationRequest: () => false,
+    })
+  ).current;
 
   useEffect(() => {
     if (!videoId || videoId.trim() === '') {
@@ -47,7 +88,7 @@ function VimeoPlayerInner({ videoId, height, onEnd, lowQuality }: VimeoPlayerPro
   }
 
   const quality = lowQuality ? '360p' : '720p';
-  const embedUrl = `https://player.vimeo.com/video/${videoId}?autoplay=0&quality=${quality}&dnt=1&fullscreen=0&playsinline=1&api=1`;
+  const embedUrl = `https://player.vimeo.com/video/${videoId}?autoplay=0&quality=${quality}&dnt=1&fullscreen=0&playsinline=1&api=1&transparent=0`;
 
   if (Platform.OS === 'web') {
     return (
@@ -90,7 +131,7 @@ ${FULLSCREEN_PREVENTION_CSS}
 </style>
 </head><body>
 <div id="w">
-<iframe id="vf" src="${embedUrl}" allow="autoplay; encrypted-media"></iframe>
+<iframe id="vf" src="${embedUrl}" allow="autoplay; encrypted-media" sandbox="allow-scripts allow-same-origin allow-popups" allowfullscreen="false" webkitallowfullscreen="false"></iframe>
 <div id="sh">
 <div id="pb"><svg viewBox="0 0 24 24"><polygon points="6,3 20,12 6,21" fill="#fff"/></svg></div>
 </div>
@@ -162,6 +203,7 @@ window.addEventListener('message',function(e){
   return (
     <View style={[styles.container, { height }]}>
       <WebView
+        ref={webViewRef}
         source={{ html }}
         style={styles.video}
         allowsInlineMediaPlayback={true}
@@ -175,7 +217,10 @@ window.addEventListener('message',function(e){
         bounces={false}
         onMessage={handleMessage}
         scalesPageToFit={false}
+        injectedJavaScriptBeforeContentLoaded={INJECTED_JS_BEFORE_LOAD}
+        setSupportMultipleWindows={false}
       />
+      <View style={styles.nativeTouchBlocker} {...touchBlocker.panHandlers} />
     </View>
   );
 }
@@ -200,5 +245,14 @@ const styles = StyleSheet.create({
   },
   unavailableLabel: {
     marginTop: 8,
+  },
+  nativeTouchBlocker: {
+    position: 'absolute' as const,
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    zIndex: 999,
+    backgroundColor: 'transparent',
   },
 });

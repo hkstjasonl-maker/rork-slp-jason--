@@ -1,7 +1,7 @@
-import React, { useCallback } from 'react';
-import { View, Text, StyleSheet, Platform } from 'react-native';
+import React, { useCallback, useRef } from 'react';
+import { View, Text, StyleSheet, Platform, PanResponder, GestureResponderEvent, PanResponderGestureState } from 'react-native';
 import { log } from '@/lib/logger';
-import { FULLSCREEN_PREVENTION_CSS } from '@/lib/fullscreenPrevention';
+import { FULLSCREEN_PREVENTION_CSS, INJECTED_JS_BEFORE_LOAD } from '@/lib/fullscreenPrevention';
 
 interface YouTubePlayerProps {
   videoId: string;
@@ -92,6 +92,48 @@ function onYouTubeIframeAPIReady(){
 }
 
 function YouTubePlayerInner({ videoId, height, onEnd }: YouTubePlayerProps) {
+  const webViewRef = useRef<any>(null);
+  const tapStartTime = useRef<number>(0);
+  const tapStartPos = useRef<{ x: number; y: number }>({ x: 0, y: 0 });
+
+  const handleTap = useCallback(() => {
+    if (webViewRef.current) {
+      webViewRef.current.injectJavaScript(`
+        (function(){
+          var sh = document.getElementById('sh');
+          if (sh) sh.click();
+        })();
+        true;
+      `);
+    }
+  }, []);
+
+  const touchBlocker = useRef(
+    PanResponder.create({
+      onStartShouldSetPanResponder: () => true,
+      onStartShouldSetPanResponderCapture: () => true,
+      onMoveShouldSetPanResponder: () => true,
+      onMoveShouldSetPanResponderCapture: () => true,
+      onPanResponderGrant: (evt: GestureResponderEvent) => {
+        tapStartTime.current = Date.now();
+        tapStartPos.current = {
+          x: evt.nativeEvent.pageX,
+          y: evt.nativeEvent.pageY,
+        };
+      },
+      onPanResponderMove: () => {},
+      onPanResponderRelease: (evt: GestureResponderEvent, gestureState: PanResponderGestureState) => {
+        const elapsed = Date.now() - tapStartTime.current;
+        const dist = Math.sqrt(gestureState.dx * gestureState.dx + gestureState.dy * gestureState.dy);
+        if (elapsed < 300 && dist < 15 && evt.nativeEvent.touches.length <= 1) {
+          handleTap();
+        }
+      },
+      onPanResponderTerminate: () => {},
+      onPanResponderTerminationRequest: () => false,
+    })
+  ).current;
+
   const handleMessage = useCallback((event: { nativeEvent: { data: string } }) => {
     try {
       const data = JSON.parse(event.nativeEvent.data);
@@ -137,6 +179,7 @@ function YouTubePlayerInner({ videoId, height, onEnd }: YouTubePlayerProps) {
   return (
     <View style={[styles.container, { height }]}>
       <WebView
+        ref={webViewRef}
         source={{ html: getYouTubeHTML(videoId) }}
         style={styles.webview}
         allowsInlineMediaPlayback={true}
@@ -150,7 +193,10 @@ function YouTubePlayerInner({ videoId, height, onEnd }: YouTubePlayerProps) {
         scrollEnabled={false}
         bounces={false}
         scalesPageToFit={false}
+        injectedJavaScriptBeforeContentLoaded={INJECTED_JS_BEFORE_LOAD}
+        setSupportMultipleWindows={false}
       />
+      <View style={styles.nativeTouchBlocker} {...touchBlocker.panHandlers} />
     </View>
   );
 }
@@ -176,5 +222,14 @@ const styles = StyleSheet.create({
   unavailableText: {
     color: '#fff',
     fontSize: 14,
+  },
+  nativeTouchBlocker: {
+    position: 'absolute' as const,
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    zIndex: 999,
+    backgroundColor: 'transparent',
   },
 });

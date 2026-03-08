@@ -1,5 +1,5 @@
-import React, { useMemo, useRef } from 'react';
-import { View, Text, StyleSheet, Platform, PanResponder } from 'react-native';
+import React, { useMemo } from 'react';
+import { View, Text, StyleSheet } from 'react-native';
 
 interface VideoProtectionOverlayProps {
   patientName: string;
@@ -16,56 +16,12 @@ function VideoProtectionOverlayInner({ patientName, children, height }: VideoPro
     return `${patientName} · ${yyyy}-${mm}-${dd}`;
   }, [patientName]);
 
-  const multiTouchActive = useRef(false);
-
-  const panResponder = useRef(
-    PanResponder.create({
-      onStartShouldSetPanResponder: (evt) => {
-        if (evt.nativeEvent.touches && evt.nativeEvent.touches.length > 1) {
-          multiTouchActive.current = true;
-          return true;
-        }
-        return false;
-      },
-      onStartShouldSetPanResponderCapture: (evt) => {
-        if (evt.nativeEvent.touches && evt.nativeEvent.touches.length > 1) {
-          multiTouchActive.current = true;
-          return true;
-        }
-        return false;
-      },
-      onMoveShouldSetPanResponder: (evt) => {
-        if (evt.nativeEvent.touches && evt.nativeEvent.touches.length > 1) {
-          multiTouchActive.current = true;
-          return true;
-        }
-        return false;
-      },
-      onMoveShouldSetPanResponderCapture: (evt) => {
-        if (evt.nativeEvent.touches && evt.nativeEvent.touches.length > 1) {
-          multiTouchActive.current = true;
-          return true;
-        }
-        return false;
-      },
-      onPanResponderGrant: () => {},
-      onPanResponderMove: () => {},
-      onPanResponderRelease: () => { multiTouchActive.current = false; },
-      onPanResponderTerminate: () => { multiTouchActive.current = false; },
-    })
-  ).current;
-
   return (
     <View style={[styles.wrapper, height ? { height } : undefined]}>
       {children}
-      <View
-        style={styles.touchInterceptor}
-        {...(Platform.OS !== 'web' ? panResponder.panHandlers : {})}
-      >
-        <View style={styles.watermarkContainer} pointerEvents="none">
-          <View style={styles.watermarkBox}>
-            <Text style={styles.watermarkText}>{watermarkText}</Text>
-          </View>
+      <View style={styles.watermarkContainer} pointerEvents="none">
+        <View style={styles.watermarkBox}>
+          <Text style={styles.watermarkText}>{watermarkText}</Text>
         </View>
       </View>
     </View>
@@ -80,20 +36,14 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
     borderRadius: 12,
   },
-  touchInterceptor: {
-    position: 'absolute' as const,
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    zIndex: 999,
-    borderRadius: 12,
-    ...(Platform.OS === 'web' ? {} : { elevation: 999 }),
-  },
   watermarkContainer: {
-    flex: 1,
-    justifyContent: 'flex-end' as const,
+    position: 'absolute' as const,
+    bottom: 0,
+    right: 0,
+    left: 0,
     alignItems: 'flex-end' as const,
+    justifyContent: 'flex-end' as const,
+    zIndex: 1000,
   },
   watermarkBox: {
     marginBottom: 10,

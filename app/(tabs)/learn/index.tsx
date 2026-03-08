@@ -10,8 +10,9 @@ import {
   Linking,
   Platform,
   TextInput,
-  FlatList,
+
   Animated,
+  useWindowDimensions,
 } from 'react-native';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useApp } from '@/contexts/AppContext';
@@ -40,10 +41,16 @@ import {
   Inbox,
   User,
   Building2,
+  LayoutList,
+  LayoutGrid,
+  ArrowDownUp,
+  Calendar,
 } from 'lucide-react-native';
 import { Image } from 'react-native';
 
 type TabType = 'foryou' | 'explore';
+type ViewMode = 'list' | 'grid';
+type SortMode = 'category' | 'newest' | 'oldest';
 
 const CATEGORY_CONFIG: Record<KnowledgeVideoCategory, { color: string; bgColor: string; icon: typeof GraduationCap }> = {
   educational: { color: '#2E86AB', bgColor: '#E8F4F8', icon: GraduationCap },
@@ -93,6 +100,16 @@ function getProviderOrg(video: KnowledgeVideo, language: Language | null): strin
   const isZh = language === 'zh_hant' || language === 'zh_hans';
   if (isZh) return video.provider_org_zh || video.provider_org_en || null;
   return video.provider_org_en || video.provider_org_zh || null;
+}
+
+function getVideoThumbnailUrl(video: KnowledgeVideo): string | null {
+  if (video.youtube_video_id) {
+    return `https://img.youtube.com/vi/${video.youtube_video_id}/mqdefault.jpg`;
+  }
+  if (video.vimeo_video_id) {
+    return `https://vumbnail.com/${video.vimeo_video_id}.jpg`;
+  }
+  return null;
 }
 
 function CreatorProviderLine({ video, language }: { video: KnowledgeVideo; language: Language | null }) {
@@ -165,6 +182,129 @@ function CreatorProviderDetail({ video, language }: { video: KnowledgeVideo; lan
           </View>
         </View>
       ) : null}
+    </View>
+  );
+}
+
+function ViewModeToggle({
+  viewMode,
+  onToggle,
+  sortMode,
+  onSortChange,
+  t,
+}: {
+  viewMode: ViewMode;
+  onToggle: (mode: ViewMode) => void;
+  sortMode: SortMode;
+  onSortChange: (mode: SortMode) => void;
+  t: (key: string) => string;
+}) {
+  const [showSortMenu, setShowSortMenu] = useState(false);
+
+  const handleSortPress = useCallback(() => {
+    setShowSortMenu((prev) => !prev);
+  }, []);
+
+  const handleSelectSort = useCallback((mode: SortMode) => {
+    onSortChange(mode);
+    setShowSortMenu(false);
+  }, [onSortChange]);
+
+  return (
+    <View style={styles.viewModeContainer}>
+      <View style={styles.viewModeToggle}>
+        <TouchableOpacity
+          style={[styles.viewModeBtn, viewMode === 'list' && styles.viewModeBtnActive]}
+          onPress={() => onToggle('list')}
+          activeOpacity={0.7}
+          testID="view-mode-list"
+        >
+          <LayoutList size={16} color={viewMode === 'list' ? Colors.primary : Colors.textSecondary} />
+          <ScaledText
+            size={12}
+            weight={viewMode === 'list' ? '600' : '500'}
+            color={viewMode === 'list' ? Colors.primary : Colors.textSecondary}
+          >
+            {t('listView')}
+          </ScaledText>
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={[styles.viewModeBtn, viewMode === 'grid' && styles.viewModeBtnActive]}
+          onPress={() => onToggle('grid')}
+          activeOpacity={0.7}
+          testID="view-mode-grid"
+        >
+          <LayoutGrid size={16} color={viewMode === 'grid' ? Colors.primary : Colors.textSecondary} />
+          <ScaledText
+            size={12}
+            weight={viewMode === 'grid' ? '600' : '500'}
+            color={viewMode === 'grid' ? Colors.primary : Colors.textSecondary}
+          >
+            {t('gridView')}
+          </ScaledText>
+        </TouchableOpacity>
+      </View>
+
+      <View style={styles.sortContainer}>
+        <TouchableOpacity
+          style={styles.sortButton}
+          onPress={handleSortPress}
+          activeOpacity={0.7}
+          testID="sort-button"
+        >
+          <ArrowDownUp size={14} color={Colors.textSecondary} />
+          <ScaledText size={12} weight="500" color={Colors.textSecondary}>
+            {sortMode === 'category' ? t('sortByCategory') : sortMode === 'newest' ? t('newestFirst') : t('oldestFirst')}
+          </ScaledText>
+        </TouchableOpacity>
+
+        {showSortMenu && (
+          <View style={styles.sortMenu}>
+            <TouchableOpacity
+              style={[styles.sortMenuItem, sortMode === 'category' && styles.sortMenuItemActive]}
+              onPress={() => handleSelectSort('category')}
+              activeOpacity={0.7}
+            >
+              <Tag size={14} color={sortMode === 'category' ? Colors.primary : Colors.textSecondary} />
+              <ScaledText
+                size={13}
+                weight={sortMode === 'category' ? '600' : '500'}
+                color={sortMode === 'category' ? Colors.primary : Colors.textPrimary}
+              >
+                {t('sortByCategory')}
+              </ScaledText>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.sortMenuItem, sortMode === 'newest' && styles.sortMenuItemActive]}
+              onPress={() => handleSelectSort('newest')}
+              activeOpacity={0.7}
+            >
+              <Calendar size={14} color={sortMode === 'newest' ? Colors.primary : Colors.textSecondary} />
+              <ScaledText
+                size={13}
+                weight={sortMode === 'newest' ? '600' : '500'}
+                color={sortMode === 'newest' ? Colors.primary : Colors.textPrimary}
+              >
+                {t('newestFirst')}
+              </ScaledText>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.sortMenuItem, sortMode === 'oldest' && styles.sortMenuItemActive]}
+              onPress={() => handleSelectSort('oldest')}
+              activeOpacity={0.7}
+            >
+              <Calendar size={14} color={sortMode === 'oldest' ? Colors.primary : Colors.textSecondary} />
+              <ScaledText
+                size={13}
+                weight={sortMode === 'oldest' ? '600' : '500'}
+                color={sortMode === 'oldest' ? Colors.primary : Colors.textPrimary}
+              >
+                {t('oldestFirst')}
+              </ScaledText>
+            </TouchableOpacity>
+          </View>
+        )}
+      </View>
     </View>
   );
 }
@@ -318,6 +458,105 @@ function AssignedVideoCard({
   );
 }
 
+function AssignedGridCard({
+  assignment,
+  language,
+  t,
+  onMarkViewed,
+}: {
+  assignment: KnowledgeVideoAssignment;
+  language: Language | null;
+  t: (key: string) => string;
+  onMarkViewed: (id: string) => void;
+}) {
+  const [expanded, setExpanded] = useState(false);
+  const video = assignment.knowledge_videos;
+  const isNew = !assignment.viewed_at;
+  const category = (video.category as KnowledgeVideoCategory) || 'other';
+  const config = CATEGORY_CONFIG[category] || CATEGORY_CONFIG.other;
+  const title = getVideoTitle(video, language);
+  const thumbnailUrl = getVideoThumbnailUrl(video);
+
+  const handlePress = useCallback(() => {
+    setExpanded((prev) => !prev);
+    if (!expanded && isNew) {
+      onMarkViewed(assignment.id);
+    }
+  }, [expanded, isNew, assignment.id, onMarkViewed]);
+
+  const handleOpenYouTube = useCallback(() => {
+    if (video.youtube_video_id) {
+      const url = `https://www.youtube.com/watch?v=${video.youtube_video_id}`;
+      Linking.openURL(url).catch((err) => log('[Learn] Failed to open YouTube:', err));
+      if (isNew) onMarkViewed(assignment.id);
+    }
+  }, [video.youtube_video_id, isNew, assignment.id, onMarkViewed]);
+
+  return (
+    <View style={styles.gridCard}>
+      <TouchableOpacity onPress={handlePress} activeOpacity={0.8} testID={`grid-video-${assignment.id}`}>
+        <View style={styles.gridThumbnailWrap}>
+          {thumbnailUrl ? (
+            <Image source={{ uri: thumbnailUrl }} style={styles.gridThumbnail} resizeMode="cover" />
+          ) : (
+            <View style={styles.gridThumbnailPlaceholder}>
+              <Play size={24} color="#999" />
+            </View>
+          )}
+          <View style={styles.gridPlayOverlay}>
+            <View style={styles.gridPlayBtn}>
+              <Play size={20} color="#fff" fill="#fff" />
+            </View>
+          </View>
+          {isNew && (
+            <View style={styles.gridNewBadge}>
+              <ScaledText size={9} weight="700" color="#fff">{t('newBadge')}</ScaledText>
+            </View>
+          )}
+          <View style={[styles.gridCategoryStrip, { backgroundColor: config.color }]} />
+        </View>
+        <View style={styles.gridCardInfo}>
+          <ScaledText size={13} weight="600" color={Colors.textPrimary} numberOfLines={2}>
+            {title}
+          </ScaledText>
+          <CreatorProviderLine video={video} language={language} />
+        </View>
+      </TouchableOpacity>
+
+      {expanded && (
+        <View style={styles.gridCardExpanded}>
+          {video.vimeo_video_id ? (
+            <View style={styles.playerContainer}>
+              <VimeoPlayer videoId={video.vimeo_video_id} height={180} />
+            </View>
+          ) : video.youtube_video_id ? (
+            Platform.OS === 'web' ? (
+              <View style={styles.playerContainer}>
+                <YouTubePlayer videoId={video.youtube_video_id} height={180} />
+              </View>
+            ) : (
+              <TouchableOpacity onPress={handleOpenYouTube} activeOpacity={0.9}>
+                <View style={styles.gridExpandedThumbnail}>
+                  <Image
+                    source={{ uri: `https://img.youtube.com/vi/${video.youtube_video_id}/hqdefault.jpg` }}
+                    style={styles.gridExpandedThumbImg}
+                    resizeMode="cover"
+                  />
+                  <View style={styles.thumbnailOverlay}>
+                    <View style={styles.thumbnailPlayButton}>
+                      <Play size={24} color="#fff" fill="#fff" />
+                    </View>
+                  </View>
+                </View>
+              </TouchableOpacity>
+            )
+          ) : null}
+        </View>
+      )}
+    </View>
+  );
+}
+
 function ExploreVideoCard({
   video,
   language,
@@ -440,8 +679,96 @@ function ExploreVideoCard({
   );
 }
 
+function ExploreGridCard({
+  video,
+  language,
+  t: _t,
+}: {
+  video: KnowledgeVideo;
+  language: Language | null;
+  t: (key: string) => string;
+}) {
+  const [expanded, setExpanded] = useState(false);
+  const category = (video.category as KnowledgeVideoCategory) || 'other';
+  const config = CATEGORY_CONFIG[category] || CATEGORY_CONFIG.other;
+  const title = getVideoTitle(video, language);
+  const thumbnailUrl = getVideoThumbnailUrl(video);
+
+  const handlePress = useCallback(() => {
+    setExpanded((prev) => !prev);
+  }, []);
+
+  const handleOpenYouTube = useCallback(() => {
+    if (video.youtube_video_id) {
+      const url = `https://www.youtube.com/watch?v=${video.youtube_video_id}`;
+      Linking.openURL(url).catch((err) => log('[Learn] Failed to open YouTube:', err));
+    }
+  }, [video.youtube_video_id]);
+
+  return (
+    <View style={styles.gridCard}>
+      <TouchableOpacity onPress={handlePress} activeOpacity={0.8} testID={`grid-explore-${video.id}`}>
+        <View style={styles.gridThumbnailWrap}>
+          {thumbnailUrl ? (
+            <Image source={{ uri: thumbnailUrl }} style={styles.gridThumbnail} resizeMode="cover" />
+          ) : (
+            <View style={styles.gridThumbnailPlaceholder}>
+              <Play size={24} color="#999" />
+            </View>
+          )}
+          <View style={styles.gridPlayOverlay}>
+            <View style={styles.gridPlayBtn}>
+              <Play size={20} color="#fff" fill="#fff" />
+            </View>
+          </View>
+          <View style={[styles.gridCategoryStrip, { backgroundColor: config.color }]} />
+        </View>
+        <View style={styles.gridCardInfo}>
+          <ScaledText size={13} weight="600" color={Colors.textPrimary} numberOfLines={2}>
+            {title}
+          </ScaledText>
+          <CreatorProviderLine video={video} language={language} />
+        </View>
+      </TouchableOpacity>
+
+      {expanded && (
+        <View style={styles.gridCardExpanded}>
+          {video.vimeo_video_id ? (
+            <View style={styles.playerContainer}>
+              <VimeoPlayer videoId={video.vimeo_video_id} height={180} />
+            </View>
+          ) : video.youtube_video_id ? (
+            Platform.OS === 'web' ? (
+              <View style={styles.playerContainer}>
+                <YouTubePlayer videoId={video.youtube_video_id} height={180} />
+              </View>
+            ) : (
+              <TouchableOpacity onPress={handleOpenYouTube} activeOpacity={0.9}>
+                <View style={styles.gridExpandedThumbnail}>
+                  <Image
+                    source={{ uri: `https://img.youtube.com/vi/${video.youtube_video_id}/hqdefault.jpg` }}
+                    style={styles.gridExpandedThumbImg}
+                    resizeMode="cover"
+                  />
+                  <View style={styles.thumbnailOverlay}>
+                    <View style={styles.thumbnailPlayButton}>
+                      <Play size={24} color="#fff" fill="#fff" />
+                    </View>
+                  </View>
+                </View>
+              </TouchableOpacity>
+            )
+          ) : null}
+        </View>
+      )}
+    </View>
+  );
+}
+
 const MemoizedAssignedVideoCard = React.memo(AssignedVideoCard);
+const MemoizedAssignedGridCard = React.memo(AssignedGridCard);
 const MemoizedExploreVideoCard = React.memo(ExploreVideoCard);
+const MemoizedExploreGridCard = React.memo(ExploreGridCard);
 
 function ForYouTab({
   patientId,
@@ -456,6 +783,10 @@ function ForYouTab({
 }) {
   const queryClient = useQueryClient();
   const [refreshing, setRefreshing] = useState(false);
+  const [viewMode, setViewMode] = useState<ViewMode>('list');
+  const [sortMode, setSortMode] = useState<SortMode>('category');
+  const { width: screenWidth } = useWindowDimensions();
+  const numColumns = screenWidth >= 768 ? 3 : 2;
 
   const videosQuery = useQuery({
     queryKey: ['knowledge_videos', patientId, today],
@@ -512,9 +843,27 @@ function ForYouTab({
 
   const videos = useMemo(() => videosQuery.data || [], [videosQuery.data]);
 
+  const sortedVideos = useMemo(() => {
+    if (sortMode === 'newest') {
+      return [...videos].sort((a, b) => {
+        const dateA = a.knowledge_videos?.created_at || '';
+        const dateB = b.knowledge_videos?.created_at || '';
+        return dateB.localeCompare(dateA);
+      });
+    }
+    if (sortMode === 'oldest') {
+      return [...videos].sort((a, b) => {
+        const dateA = a.knowledge_videos?.created_at || '';
+        const dateB = b.knowledge_videos?.created_at || '';
+        return dateA.localeCompare(dateB);
+      });
+    }
+    return videos;
+  }, [videos, sortMode]);
+
   const groupedVideos = useMemo(() => {
     const groups: Record<string, KnowledgeVideoAssignment[]> = {};
-    for (const v of videos) {
+    for (const v of sortedVideos) {
       const cat = v.knowledge_videos?.category || 'other';
       if (!groups[cat]) groups[cat] = [];
       groups[cat].push(v);
@@ -523,7 +872,7 @@ function ForYouTab({
     return order
       .filter((cat) => groups[cat] && groups[cat].length > 0)
       .map((cat) => ({ category: cat, items: groups[cat] }));
-  }, [videos]);
+  }, [sortedVideos]);
 
   if (videosQuery.isLoading) {
     return (
@@ -553,28 +902,66 @@ function ForYouTab({
   }
 
   return (
-    <ScrollView
-      style={styles.scrollView}
-      contentContainerStyle={styles.scrollContent}
-      showsVerticalScrollIndicator={false}
-      refreshControl={
-        <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={Colors.primary} />
-      }
-    >
-      {groupedVideos.map((group) => {
-        const catConfig = CATEGORY_CONFIG[group.category] || CATEGORY_CONFIG.other;
-        return (
-          <View key={group.category} style={styles.sectionContainer}>
-            <View style={styles.sectionHeader}>
-              <View style={[styles.sectionDot, { backgroundColor: catConfig.color }]} />
-              <ScaledText size={14} weight="600" color={catConfig.color}>
-                {getCategoryLabel(group.category, t)}
-              </ScaledText>
-              <ScaledText size={12} color={Colors.textSecondary} style={styles.sectionCount}>
-                {group.items.length}
-              </ScaledText>
-            </View>
-            {group.items.map((assignment) => (
+    <View style={{ flex: 1 }}>
+      <ViewModeToggle
+        viewMode={viewMode}
+        onToggle={setViewMode}
+        sortMode={sortMode}
+        onSortChange={setSortMode}
+        t={t}
+      />
+      <ScrollView
+        style={styles.scrollView}
+        contentContainerStyle={styles.scrollContent}
+        showsVerticalScrollIndicator={false}
+        refreshControl={
+          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={Colors.primary} />
+        }
+      >
+        {sortMode === 'category' ? (
+          groupedVideos.map((group) => {
+            const catConfig = CATEGORY_CONFIG[group.category] || CATEGORY_CONFIG.other;
+            return (
+              <View key={group.category} style={styles.sectionContainer}>
+                <View style={styles.sectionHeader}>
+                  <View style={[styles.sectionDot, { backgroundColor: catConfig.color }]} />
+                  <ScaledText size={14} weight="600" color={catConfig.color}>
+                    {getCategoryLabel(group.category, t)}
+                  </ScaledText>
+                  <ScaledText size={12} color={Colors.textSecondary} style={styles.sectionCount}>
+                    {group.items.length}
+                  </ScaledText>
+                </View>
+                {viewMode === 'list' ? (
+                  group.items.map((assignment) => (
+                    <MemoizedAssignedVideoCard
+                      key={assignment.id}
+                      assignment={assignment}
+                      language={language}
+                      t={t}
+                      onMarkViewed={handleMarkViewed}
+                    />
+                  ))
+                ) : (
+                  <View style={styles.gridRow}>
+                    {group.items.map((assignment) => (
+                      <View key={assignment.id} style={[styles.gridItemWrap, { width: `${100 / numColumns}%` as unknown as number }]}>
+                        <MemoizedAssignedGridCard
+                          assignment={assignment}
+                          language={language}
+                          t={t}
+                          onMarkViewed={handleMarkViewed}
+                        />
+                      </View>
+                    ))}
+                  </View>
+                )}
+              </View>
+            );
+          })
+        ) : (
+          viewMode === 'list' ? (
+            sortedVideos.map((assignment) => (
               <MemoizedAssignedVideoCard
                 key={assignment.id}
                 assignment={assignment}
@@ -582,12 +969,25 @@ function ForYouTab({
                 t={t}
                 onMarkViewed={handleMarkViewed}
               />
-            ))}
-          </View>
-        );
-      })}
-      <CopyrightFooter />
-    </ScrollView>
+            ))
+          ) : (
+            <View style={styles.gridRow}>
+              {sortedVideos.map((assignment) => (
+                <View key={assignment.id} style={[styles.gridItemWrap, { width: `${100 / numColumns}%` as unknown as number }]}>
+                  <MemoizedAssignedGridCard
+                    assignment={assignment}
+                    language={language}
+                    t={t}
+                    onMarkViewed={handleMarkViewed}
+                  />
+                </View>
+              ))}
+            </View>
+          )
+        )}
+        <CopyrightFooter />
+      </ScrollView>
+    </View>
   );
 }
 
@@ -602,6 +1002,10 @@ function ExploreTab({
   const [refreshing, setRefreshing] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [categoryFilter, setCategoryFilter] = useState('all');
+  const [viewMode, setViewMode] = useState<ViewMode>('list');
+  const [sortMode, setSortMode] = useState<SortMode>('category');
+  const { width: screenWidth } = useWindowDimensions();
+  const numColumns = screenWidth >= 768 ? 3 : 2;
 
   const allVideosQuery = useQuery({
     queryKey: ['knowledge_videos_all'],
@@ -633,7 +1037,7 @@ function ExploreTab({
   const allVideos = useMemo(() => allVideosQuery.data || [], [allVideosQuery.data]);
 
   const filteredVideos = useMemo(() => {
-    return allVideos.filter((v) => {
+    let result = allVideos.filter((v) => {
       const matchCat = categoryFilter === 'all' || v.category === categoryFilter;
       if (!searchQuery.trim()) return matchCat;
       const q = searchQuery.toLowerCase();
@@ -645,19 +1049,21 @@ function ExploreTab({
         (v.tags || []).some((tag) => tag.toLowerCase().includes(q));
       return matchCat && matchText;
     });
-  }, [allVideos, searchQuery, categoryFilter]);
+
+    if (sortMode === 'newest') {
+      result = [...result].sort((a, b) => (b.created_at || '').localeCompare(a.created_at || ''));
+    } else if (sortMode === 'oldest') {
+      result = [...result].sort((a, b) => (a.created_at || '').localeCompare(b.created_at || ''));
+    }
+
+    return result;
+  }, [allVideos, searchQuery, categoryFilter, sortMode]);
 
   const isZh = language === 'zh_hant' || language === 'zh_hans';
 
   const handleClearSearch = useCallback(() => {
     setSearchQuery('');
   }, []);
-
-  const renderVideoItem = useCallback(({ item }: { item: KnowledgeVideo }) => (
-    <MemoizedExploreVideoCard video={item} language={language} t={t} />
-  ), [language, t]);
-
-  const keyExtractor = useCallback((item: KnowledgeVideo) => item.id, []);
 
   if (allVideosQuery.isLoading) {
     return (
@@ -726,6 +1132,14 @@ function ExploreTab({
         </ScrollView>
       </View>
 
+      <ViewModeToggle
+        viewMode={viewMode}
+        onToggle={setViewMode}
+        sortMode={sortMode}
+        onSortChange={setSortMode}
+        t={t}
+      />
+
       {filteredVideos.length === 0 ? (
         <View style={styles.center}>
           <View style={styles.emptyIconCircle}>
@@ -739,17 +1153,29 @@ function ExploreTab({
           </ScaledText>
         </View>
       ) : (
-        <FlatList
-          data={filteredVideos}
-          keyExtractor={keyExtractor}
-          renderItem={renderVideoItem}
-          contentContainerStyle={styles.flatListContent}
+        <ScrollView
+          style={styles.scrollView}
+          contentContainerStyle={styles.scrollContent}
           showsVerticalScrollIndicator={false}
           refreshControl={
             <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={Colors.primary} />
           }
-          ListFooterComponent={<CopyrightFooter />}
-        />
+        >
+          {viewMode === 'list' ? (
+            filteredVideos.map((video) => (
+              <MemoizedExploreVideoCard key={video.id} video={video} language={language} t={t} />
+            ))
+          ) : (
+            <View style={styles.gridRow}>
+              {filteredVideos.map((video) => (
+                <View key={video.id} style={[styles.gridItemWrap, { width: `${100 / numColumns}%` as unknown as number }]}>
+                  <MemoizedExploreGridCard video={video} language={language} t={t} />
+                </View>
+              ))}
+            </View>
+          )}
+          <CopyrightFooter />
+        </ScrollView>
       )}
     </View>
   );
@@ -956,11 +1382,11 @@ const styles = StyleSheet.create({
     marginBottom: 16,
   },
   emptyText: {
-    textAlign: 'center',
+    textAlign: 'center' as const,
   },
   emptySubtext: {
     marginTop: 6,
-    textAlign: 'center',
+    textAlign: 'center' as const,
   },
   sectionContainer: {
     marginBottom: 20,
@@ -1201,5 +1627,159 @@ const styles = StyleSheet.create({
   flatListContent: {
     paddingHorizontal: 16,
     paddingBottom: 32,
+  },
+  viewModeContainer: {
+    flexDirection: 'row' as const,
+    alignItems: 'center' as const,
+    justifyContent: 'space-between' as const,
+    paddingHorizontal: 16,
+    paddingVertical: 6,
+  },
+  viewModeToggle: {
+    flexDirection: 'row' as const,
+    backgroundColor: Colors.card,
+    borderRadius: 10,
+    padding: 3,
+    borderWidth: 1,
+    borderColor: Colors.border,
+  },
+  viewModeBtn: {
+    flexDirection: 'row' as const,
+    alignItems: 'center' as const,
+    gap: 4,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 8,
+  },
+  viewModeBtnActive: {
+    backgroundColor: Colors.primaryLight,
+  },
+  sortContainer: {
+    position: 'relative' as const,
+    zIndex: 10,
+  },
+  sortButton: {
+    flexDirection: 'row' as const,
+    alignItems: 'center' as const,
+    gap: 5,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 8,
+    backgroundColor: Colors.card,
+    borderWidth: 1,
+    borderColor: Colors.border,
+  },
+  sortMenu: {
+    position: 'absolute' as const,
+    top: 36,
+    right: 0,
+    backgroundColor: Colors.card,
+    borderRadius: 12,
+    padding: 4,
+    minWidth: 160,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.15,
+    shadowRadius: 12,
+    elevation: 8,
+    borderWidth: 1,
+    borderColor: Colors.border,
+    zIndex: 100,
+  },
+  sortMenuItem: {
+    flexDirection: 'row' as const,
+    alignItems: 'center' as const,
+    gap: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    borderRadius: 8,
+  },
+  sortMenuItemActive: {
+    backgroundColor: Colors.primaryLight,
+  },
+  gridRow: {
+    flexDirection: 'row' as const,
+    flexWrap: 'wrap' as const,
+    marginHorizontal: -4,
+  },
+  gridItemWrap: {
+    paddingHorizontal: 4,
+    marginBottom: 10,
+  },
+  gridCard: {
+    backgroundColor: Colors.card,
+    borderRadius: 12,
+    overflow: 'hidden',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.06,
+    shadowRadius: 4,
+    elevation: 2,
+  },
+  gridThumbnailWrap: {
+    position: 'relative' as const,
+    aspectRatio: 16 / 9,
+    backgroundColor: '#1a1a2e',
+  },
+  gridThumbnail: {
+    width: '100%' as unknown as number,
+    height: '100%' as unknown as number,
+  },
+  gridThumbnailPlaceholder: {
+    flex: 1,
+    justifyContent: 'center' as const,
+    alignItems: 'center' as const,
+    backgroundColor: '#1a1a2e',
+  },
+  gridPlayOverlay: {
+    position: 'absolute' as const,
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    justifyContent: 'center' as const,
+    alignItems: 'center' as const,
+  },
+  gridPlayBtn: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: 'rgba(0,0,0,0.55)',
+    justifyContent: 'center' as const,
+    alignItems: 'center' as const,
+  },
+  gridNewBadge: {
+    position: 'absolute' as const,
+    top: 6,
+    right: 6,
+    backgroundColor: '#E74C3C',
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 6,
+  },
+  gridCategoryStrip: {
+    position: 'absolute' as const,
+    bottom: 0,
+    left: 0,
+    right: 0,
+    height: 3,
+  },
+  gridCardInfo: {
+    padding: 10,
+    gap: 2,
+  },
+  gridCardExpanded: {
+    paddingHorizontal: 8,
+    paddingBottom: 8,
+  },
+  gridExpandedThumbnail: {
+    position: 'relative' as const,
+    borderRadius: 8,
+    overflow: 'hidden',
+  },
+  gridExpandedThumbImg: {
+    width: '100%' as unknown as number,
+    height: 140,
+    backgroundColor: '#000',
   },
 });

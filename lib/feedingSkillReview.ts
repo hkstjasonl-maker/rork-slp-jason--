@@ -99,7 +99,7 @@ function getFileExtension(contentType: string): string {
 export async function uploadAndSubmitFeedingVideo(
   videoUri: string,
   patientId: string,
-  requirementId: string,
+  requirementId: string | null,
   feedingSkillVideoId: string,
   videoTitleEn: string
 ): Promise<boolean> {
@@ -159,17 +159,21 @@ export async function uploadAndSubmitFeedingVideo(
     const videoUrl = urlData?.publicUrl || filePath;
     log('[FeedingReview] Video URL:', videoUrl);
 
+    const insertPayload: Record<string, unknown> = {
+      patient_id: patientId,
+      feeding_skill_video_id: feedingSkillVideoId,
+      video_title_en: videoTitleEn,
+      video_url: videoUrl,
+      submission_date: today,
+      review_status: 'pending',
+    };
+    if (requirementId) {
+      insertPayload.requirement_id = requirementId;
+    }
+
     const { error: insertError } = await supabase
       .from('feeding_skill_video_submissions')
-      .insert({
-        requirement_id: requirementId,
-        patient_id: patientId,
-        feeding_skill_video_id: feedingSkillVideoId,
-        video_title_en: videoTitleEn,
-        video_url: videoUrl,
-        submission_date: today,
-        review_status: 'pending',
-      });
+      .insert(insertPayload);
 
     if (insertError) {
       log('[FeedingReview] Insert error:', JSON.stringify(insertError));

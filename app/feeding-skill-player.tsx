@@ -287,14 +287,17 @@ export default function FeedingSkillPlayerScreen() {
   const isInMirror = mediaMode !== 'video';
 
   const canSubmitVideo = useMemo(() => {
-    if (!reviewRequirement) return false;
+    if (!reviewRequirement) return true;
     if (!isTodayAllowed(reviewRequirement.allowed_days)) return false;
     if (todaySubmissionCount >= reviewRequirement.max_submissions) return false;
     return true;
   }, [reviewRequirement, todaySubmissionCount]);
 
   const submissionStatusText = useMemo(() => {
-    if (!reviewRequirement) return null;
+    if (!reviewRequirement) {
+      if (todaySubmissionCount > 0) return t('feedingSkillSubmittedToday');
+      return t('feedingSkillVideoRequired');
+    }
     if (todaySubmissionCount > 0 && todaySubmissionCount >= reviewRequirement.max_submissions) {
       return t('feedingSkillMaxSubmissions');
     }
@@ -483,13 +486,13 @@ export default function FeedingSkillPlayerScreen() {
   }, [activeRecordingRef]);
 
   const handleSubmitVideo = useCallback(async () => {
-    if (!lastRecordedUri || !patientId || !reviewRequirement || !video) return;
+    if (!lastRecordedUri || !patientId || !video) return;
     setIsSubmitting(true);
     try {
       const success = await uploadAndSubmitFeedingVideo(
         lastRecordedUri,
         patientId,
-        reviewRequirement.id,
+        reviewRequirement?.id ?? null,
         assignment!.feeding_skill_video_id,
         video.title_en
       );
@@ -513,6 +516,10 @@ export default function FeedingSkillPlayerScreen() {
       setIsSubmitting(false);
     }
   }, [lastRecordedUri, patientId, reviewRequirement, video, assignment, t, queryClient]);
+
+  const showSubmitButton = useMemo(() => {
+    return lastRecordedUri && canSubmitVideo && !submissionSuccess;
+  }, [lastRecordedUri, canSubmitVideo, submissionSuccess]);
 
   if (assignmentQuery.isLoading) {
     return (
@@ -694,7 +701,7 @@ export default function FeedingSkillPlayerScreen() {
             </View>
           )}
 
-          {isInMirror && !isRecording && reviewRequirement && canSubmitVideo && lastRecordedUri && !submissionSuccess && (
+          {isInMirror && !isRecording && showSubmitButton && (
             <View style={styles.mirrorSubmitContainer}>
               <TouchableOpacity
                 style={styles.mirrorSubmitButton}
@@ -824,7 +831,7 @@ export default function FeedingSkillPlayerScreen() {
                   </ScaledText>
                 </TouchableOpacity>
 
-                {reviewRequirement && canSubmitVideo && lastRecordedUri && !submissionSuccess && (
+                {showSubmitButton && (
                   <TouchableOpacity
                     style={styles.submitReviewButton}
                     onPress={handleSubmitVideo}

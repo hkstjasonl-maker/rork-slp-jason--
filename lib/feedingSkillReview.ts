@@ -1,7 +1,7 @@
+import { Platform } from 'react-native';
 import { supabase } from '@/lib/supabase';
 import { log } from '@/lib/logger';
 import { FeedingSkillReviewRequirement } from '@/types';
-import { File as ExpoFile } from 'expo-file-system';
 
 const DAY_NAMES = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'];
 
@@ -110,42 +110,38 @@ export async function uploadAndSubmitFeedingVideo(
 
     log('[FeedingReview] Starting upload — URI:', videoUri, 'patient:', patientId, 'videoId:', feedingSkillVideoId, 'requirementId:', requirementId);
 
-    let fileBytes: Uint8Array;
+    const contentType = detectContentType(videoUri);
+    const extension = getFileExtension(contentType);
+    const filePath = `feeding/${patientId}/${today}-${sanitizedTitle}-${timestamp}.${extension}`;
+
+    let uploadData: Blob | ArrayBuffer;
     try {
-      const file = new ExpoFile(videoUri);
-      if (!file.exists) {
-        log('[FeedingReview] Video file does not exist at URI:', videoUri);
+      const normalizedUri = Platform.OS === 'ios' && !videoUri.startsWith('file://') 
+        ? `file://${videoUri}` 
+        : videoUri;
+      log('[FeedingReview] Fetching file as blob from:', normalizedUri);
+      const response = await fetch(normalizedUri);
+      if (!response.ok) {
+        log('[FeedingReview] Fetch failed with status:', response.status);
         return false;
       }
-      log('[FeedingReview] File exists, size:', file.size);
-
-      if (file.size === 0) {
-        log('[FeedingReview] Video file is empty (0 bytes), aborting upload');
+      const blob = await response.blob();
+      log('[FeedingReview] Blob size:', blob.size, 'type:', blob.type);
+      if (blob.size === 0) {
+        log('[FeedingReview] Video blob is empty (0 bytes), aborting upload');
         return false;
       }
-
-      fileBytes = await file.bytes();
+      uploadData = blob;
     } catch (fileError) {
       log('[FeedingReview] File read error:', fileError);
       return false;
     }
 
-    if (!fileBytes || fileBytes.length === 0) {
-      log('[FeedingReview] Failed to read video file bytes');
-      return false;
-    }
-
-    log('[FeedingReview] Read bytes length:', fileBytes.length);
-
-    const contentType = detectContentType(videoUri);
-    const extension = getFileExtension(contentType);
-    const filePath = `feeding/${patientId}/${today}-${sanitizedTitle}-${timestamp}.${extension}`;
-
-    log('[FeedingReview] Uploading to storage path:', filePath, 'contentType:', contentType, 'size:', fileBytes.length);
+    log('[FeedingReview] Uploading to storage path:', filePath, 'contentType:', contentType);
 
     const { error: uploadError } = await supabase.storage
       .from('review-videos')
-      .upload(filePath, fileBytes, {
+      .upload(filePath, uploadData, {
         contentType,
         cacheControl: '3600',
         upsert: true,

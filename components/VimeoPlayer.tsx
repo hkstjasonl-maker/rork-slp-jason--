@@ -1,6 +1,5 @@
-import React, { useState, useEffect, useRef } from 'react';
-import { View, StyleSheet, Platform, ActivityIndicator, PanResponder, GestureResponderEvent } from 'react-native';
-import { Video, ResizeMode } from 'expo-av';
+import React, { useState, useEffect } from 'react';
+import { View, StyleSheet, Platform, ActivityIndicator } from 'react-native';
 import { VideoOff } from 'lucide-react-native';
 import { ScaledText } from '@/components/ScaledText';
 import Colors from '@/constants/colors';
@@ -13,89 +12,16 @@ interface VimeoPlayerProps {
   lowQuality?: boolean;
 }
 
-async function getVimeoHlsUrl(vimeoId: string): Promise<string | null> {
-  try {
-    const response = await fetch(`https://player.vimeo.com/video/${vimeoId}/config`);
-    const config = await response.json();
-
-    const progressive = config?.request?.files?.progressive || [];
-    if (progressive.length > 0) {
-      const sorted = progressive
-        .filter((f: { type?: string }) => !f.type || f.type === 'video/mp4')
-        .sort((a: { height: number }, b: { height: number }) => b.height - a.height);
-      const preferred = sorted.find((f: { height: number }) => f.height <= 720) || sorted[0];
-      if (preferred?.url) {
-        log('[VimeoPlayer] Using progressive URL, height:', preferred.height);
-        return preferred.url;
-      }
-    }
-
-    const hlsCdns = config?.request?.files?.hls?.cdns || {};
-    const cdnKeys = Object.keys(hlsCdns);
-    if (cdnKeys.length > 0) {
-      const firstCdn = hlsCdns[cdnKeys[0]];
-      const hlsUrl = firstCdn?.url || firstCdn?.avc_url;
-      if (hlsUrl) {
-        log('[VimeoPlayer] Using HLS URL');
-        return hlsUrl;
-      }
-    }
-
-    log('[VimeoPlayer] No playback URL found in config');
-    return null;
-  } catch (error) {
-    log('[VimeoPlayer] Config fetch error:', error);
-    return null;
-  }
-}
-
 function VimeoPlayerInner({ videoId, height, onEnd, lowQuality }: VimeoPlayerProps) {
-  const [videoUrl, setVideoUrl] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(false);
-
-  const pinchBlocker = useRef(
-    PanResponder.create({
-      onStartShouldSetPanResponderCapture: (e: GestureResponderEvent) => {
-        return e.nativeEvent.touches.length >= 2;
-      },
-      onMoveShouldSetPanResponderCapture: (e: GestureResponderEvent) => {
-        return e.nativeEvent.touches.length >= 2;
-      },
-      onPanResponderGrant: () => {},
-      onPanResponderMove: () => {},
-      onPanResponderRelease: () => {},
-    })
-  ).current;
 
   useEffect(() => {
     if (!videoId || videoId.trim() === '') {
       setLoading(false);
-      setError(true);
       return;
     }
-
-    let cancelled = false;
-    setLoading(true);
-    setError(false);
-    setVideoUrl(null);
-
-    log('[VimeoPlayer] Fetching config for videoId:', videoId);
-    void getVimeoHlsUrl(videoId).then((url) => {
-      if (cancelled) return;
-      log('[VimeoPlayer] Resolved URL:', url ? 'found' : 'null');
-      if (url) {
-        setVideoUrl(url);
-      } else {
-        log('[VimeoPlayer] No direct URL, will fall back to WebView embed');
-        setError(true);
-      }
-      setLoading(false);
-    });
-
-    return () => {
-      cancelled = true;
-    };
+    const timer = setTimeout(() => setLoading(false), 300);
+    return () => clearTimeout(timer);
   }, [videoId]);
 
   if (!videoId || videoId.trim() === '') {
@@ -119,9 +45,10 @@ function VimeoPlayerInner({ videoId, height, onEnd, lowQuality }: VimeoPlayerPro
     );
   }
 
+  const quality = lowQuality ? '360p' : '720p';
+  const embedUrl = `https://player.vimeo.com/video/${videoId}?autoplay=0&quality=${quality}&dnt=1&fullscreen=0`;
+
   if (Platform.OS === 'web') {
-    const quality = lowQuality ? '360p' : '720p';
-    const embedUrl = `https://player.vimeo.com/video/${videoId}?autoplay=0&quality=${quality}`;
     return (
       <View style={[styles.container, { height }]}>
         {/* @ts-ignore - iframe is valid on web */}
@@ -139,52 +66,49 @@ function VimeoPlayerInner({ videoId, height, onEnd, lowQuality }: VimeoPlayerPro
     );
   }
 
-  if (videoUrl) {
-    return (
-      <View style={[styles.container, { height }]} {...pinchBlocker.panHandlers}>
-        <Video
-          source={{ uri: videoUrl }}
-          style={styles.video}
-          resizeMode={ResizeMode.CONTAIN}
-          useNativeControls={true}
-          shouldPlay={false}
-          isMuted={false}
-          onPlaybackStatusUpdate={(status) => {
-            if ('didJustFinish' in status && status.didJustFinish && onEnd) {
-              onEnd();
-            }
-          }}
-        />
-      </View>
-    );
-  }
+  const WebView = require('react-native-webview').WebView;
 
-  if (error) {
-    const quality = lowQuality ? '360p' : '720p';
-    const embedUrl = `https://player.vimeo.com/video/${videoId}?autoplay=0&quality=${quality}`;
-    const WebView = require('react-native-webview').WebView;
-    return (
-      <View style={[styles.container, { height }]}>
-        <WebView
-          source={{ uri: embedUrl }}
-          allowsInlineMediaPlayback={true}
-          allowsFullscreenVideo={false}
-          mediaPlaybackRequiresUserAction={false}
-          style={styles.video}
-          javaScriptEnabled={true}
-          scrollEnabled={false}
-          bounces={false}
-        />
-      </View>
-    );
-  }
+  const html = `<!DOCTYPE html>
+<html><head>
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<style>
+*{margin:0;padding:0;box-sizing:border-box;}
+html,body{width:100%;height:100%;background:#000;overflow:hidden;touch-action:manipulation;}
+iframe{width:100%;height:100%;border:none;}
+</style>
+</head><body>
+<iframe src="${embedUrl}" allow="autoplay; encrypted-media; picture-in-picture"></iframe>
+<script>
+document.addEventListener('touchstart',function(e){if(e.touches.length>1){e.preventDefault();}},{passive:false});
+document.addEventListener('gesturestart',function(e){e.preventDefault();},{passive:false});
+</script>
+</body></html>`;
+
+  const handleMessage = (event: { nativeEvent: { data: string } }) => {
+    try {
+      const data = JSON.parse(event.nativeEvent.data);
+      if (data.type === 'videoEnded' && onEnd) {
+        onEnd();
+      }
+    } catch (e) {
+      log('[VimeoPlayer] Message parse error:', e);
+    }
+  };
 
   return (
     <View style={[styles.container, { height }]}>
-      <View style={styles.unavailable}>
-        <VideoOff size={32} color="#666" />
-        <ScaledText size={14} color="#999" style={styles.unavailableLabel}>{String('Video unavailable')}</ScaledText>
-      </View>
+      <WebView
+        source={{ html }}
+        style={styles.video}
+        allowsInlineMediaPlayback={true}
+        allowsFullscreenVideo={false}
+        mediaPlaybackRequiresUserAction={false}
+        javaScriptEnabled={true}
+        scrollEnabled={false}
+        bounces={false}
+        onMessage={handleMessage}
+        scalesPageToFit={false}
+      />
     </View>
   );
 }
@@ -199,6 +123,7 @@ const styles = StyleSheet.create({
   },
   video: {
     flex: 1,
+    backgroundColor: '#000',
   },
   unavailable: {
     flex: 1,
@@ -209,5 +134,4 @@ const styles = StyleSheet.create({
   unavailableLabel: {
     marginTop: 8,
   },
-
 });

@@ -129,15 +129,14 @@ function SplitVideoLayerInner({ vimeoId, youtubeId }: { vimeoId: string | null; 
           <iframe
             src={embedUrl}
             style={{ width: '100%', height: '100%', border: 'none' }}
-            allow="autoplay; fullscreen; picture-in-picture; encrypted-media"
-            allowFullScreen
+            allow="autoplay; picture-in-picture; encrypted-media"
           />
         </View>
       );
     }
 
     const WebView = require('react-native-webview').WebView;
-    const videoHtml = `<!DOCTYPE html><html><head><meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1"><style>*{margin:0;padding:0;}body{background:#000;display:flex;align-items:center;justify-content:center;height:100vh;overflow:hidden;}iframe{width:100%;height:100%;border:none;}</style></head><body><iframe src="https://player.vimeo.com/video/${vimeoId}?autoplay=0&quality=240p&dnt=1&transparent=0" allow="autoplay; fullscreen" allowfullscreen></iframe></body></html>`;
+    const videoHtml = `<!DOCTYPE html><html><head><meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no"><style>*{margin:0;padding:0;}html,body{background:#000;display:flex;align-items:center;justify-content:center;height:100vh;overflow:hidden;touch-action:manipulation;}iframe{width:100%;height:100%;border:none;}</style></head><body><iframe src="https://player.vimeo.com/video/${vimeoId}?autoplay=0&quality=240p&dnt=1&transparent=0&fullscreen=0" allow="autoplay; encrypted-media"></iframe><script>document.addEventListener('touchstart',function(e){if(e.touches.length>1){e.preventDefault();}},{passive:false});document.addEventListener('gesturestart',function(e){e.preventDefault();},{passive:false});</script></body></html>`;
 
     return (
       <WebView
@@ -146,6 +145,7 @@ function SplitVideoLayerInner({ vimeoId, youtubeId }: { vimeoId: string | null; 
         allowsInlineMediaPlayback={true}
         mediaPlaybackRequiresUserAction={true}
         allowsAirPlayForMediaPlayback={false}
+      allowsFullscreenVideo={false}
         javaScriptEnabled={true}
         scrollEnabled={false}
         bounces={false}

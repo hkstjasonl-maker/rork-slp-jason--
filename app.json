@@ -15,9 +15,12 @@
     },
     "ios": {
       "supportsTablet": true,
+      "requireFullScreen": true,
       "bundleIdentifier": "com.slpjason.app",
       "buildNumber": "1",
       "infoPlist": {
+        "UISupportedInterfaceOrientations": ["UIInterfaceOrientationPortrait"],
+        "UISupportedInterfaceOrientations~ipad": ["UIInterfaceOrientationPortrait", "UIInterfaceOrientationPortraitUpsideDown"],
         "NSCameraUsageDescription": "This app uses the camera so you can watch yourself while practicing exercises",
         "NSMicrophoneUsageDescription": "This app uses the microphone to record your exercise practice videos",
         "NSPhotoLibraryAddUsageDescription": "This app saves your exercise practice videos to your photo album so you can show them to your therapist"

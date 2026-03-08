@@ -1,5 +1,5 @@
 import React, { useRef, useCallback } from 'react';
-import { View, Text, StyleSheet, Platform } from 'react-native';
+import { View, Text, StyleSheet, Platform, PanResponder, GestureResponderEvent } from 'react-native';
 import { WebView } from 'react-native-webview';
 import { log } from '@/lib/logger';
 
@@ -24,9 +24,8 @@ function getYouTubeHTML(videoId: string): string {
 <body>
   <iframe
     id="player"
-    src="https://www.youtube.com/embed/${videoId}?rel=0&modestbranding=1&playsinline=1&enablejsapi=1"
+    src="https://www.youtube.com/embed/${videoId}?rel=0&modestbranding=1&playsinline=1&enablejsapi=1&fs=0"
     allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-    allowfullscreen
   ></iframe>
   <script>
     window.addEventListener('message', function(event) {
@@ -42,8 +41,17 @@ function getYouTubeHTML(videoId: string): string {
 </html>`;
 }
 
+const pinchBlockerRef = PanResponder.create({
+  onStartShouldSetPanResponderCapture: (e: GestureResponderEvent) => e.nativeEvent.touches.length >= 2,
+  onMoveShouldSetPanResponderCapture: (e: GestureResponderEvent) => e.nativeEvent.touches.length >= 2,
+  onPanResponderGrant: () => {},
+  onPanResponderMove: () => {},
+  onPanResponderRelease: () => {},
+});
+
 function YouTubePlayerInner({ videoId, height, onEnd }: YouTubePlayerProps) {
   const webViewRef = useRef(null);
+  const pinchBlocker = useRef(pinchBlockerRef).current;
 
   const handleMessage = useCallback((event: { nativeEvent: { data: string } }) => {
     try {
@@ -79,19 +87,19 @@ function YouTubePlayerInner({ videoId, height, onEnd }: YouTubePlayerProps) {
             borderRadius: 12,
           }}
           allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-          allowFullScreen
         />
       </View>
     );
   }
 
   return (
-    <View style={[styles.container, { height }]}>
+    <View style={[styles.container, { height }]} {...pinchBlocker.panHandlers}>
       <WebView
         ref={webViewRef}
         source={{ html: getYouTubeHTML(videoId) }}
         style={styles.webview}
         allowsInlineMediaPlayback
+        allowsFullscreenVideo={false}
         mediaPlaybackRequiresUserAction={false}
         javaScriptEnabled
         onMessage={handleMessage}

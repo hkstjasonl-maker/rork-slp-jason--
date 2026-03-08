@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from 'react';
-import { View, StyleSheet, Platform, ActivityIndicator } from 'react-native';
+import React, { useState, useEffect, useRef } from 'react';
+import { View, StyleSheet, Platform, ActivityIndicator, PanResponder, GestureResponderEvent } from 'react-native';
 import { Video, ResizeMode } from 'expo-av';
 import { VideoOff } from 'lucide-react-native';
 import { ScaledText } from '@/components/ScaledText';
@@ -53,6 +53,20 @@ function VimeoPlayerInner({ videoId, height, onEnd, lowQuality }: VimeoPlayerPro
   const [videoUrl, setVideoUrl] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
+
+  const pinchBlocker = useRef(
+    PanResponder.create({
+      onStartShouldSetPanResponderCapture: (e: GestureResponderEvent) => {
+        return e.nativeEvent.touches.length >= 2;
+      },
+      onMoveShouldSetPanResponderCapture: (e: GestureResponderEvent) => {
+        return e.nativeEvent.touches.length >= 2;
+      },
+      onPanResponderGrant: () => {},
+      onPanResponderMove: () => {},
+      onPanResponderRelease: () => {},
+    })
+  ).current;
 
   useEffect(() => {
     if (!videoId || videoId.trim() === '') {
@@ -119,8 +133,7 @@ function VimeoPlayerInner({ videoId, height, onEnd, lowQuality }: VimeoPlayerPro
             border: 'none',
             borderRadius: 12,
           }}
-          allow="autoplay; fullscreen; picture-in-picture; encrypted-media"
-          allowFullScreen
+          allow="autoplay; picture-in-picture; encrypted-media"
         />
       </View>
     );
@@ -128,7 +141,7 @@ function VimeoPlayerInner({ videoId, height, onEnd, lowQuality }: VimeoPlayerPro
 
   if (videoUrl) {
     return (
-      <View style={[styles.container, { height }]}>
+      <View style={[styles.container, { height }]} {...pinchBlocker.panHandlers}>
         <Video
           source={{ uri: videoUrl }}
           style={styles.video}
@@ -155,6 +168,7 @@ function VimeoPlayerInner({ videoId, height, onEnd, lowQuality }: VimeoPlayerPro
         <WebView
           source={{ uri: embedUrl }}
           allowsInlineMediaPlayback={true}
+          allowsFullscreenVideo={false}
           mediaPlaybackRequiresUserAction={false}
           style={styles.video}
           javaScriptEnabled={true}
@@ -195,4 +209,5 @@ const styles = StyleSheet.create({
   unavailableLabel: {
     marginTop: 8,
   },
+
 });

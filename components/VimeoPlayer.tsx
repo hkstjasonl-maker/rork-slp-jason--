@@ -122,6 +122,24 @@ function cmd(m){try{vf.contentWindow.postMessage(JSON.stringify(m),'*');}catch(e
   },{passive:false,capture:true});
 });
 
+var tapStart=0,tapX=0,tapY=0;
+sh.addEventListener('touchstart',function(e){
+  if(e.touches.length===1){
+    tapStart=Date.now();
+    tapX=e.touches[0].clientX;
+    tapY=e.touches[0].clientY;
+  }
+},{passive:true,capture:false});
+sh.addEventListener('touchend',function(e){
+  var dt=Date.now()-tapStart;
+  if(dt>400)return;
+  var cx=e.changedTouches[0].clientX;
+  var cy=e.changedTouches[0].clientY;
+  if(Math.abs(cx-tapX)>15||Math.abs(cy-tapY)>15)return;
+  if(!rdy)return;
+  if(pl){cmd({method:'pause'});}
+  else{cmd({method:'play'});}
+},{passive:true,capture:false});
 sh.addEventListener('click',function(){
   if(!rdy)return;
   if(pl){cmd({method:'pause'});}

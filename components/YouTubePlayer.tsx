@@ -1,6 +1,5 @@
 import React, { useCallback, useRef } from 'react';
-// useCallback kept for handleMessage
-import { View, Text, StyleSheet, Platform, PanResponder, GestureResponderEvent } from 'react-native';
+import { View, Text, StyleSheet, Platform } from 'react-native';
 import { log } from '@/lib/logger';
 import { FULLSCREEN_PREVENTION_CSS, INJECTED_JS_BEFORE_LOAD } from '@/lib/fullscreenPrevention';
 
@@ -65,6 +64,25 @@ function show(playing){pb.classList.remove('h');clearTimeout(ft);if(playing)ft=s
   },{passive:false,capture:true});
 });
 
+var tapStart=0,tapX=0,tapY=0;
+sh.addEventListener('touchstart',function(e){
+  if(e.touches.length===1){
+    tapStart=Date.now();
+    tapX=e.touches[0].clientX;
+    tapY=e.touches[0].clientY;
+  }
+},{passive:true,capture:false});
+sh.addEventListener('touchend',function(e){
+  var dt=Date.now()-tapStart;
+  if(dt>400)return;
+  var cx=e.changedTouches[0].clientX;
+  var cy=e.changedTouches[0].clientY;
+  if(Math.abs(cx-tapX)>15||Math.abs(cy-tapY)>15)return;
+  if(!player||typeof player.getPlayerState!=='function')return;
+  var st=player.getPlayerState();
+  if(st===1){player.pauseVideo();ic(false);show(false);}
+  else{player.playVideo();ic(true);show(true);}
+},{passive:true,capture:false});
 sh.addEventListener('click',function(){
   if(!player||typeof player.getPlayerState!=='function')return;
   var st=player.getPlayerState();
@@ -94,28 +112,6 @@ function onYouTubeIframeAPIReady(){
 
 function YouTubePlayerInner({ videoId, height, onEnd }: YouTubePlayerProps) {
   const webViewRef = useRef<any>(null);
-
-  const touchBlocker = useRef(
-    PanResponder.create({
-      onStartShouldSetPanResponder: (evt: GestureResponderEvent) => {
-        return (evt.nativeEvent.touches?.length ?? 0) > 1;
-      },
-      onStartShouldSetPanResponderCapture: (evt: GestureResponderEvent) => {
-        return (evt.nativeEvent.touches?.length ?? 0) > 1;
-      },
-      onMoveShouldSetPanResponder: (evt: GestureResponderEvent) => {
-        return (evt.nativeEvent.touches?.length ?? 0) > 1;
-      },
-      onMoveShouldSetPanResponderCapture: (evt: GestureResponderEvent) => {
-        return (evt.nativeEvent.touches?.length ?? 0) > 1;
-      },
-      onPanResponderGrant: () => {},
-      onPanResponderMove: () => {},
-      onPanResponderRelease: () => {},
-      onPanResponderTerminate: () => {},
-      onPanResponderTerminationRequest: () => false,
-    })
-  ).current;
 
   const handleMessage = useCallback((event: { nativeEvent: { data: string } }) => {
     try {
@@ -179,7 +175,6 @@ function YouTubePlayerInner({ videoId, height, onEnd }: YouTubePlayerProps) {
         injectedJavaScriptBeforeContentLoaded={INJECTED_JS_BEFORE_LOAD}
         setSupportMultipleWindows={false}
       />
-      <View style={styles.nativeTouchBlocker} {...touchBlocker.panHandlers} />
     </View>
   );
 }
@@ -206,13 +201,5 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontSize: 14,
   },
-  nativeTouchBlocker: {
-    position: 'absolute' as const,
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    zIndex: 999,
-    backgroundColor: 'transparent',
-  },
+
 });

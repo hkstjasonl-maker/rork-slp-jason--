@@ -425,8 +425,9 @@ export default function ExerciseScreen() {
   const splitCameraRef = useRef<CameraView>(null);
   const [splitCameraReady, setSplitCameraReady] = useState(false);
   const [cameraMode, setCameraMode] = useState<'picture' | 'video'>('picture');
-  const { width: screenWidth } = useWindowDimensions();
+  const { width: screenWidth, height: screenHeight } = useWindowDimensions();
   const isTablet = screenWidth >= 768;
+  const videoHeight = isTablet ? Math.round(screenHeight * 0.45) : 220;
 
 
   const hasCameraPermission = cameraPermission?.granted === true;
@@ -1304,8 +1305,8 @@ export default function ExerciseScreen() {
               showsVerticalScrollIndicator={false}
             >
               <View style={styles.videoSection}>
-                <VideoProtectionOverlay patientName={patientName ?? ''} height={220}>
-                  <ExerciseVideoPlayer exercise={exercise} height={220} />
+                <VideoProtectionOverlay patientName={patientName ?? ''} height={videoHeight}>
+                  <ExerciseVideoPlayer exercise={exercise} height={videoHeight} />
                 </VideoProtectionOverlay>
                 <Animated.View
                   style={[

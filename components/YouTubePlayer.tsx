@@ -1,5 +1,6 @@
 import React, { useCallback, useRef } from 'react';
-import { View, Text, StyleSheet, Platform, PanResponder, GestureResponderEvent, PanResponderGestureState } from 'react-native';
+// useCallback kept for handleMessage
+import { View, Text, StyleSheet, Platform, PanResponder, GestureResponderEvent } from 'react-native';
 import { log } from '@/lib/logger';
 import { FULLSCREEN_PREVENTION_CSS, INJECTED_JS_BEFORE_LOAD } from '@/lib/fullscreenPrevention';
 
@@ -93,42 +94,24 @@ function onYouTubeIframeAPIReady(){
 
 function YouTubePlayerInner({ videoId, height, onEnd }: YouTubePlayerProps) {
   const webViewRef = useRef<any>(null);
-  const tapStartTime = useRef<number>(0);
-  const tapStartPos = useRef<{ x: number; y: number }>({ x: 0, y: 0 });
-
-  const handleTap = useCallback(() => {
-    if (webViewRef.current) {
-      webViewRef.current.injectJavaScript(`
-        (function(){
-          var sh = document.getElementById('sh');
-          if (sh) sh.click();
-        })();
-        true;
-      `);
-    }
-  }, []);
 
   const touchBlocker = useRef(
     PanResponder.create({
-      onStartShouldSetPanResponder: () => true,
-      onStartShouldSetPanResponderCapture: () => true,
-      onMoveShouldSetPanResponder: () => true,
-      onMoveShouldSetPanResponderCapture: () => true,
-      onPanResponderGrant: (evt: GestureResponderEvent) => {
-        tapStartTime.current = Date.now();
-        tapStartPos.current = {
-          x: evt.nativeEvent.pageX,
-          y: evt.nativeEvent.pageY,
-        };
+      onStartShouldSetPanResponder: (evt: GestureResponderEvent) => {
+        return (evt.nativeEvent.touches?.length ?? 0) > 1;
       },
+      onStartShouldSetPanResponderCapture: (evt: GestureResponderEvent) => {
+        return (evt.nativeEvent.touches?.length ?? 0) > 1;
+      },
+      onMoveShouldSetPanResponder: (evt: GestureResponderEvent) => {
+        return (evt.nativeEvent.touches?.length ?? 0) > 1;
+      },
+      onMoveShouldSetPanResponderCapture: (evt: GestureResponderEvent) => {
+        return (evt.nativeEvent.touches?.length ?? 0) > 1;
+      },
+      onPanResponderGrant: () => {},
       onPanResponderMove: () => {},
-      onPanResponderRelease: (evt: GestureResponderEvent, gestureState: PanResponderGestureState) => {
-        const elapsed = Date.now() - tapStartTime.current;
-        const dist = Math.sqrt(gestureState.dx * gestureState.dx + gestureState.dy * gestureState.dy);
-        if (elapsed < 300 && dist < 15 && evt.nativeEvent.touches.length <= 1) {
-          handleTap();
-        }
-      },
+      onPanResponderRelease: () => {},
       onPanResponderTerminate: () => {},
       onPanResponderTerminationRequest: () => false,
     })

@@ -96,13 +96,18 @@ function getFileExtension(contentType: string): string {
   return 'mp4';
 }
 
+export interface UploadSubmitResult {
+  success: boolean;
+  errorDetail?: string;
+}
+
 export async function uploadAndSubmitFeedingVideo(
   videoUri: string,
   patientId: string,
   requirementId: string | null,
   feedingSkillVideoId: string,
   videoTitleEn: string
-): Promise<boolean> {
+): Promise<UploadSubmitResult> {
   try {
     const today = getTodayDateString();
     const sanitizedTitle = videoTitleEn.replace(/[^a-zA-Z0-9_-]/g, '_').substring(0, 50);
@@ -123,18 +128,18 @@ export async function uploadAndSubmitFeedingVideo(
       const response = await fetch(normalizedUri);
       if (!response.ok) {
         log('[FeedingReview] Fetch failed with status:', response.status);
-        return false;
+        return { success: false, errorDetail: `File read failed (status ${response.status})` };
       }
       const blob = await response.blob();
       log('[FeedingReview] Blob size:', blob.size, 'type:', blob.type);
       if (blob.size === 0) {
         log('[FeedingReview] Video blob is empty (0 bytes), aborting upload');
-        return false;
+        return { success: false, errorDetail: 'Video file is empty (0 bytes)' };
       }
       uploadData = blob;
     } catch (fileError) {
       log('[FeedingReview] File read error:', fileError);
-      return false;
+      return { success: false, errorDetail: `File read error: ${fileError instanceof Error ? fileError.message : String(fileError)}` };
     }
 
     log('[FeedingReview] Uploading to storage path:', filePath, 'contentType:', contentType);
@@ -150,7 +155,7 @@ export async function uploadAndSubmitFeedingVideo(
     if (uploadError) {
       log('[FeedingReview] Storage upload FAILED:', JSON.stringify(uploadError));
       log('[FeedingReview] Upload error message:', uploadError.message);
-      return false;
+      return { success: false, errorDetail: `Upload failed: ${uploadError.message}` };
     }
 
     log('[FeedingReview] Storage upload successful');
@@ -183,14 +188,14 @@ export async function uploadAndSubmitFeedingVideo(
     if (insertError) {
       log('[FeedingReview] DB insert FAILED:', JSON.stringify(insertError));
       log('[FeedingReview] Insert error code:', insertError.code, 'details:', insertError.details, 'hint:', insertError.hint);
-      return false;
+      return { success: false, errorDetail: `DB insert failed: ${insertError.message} (code: ${insertError.code})` };
     }
 
     log('[FeedingReview] Submission inserted successfully');
-    return true;
+    return { success: true };
   } catch (e) {
     log('[FeedingReview] Submit exception:', e);
-    return false;
+    return { success: false, errorDetail: `Exception: ${e instanceof Error ? e.message : String(e)}` };
   }
 }
 

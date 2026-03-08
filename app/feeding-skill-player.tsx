@@ -16,6 +16,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import * as Haptics from 'expo-haptics';
 import { ChevronLeft, Eye, Camera, X, Maximize2, SplitSquareHorizontal, VideoOff } from 'lucide-react-native';
 import * as MediaLibrary from 'expo-media-library';
+import * as LegacyFileSystem from 'expo-file-system/legacy';
 import { Audio } from 'expo-av';
 import { CameraView, useCameraPermissions, useMicrophonePermissions } from 'expo-camera';
 
@@ -406,8 +407,24 @@ export default function FeedingSkillPlayerScreen() {
         patientName: patientName ?? undefined,
       });
       log('[FeedingSkillPlayer] Watermark result — processed:', wasProcessed, 'uri:', processedUri);
+
+      let stableUri = processedUri;
+      if (Platform.OS !== 'web') {
+        try {
+          const ext = processedUri.toLowerCase().endsWith('.mp4') ? 'mp4' : 'mov';
+          stableUri = `${LegacyFileSystem.cacheDirectory}upload_ready_${Date.now()}.${ext}`;
+          await LegacyFileSystem.copyAsync({ from: processedUri, to: stableUri });
+          log('[FeedingSkillPlayer] Copied video to stable cache path:', stableUri);
+          const info = await LegacyFileSystem.getInfoAsync(stableUri);
+          log('[FeedingSkillPlayer] Stable copy exists:', info.exists, 'size:', (info as any).size);
+        } catch (copyErr) {
+          log('[FeedingSkillPlayer] Copy to stable path failed, using original:', copyErr);
+          stableUri = processedUri;
+        }
+      }
+
       await MediaLibrary.saveToLibraryAsync(processedUri);
-      setLastRecordedUri(processedUri);
+      setLastRecordedUri(stableUri);
       setToastType('success');
       if (wasProcessed) {
         setToastMessage(t('recordingSavedToAlbum'));
@@ -489,17 +506,36 @@ export default function FeedingSkillPlayerScreen() {
   }, [activeRecordingRef]);
 
   const handleSubmitVideo = useCallback(async () => {
-    if (!lastRecordedUri || !patientId || !video) return;
+    if (!lastRecordedUri || !patientId || !video) {
+      log('[FeedingReviewSubmit] Missing data — uri:', !!lastRecordedUri, 'patient:', !!patientId, 'video:', !!video);
+      return;
+    }
+
+    if (Platform.OS !== 'web') {
+      try {
+        const fileInfo = await LegacyFileSystem.getInfoAsync(lastRecordedUri);
+        log('[FeedingReviewSubmit] File check — exists:', fileInfo.exists, 'size:', (fileInfo as any).size);
+        if (!fileInfo.exists) {
+          setToastType('error');
+          setToastMessage(t('submissionFailed'));
+          log('[FeedingReviewSubmit] Video file no longer exists at:', lastRecordedUri);
+          return;
+        }
+      } catch (checkErr) {
+        log('[FeedingReviewSubmit] File check error:', checkErr);
+      }
+    }
+
     setIsSubmitting(true);
     try {
-      const success = await uploadAndSubmitFeedingVideo(
+      const result = await uploadAndSubmitFeedingVideo(
         lastRecordedUri,
         patientId,
         reviewRequirement?.id ?? null,
         assignment!.feeding_skill_video_id,
         video.title_en
       );
-      if (success) {
+      if (result.success) {
         setSubmissionSuccess(true);
         setTodaySubmissionCount((prev) => prev + 1);
         setToastType('success');
@@ -509,7 +545,8 @@ export default function FeedingSkillPlayerScreen() {
         void queryClient.invalidateQueries({ queryKey: ['feedingTodaySubmissions'] });
       } else {
         setToastType('error');
-        setToastMessage(t('submissionFailed'));
+        setToastMessage(result.errorDetail || t('submissionFailed'));
+        log('[FeedingReviewSubmit] Failed with detail:', result.errorDetail);
       }
     } catch (e) {
       log('[FeedingReviewSubmit] Error:', e);

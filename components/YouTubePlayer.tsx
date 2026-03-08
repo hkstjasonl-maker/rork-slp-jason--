@@ -1,5 +1,5 @@
-import React, { useCallback } from 'react';
-import { View, Text, StyleSheet, Platform } from 'react-native';
+import React, { useCallback, useMemo } from 'react';
+import { View, Text, StyleSheet, Platform, PanResponder } from 'react-native';
 import { log } from '@/lib/logger';
 import { FULLSCREEN_PREVENTION_CSS, FULLSCREEN_PREVENTION_JS, INJECTED_JS_BEFORE_LOAD } from '@/lib/fullscreenPrevention';
 
@@ -15,8 +15,8 @@ function getYouTubeHTML(videoId: string): string {
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
 <style>
 *{margin:0;padding:0;-webkit-touch-callout:none;}
-html,body{width:100%;height:100%;background:#000;overflow:hidden;touch-action:manipulation;-webkit-user-select:none;}
-iframe{width:100%;height:100%;border:none;}
+html,body{width:100%;height:100%;background:#000;overflow:hidden;touch-action:none;-webkit-user-select:none;-webkit-touch-callout:none;}
+iframe{width:100%;height:100%;border:none;touch-action:none;}
 ${FULLSCREEN_PREVENTION_CSS}
 </style>
 </head><body>
@@ -41,6 +41,26 @@ window.addEventListener('message', function(event) {
 }
 
 function YouTubePlayerInner({ videoId, height, onEnd }: YouTubePlayerProps) {
+  const pinchBlocker = useMemo(() => PanResponder.create({
+    onStartShouldSetPanResponderCapture: (evt) => {
+      return (evt.nativeEvent.touches?.length ?? 0) > 1;
+    },
+    onMoveShouldSetPanResponderCapture: (evt) => {
+      return (evt.nativeEvent.touches?.length ?? 0) > 1;
+    },
+    onStartShouldSetPanResponder: (evt) => {
+      return (evt.nativeEvent.touches?.length ?? 0) > 1;
+    },
+    onMoveShouldSetPanResponder: (evt) => {
+      return (evt.nativeEvent.touches?.length ?? 0) > 1;
+    },
+    onPanResponderTerminationRequest: () => false,
+    onPanResponderGrant: () => {},
+    onPanResponderMove: () => {},
+    onPanResponderRelease: () => {},
+    onPanResponderTerminate: () => {},
+  }), []);
+
   const handleMessage = useCallback((event: { nativeEvent: { data: string } }) => {
     try {
       const data = JSON.parse(event.nativeEvent.data);
@@ -84,7 +104,7 @@ function YouTubePlayerInner({ videoId, height, onEnd }: YouTubePlayerProps) {
   const WebView = require('react-native-webview').WebView;
 
   return (
-    <View style={[styles.container, { height }]}>
+    <View style={[styles.container, { height }]} {...pinchBlocker.panHandlers}>
       <WebView
         source={{ html: getYouTubeHTML(videoId) }}
         style={styles.webview}
@@ -92,6 +112,7 @@ function YouTubePlayerInner({ videoId, height, onEnd }: YouTubePlayerProps) {
         allowsFullscreenVideo={false}
         allowsAirPlayForMediaPlayback={false}
         allowsLinkPreview={false}
+        allowsPictureInPictureMediaPlayback={false}
         mediaPlaybackRequiresUserAction={false}
         javaScriptEnabled={true}
         onMessage={handleMessage}

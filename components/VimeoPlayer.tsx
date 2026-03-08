@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from 'react';
-import { View, StyleSheet, Platform, ActivityIndicator } from 'react-native';
+import React, { useState, useEffect, useMemo } from 'react';
+import { View, StyleSheet, Platform, ActivityIndicator, PanResponder } from 'react-native';
 import { VideoOff } from 'lucide-react-native';
 import { ScaledText } from '@/components/ScaledText';
 import Colors from '@/constants/colors';
@@ -15,6 +15,26 @@ interface VimeoPlayerProps {
 
 function VimeoPlayerInner({ videoId, height, onEnd, lowQuality }: VimeoPlayerProps) {
   const [loading, setLoading] = useState(true);
+
+  const pinchBlocker = useMemo(() => PanResponder.create({
+    onStartShouldSetPanResponderCapture: (evt) => {
+      return (evt.nativeEvent.touches?.length ?? 0) > 1;
+    },
+    onMoveShouldSetPanResponderCapture: (evt) => {
+      return (evt.nativeEvent.touches?.length ?? 0) > 1;
+    },
+    onStartShouldSetPanResponder: (evt) => {
+      return (evt.nativeEvent.touches?.length ?? 0) > 1;
+    },
+    onMoveShouldSetPanResponder: (evt) => {
+      return (evt.nativeEvent.touches?.length ?? 0) > 1;
+    },
+    onPanResponderTerminationRequest: () => false,
+    onPanResponderGrant: () => {},
+    onPanResponderMove: () => {},
+    onPanResponderRelease: () => {},
+    onPanResponderTerminate: () => {},
+  }), []);
 
   useEffect(() => {
     if (!videoId || videoId.trim() === '') {
@@ -75,8 +95,8 @@ function VimeoPlayerInner({ videoId, height, onEnd, lowQuality }: VimeoPlayerPro
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
 <style>
 *{margin:0;padding:0;box-sizing:border-box;-webkit-touch-callout:none;}
-html,body{width:100%;height:100%;background:#000;overflow:hidden;touch-action:manipulation;-webkit-user-select:none;}
-iframe{width:100%;height:100%;border:none;pointer-events:auto;}
+html,body{width:100%;height:100%;background:#000;overflow:hidden;touch-action:none;-webkit-user-select:none;-webkit-touch-callout:none;}
+iframe{width:100%;height:100%;border:none;pointer-events:auto;touch-action:none;}
 ${FULLSCREEN_PREVENTION_CSS}
 </style>
 </head><body>
@@ -96,7 +116,7 @@ ${FULLSCREEN_PREVENTION_CSS}
   };
 
   return (
-    <View style={[styles.container, { height }]}>
+    <View style={[styles.container, { height }]} {...pinchBlocker.panHandlers}>
       <WebView
         source={{ html }}
         style={styles.video}
@@ -104,6 +124,7 @@ ${FULLSCREEN_PREVENTION_CSS}
         allowsFullscreenVideo={false}
         allowsAirPlayForMediaPlayback={false}
         allowsLinkPreview={false}
+        allowsPictureInPictureMediaPlayback={false}
         mediaPlaybackRequiresUserAction={false}
         javaScriptEnabled={true}
         scrollEnabled={false}

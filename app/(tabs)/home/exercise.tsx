@@ -30,7 +30,6 @@ import { SelfRatingModal } from '@/components/SelfRatingModal';
 import { CopyrightFooter } from '@/components/CopyrightFooter';
 import { RestTimer } from '@/components/RestTimer';
 import { RecordingWatermark } from '@/components/RecordingWatermark';
-import { FacePositionGuide } from '@/components/FacePositionGuide';
 import { VideoProtectionOverlay } from '@/components/VideoProtectionOverlay';
 import { supabase } from '@/lib/supabase';
 import { getStarsForSession, calculateStars } from '@/lib/stars';
@@ -405,8 +404,6 @@ export default function ExerciseScreen() {
   const [showRestPrompt, setShowRestPrompt] = useState(false);
   const [countdown, setCountdown] = useState<number | null>(null);
   const [showProcessing, setShowProcessing] = useState(false);
-  const [showFaceGuide, setShowFaceGuide] = useState(false);
-  const [faceGuideForRecording, setFaceGuideForRecording] = useState(false);
   const [reviewRequirement, setReviewRequirement] = useState<ExerciseReviewRequirement | null>(null);
   const [todaySubmissionCount, setTodaySubmissionCount] = useState<number>(0);
   const [_showSubmitPrompt, setShowSubmitPrompt] = useState(false);
@@ -741,8 +738,6 @@ export default function ExerciseScreen() {
       }
     }
     setMediaMode('split');
-    setShowFaceGuide(true);
-    setFaceGuideForRecording(false);
     if (Platform.OS !== 'web') {
       void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     }
@@ -760,8 +755,6 @@ export default function ExerciseScreen() {
 
   const handleSetMode = useCallback((mode: MediaMode) => {
     if (isRecording) return;
-    setShowFaceGuide(false);
-    setFaceGuideForRecording(false);
     setMediaMode(mode);
     if (Platform.OS !== 'web') {
       void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
@@ -880,22 +873,10 @@ export default function ExerciseScreen() {
         return;
       }
     }
-    setFaceGuideForRecording(true);
-    setShowFaceGuide(true);
-  }, [activeRecordingRef, isCameraReadyForRecording, micPermission, requestMicPermission, t]);
-
-  const handleFacePositionConfirmed = useCallback(async () => {
-    setShowFaceGuide(false);
-    setFaceGuideForRecording(false);
-
-    const camRef = activeRecordingRef();
-    if (!camRef.current || !isCameraReadyForRecording()) {
-      log('Camera not ready after face position confirmed');
-      return;
-    }
     try {
       setCameraMode('video');
       await new Promise(r => setTimeout(r, 500));
+
       try {
         await Audio.setAudioModeAsync({
           allowsRecordingIOS: true,
@@ -906,6 +887,7 @@ export default function ExerciseScreen() {
       } catch (e) {
         log('[ExerciseScreen] Audio mode switch error:', e);
       }
+
       await runCountdown();
       log('Starting video recording');
       setIsRecording(true);
@@ -921,12 +903,7 @@ export default function ExerciseScreen() {
       log('Recording error:', error);
       setIsRecording(false);
     }
-  }, [activeRecordingRef, isCameraReadyForRecording, runCountdown, saveVideoToLibrary]);
-
-  const handleFaceGuideDismiss = useCallback(() => {
-    setShowFaceGuide(false);
-    setFaceGuideForRecording(false);
-  }, []);
+  }, [activeRecordingRef, isCameraReadyForRecording, micPermission, requestMicPermission, t, runCountdown, saveVideoToLibrary]);
 
   const handleStopRecording = useCallback(() => {
     const camRef = activeRecordingRef();
@@ -1216,13 +1193,6 @@ export default function ExerciseScreen() {
                   </ScaledText>
                 </View>
               )}
-
-              <FacePositionGuide
-                visible={showFaceGuide}
-                isRecordingMode={faceGuideForRecording}
-                onConfirmPositioned={handleFacePositionConfirmed}
-                onDismiss={handleFaceGuideDismiss}
-              />
 
               {countdown !== null && (
                 <View style={styles.countdownOverlay}>

@@ -71,7 +71,7 @@
       [
         "ffmpeg-kit-react-native",
         {
-          "package": "min"
+          "package": "min-gpl"
         }
       ]
     ],

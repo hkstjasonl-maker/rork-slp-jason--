@@ -599,10 +599,12 @@ const body=`<div class="form-row"><div class="form-group"><label>${t('name')} *<
 <div class="form-group"><label>${t('diagnosis')}</label><input class="form-input" id="pD" value="${esc(p?.diagnosis||'')}"></div>
 <div class="form-row"><div class="form-group"><label>${t('active')}</label><select class="form-select" id="pA"><option value="true" ${p?.is_active!==false?'selected':''}>${t('yes')}</option><option value="false" ${p?.is_active===false?'selected':''}>${t('no')}</option></select></div>
 <div class="form-group"><label>${t('frozen')}</label><select class="form-select" id="pF"><option value="false" ${p?.is_frozen!==true?'selected':''}>${t('no')}</option><option value="true" ${p?.is_frozen===true?'selected':''}>${t('yes')}</option></select></div></div>
-<h4 style="margin:18px 0 10px;font-size:.9rem;color:var(--accent);font-weight:700">Therapist Photo URLs 治療師照片</h4>
+<h4 style="margin:18px 0 10px;font-size:.9rem;color:var(--accent);font-weight:700">Therapist Info 治療師資料</h4>
+<div class="form-row"><div class="form-group"><label>Therapist Name (EN)</label><input class="form-input" id="pThNameEn" value="${esc(p?.therapist_name_en||'')}" placeholder="e.g. Dr. Smith (leave blank for default)"></div>
+<div class="form-group"><label>Therapist Name (繁中)</label><input class="form-input" id="pThNameZh" value="${esc(p?.therapist_name_zh||'')}" placeholder="e.g. 陳醫生 (leave blank for default)"></div></div>
 <div class="form-row"><div class="form-group"><label>Photo URL (real photo)</label><div class="pick-wrap"><div class="field-with-btn"><input class="form-input" id="pThPhoto" value="${esc(p?.therapist_photo_url||'')}" placeholder="https://... or leave blank for default"><button type="button" class="btn btn-sm btn-primary" onclick="triggerUploadPatientPhoto('pThPhoto')">Upload</button></div></div></div>
 <div class="form-group"><label>Cartoon URL (cartoon avatar)</label><div class="pick-wrap"><div class="field-with-btn"><input class="form-input" id="pThCartoon" value="${esc(p?.therapist_cartoon_url||'')}" placeholder="https://... or leave blank for default"><button type="button" class="btn btn-sm btn-primary" onclick="triggerUploadPatientPhoto('pThCartoon')">Upload</button></div></div></div></div>
-<p style="font-size:.75rem;color:var(--text3);margin-bottom:10px">Leave blank to use your default photos. Set these only if another therapist manages this patient.</p>
+<p style="font-size:.75rem;color:var(--text3);margin-bottom:10px">Leave blank to use defaults (Jason). Set these only if another therapist manages this patient.</p>
 <h4 style="margin:18px 0 10px;font-size:.9rem;color:var(--accent);font-weight:700">Managing Organisation 管理機構</h4>
 <div class="form-row-3"><div class="form-group"><label>Org Name (EN)</label><input class="form-input" id="pMOrgEn" value="${esc(p?.managing_org_name_en||'')}" placeholder="e.g. ABC Therapy Centre"></div>
 <div class="form-group"><label>Org Name (繁中)</label><input class="form-input" id="pMOrgZh" value="${esc(p?.managing_org_name_zh||'')}" placeholder="e.g. ABC治療中心"></div>
@@ -617,6 +619,8 @@ openModal(id?t('edit')+' '+t('patient'):t('addPat'),body,`<button class="btn btn
 async function savePat(id){
 const o={patient_name:document.getElementById('pN').value.trim(),access_code:document.getElementById('pC').value.trim(),diagnosis:document.getElementById('pD').value.trim()||null,
 is_active:document.getElementById('pA').value==='true',is_frozen:document.getElementById('pF').value==='true',
+therapist_name_en:document.getElementById('pThNameEn').value.trim()||null,
+therapist_name_zh:document.getElementById('pThNameZh').value.trim()||null,
 therapist_photo_url:document.getElementById('pThPhoto').value.trim()||null,
 therapist_cartoon_url:document.getElementById('pThCartoon').value.trim()||null,
 managing_org_name_en:document.getElementById('pMOrgEn').value.trim()||null,

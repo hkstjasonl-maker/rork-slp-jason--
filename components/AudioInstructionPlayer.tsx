@@ -10,9 +10,10 @@ interface AudioInstructionPlayerProps {
   audioUrl: string;
   label: string;
   stopLabel: string;
+  transcript?: string | null;
 }
 
-function AudioInstructionPlayerInner({ audioUrl, label, stopLabel }: AudioInstructionPlayerProps) {
+function AudioInstructionPlayerInner({ audioUrl, label, stopLabel, transcript }: AudioInstructionPlayerProps) {
   const player = useAudioPlayer({ uri: audioUrl });
   const status = useAudioPlayerStatus(player);
 
@@ -28,7 +29,7 @@ function AudioInstructionPlayerInner({ audioUrl, label, stopLabel }: AudioInstru
     } else {
       if (status.didJustFinish || (duration > 0 && currentTime >= duration - 0.1)) {
         log('[AudioInstruction] Replaying audio from start');
-        player.seekTo(0);
+        void player.seekTo(0);
         player.play();
       } else {
         log('[AudioInstruction] Playing audio');
@@ -78,6 +79,13 @@ function AudioInstructionPlayerInner({ audioUrl, label, stopLabel }: AudioInstru
           <View style={[styles.progressBarFill, { width: `${Math.min(100, progress * 100)}%` }]} />
         </View>
       )}
+      {transcript ? (
+        <View style={styles.transcriptContainer}>
+          <ScaledText size={13} color={Colors.textSecondary} style={styles.transcriptText}>
+            {transcript}
+          </ScaledText>
+        </View>
+      ) : null}
     </View>
   );
 }
@@ -119,5 +127,16 @@ const styles = StyleSheet.create({
     height: 3,
     backgroundColor: Colors.primary,
     borderRadius: 2,
+  },
+  transcriptContainer: {
+    marginTop: 10,
+    backgroundColor: Colors.card,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: Colors.border,
+    padding: 14,
+  },
+  transcriptText: {
+    lineHeight: 20,
   },
 });

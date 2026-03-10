@@ -76,6 +76,18 @@ function getAudioInstructionUrl(exercise: Exercise, language: Language | null): 
   }
 }
 
+function getAudioTranscript(exercise: Exercise, language: Language | null): string | null {
+  const lang = language || 'en';
+  switch (lang) {
+    case 'zh_hant':
+      return exercise.audio_transcript_zh_hant || exercise.audio_transcript_en || null;
+    case 'zh_hans':
+      return exercise.audio_transcript_zh_hans || exercise.audio_transcript_en || null;
+    default:
+      return exercise.audio_transcript_en || null;
+  }
+}
+
 function getExerciseTitle(exercise: Exercise, language: Language | null): string {
   const lang = language || 'en';
   switch (lang) {
@@ -1392,11 +1404,13 @@ export default function ExerciseScreen() {
 
               {(() => {
                 const audioUrl = getAudioInstructionUrl(exercise, language);
+                const transcript = getAudioTranscript(exercise, language);
                 return audioUrl ? (
                   <AudioInstructionPlayer
                     audioUrl={audioUrl}
                     label={t('playInstructions')}
                     stopLabel={t('stopInstructions')}
+                    transcript={transcript}
                   />
                 ) : null;
               })()}

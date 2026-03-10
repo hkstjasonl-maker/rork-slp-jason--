@@ -57,6 +57,9 @@ export interface Exercise {
   audio_instruction_url_en?: string | null;
   audio_instruction_url_zh_hant?: string | null;
   audio_instruction_url_zh_hans?: string | null;
+  audio_transcript_en?: string | null;
+  audio_transcript_zh_hant?: string | null;
+  audio_transcript_zh_hans?: string | null;
   created_at: string;
 }
 

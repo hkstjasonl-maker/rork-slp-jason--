@@ -9,6 +9,7 @@ import {
   Alert,
   Platform,
   Image,
+  Linking,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useApp } from '@/contexts/AppContext';
@@ -27,6 +28,7 @@ import {
   Building2,
   BookOpen,
   Heart,
+  Accessibility,
 } from 'lucide-react-native';
 import { AppTutorial } from '@/components/AppTutorial';
 
@@ -206,6 +208,37 @@ export default function SettingsScreen() {
               <ChevronRight size={18} color={Colors.disabled} />
             </TouchableOpacity>
           </View>
+
+          {Platform.OS !== 'web' && (
+            <View style={styles.section}>
+              <TouchableOpacity
+                style={styles.actionCard}
+                onPress={() => {
+                  if (Platform.OS === 'ios') {
+                    void Linking.openURL('App-prefs:ACCESSIBILITY');
+                  } else {
+                    void Linking.openSettings();
+                  }
+                }}
+                activeOpacity={0.7}
+              >
+                <Accessibility size={20} color={Colors.primary} />
+                <View style={styles.actionContent}>
+                  <ScaledText size={15} weight="600" color={Colors.textPrimary}>
+                    {language === 'zh_hant' || language === 'zh_hans'
+                      ? '無障礙設定'
+                      : 'Accessibility Settings'}
+                  </ScaledText>
+                  <ScaledText size={13} color={Colors.textSecondary}>
+                    {language === 'zh_hant' || language === 'zh_hans'
+                      ? '開啟裝置的無障礙設定（如即時字幕）'
+                      : 'Open device accessibility settings (e.g. Live Captions)'}
+                  </ScaledText>
+                </View>
+                <ChevronRight size={18} color={Colors.disabled} />
+              </TouchableOpacity>
+            </View>
+          )}
 
           <View style={styles.section}>
             <View style={styles.therapistCard}>

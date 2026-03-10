@@ -67,13 +67,7 @@
         }
       ],
       "expo-asset",
-      "expo-screen-orientation",
-      [
-        "ffmpeg-kit-react-native",
-        {
-          "package": "min-gpl"
-        }
-      ]
+      "expo-screen-orientation"
     ],
     "experiments": {
       "typedRoutes": true

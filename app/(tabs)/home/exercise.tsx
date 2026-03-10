@@ -15,7 +15,7 @@ import {
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import * as Haptics from 'expo-haptics';
-import { ArrowLeft, CheckCircle, Clock, Repeat, AlertCircle, Tag, Camera, X, Maximize2, SplitSquareHorizontal, Headphones, VideoOff, Coffee, Play, Pause } from 'lucide-react-native';
+import { ArrowLeft, CheckCircle, Clock, Repeat, AlertCircle, Tag, Camera, X, Maximize2, SplitSquareHorizontal, Headphones, VideoOff, Coffee, Play, Pause, FileText } from 'lucide-react-native';
 import * as MediaLibrary from 'expo-media-library';
 
 
@@ -23,7 +23,7 @@ import { useApp } from '@/contexts/AppContext';
 import { ScaledText } from '@/components/ScaledText';
 import { YouTubePlayer } from '@/components/YouTubePlayer';
 import { VimeoPlayer } from '@/components/VimeoPlayer';
-import { AudioInstructionPlayer } from '@/components/AudioInstructionPlayer';
+import { useAudioPlayer, useAudioPlayerStatus } from 'expo-audio';
 import { EncouragementModal } from '@/components/EncouragementModal';
 import { SelfRatingModal } from '@/components/SelfRatingModal';
 import { CopyrightFooter } from '@/components/CopyrightFooter';
@@ -133,7 +133,111 @@ const LiveCamera = forwardRef<CameraView, { onCameraReady?: () => void; cameraMo
 LiveCamera.displayName = 'LiveCamera';
 const MemoLiveCamera = memo(LiveCamera, (prev, next) => prev.cameraMode === next.cameraMode && prev.onCameraReady === next.onCameraReady);
 
+function MirrorAudioButtonInner({ audioUrl, label, stopLabel }: { audioUrl: string; label: string; stopLabel: string }) {
+  const player = useAudioPlayer({ uri: audioUrl });
+  const status = useAudioPlayerStatus(player);
+  const isPlaying = status.playing;
 
+  const handleToggle = useCallback(() => {
+    if (isPlaying) {
+      log('[MirrorAudio] Pausing');
+      player.pause();
+    } else {
+      const duration = status.duration || 0;
+      const currentTime = status.currentTime || 0;
+      if (status.didJustFinish || (duration > 0 && currentTime >= duration - 0.1)) {
+        void player.seekTo(0);
+        player.play();
+      } else {
+        player.play();
+      }
+    }
+    if (Platform.OS !== 'web') {
+      void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    }
+  }, [isPlaying, player, status.didJustFinish, status.duration, status.currentTime]);
+
+  return (
+    <TouchableOpacity
+      style={[mirrorAudioStyles.iconBtn, isPlaying && mirrorAudioStyles.iconBtnActive]}
+      onPress={handleToggle}
+      activeOpacity={0.7}
+      testID="mirror-audio-toggle"
+    >
+      {isPlaying ? (
+        <Pause size={16} color={Colors.white} />
+      ) : (
+        <Headphones size={16} color={Colors.white} />
+      )}
+      <ScaledText size={10} weight="600" color={Colors.white} numberOfLines={1}>
+        {isPlaying ? stopLabel : label}
+      </ScaledText>
+    </TouchableOpacity>
+  );
+}
+const MirrorAudioButton = memo(MirrorAudioButtonInner);
+
+function TranscriptOverlay({ transcript, onClose }: { transcript: string; onClose: () => void }) {
+  return (
+    <View style={mirrorAudioStyles.transcriptOverlay}>
+      <View style={mirrorAudioStyles.transcriptHeader}>
+        <ScaledText size={13} weight="700" color={Colors.white}>
+          {String('')}
+        </ScaledText>
+        <TouchableOpacity onPress={onClose} activeOpacity={0.7} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
+          <X size={18} color={Colors.white} />
+        </TouchableOpacity>
+      </View>
+      <ScrollView style={mirrorAudioStyles.transcriptScroll} showsVerticalScrollIndicator={true}>
+        <ScaledText size={14} color={Colors.white} style={mirrorAudioStyles.transcriptText}>
+          {transcript}
+        </ScaledText>
+      </ScrollView>
+    </View>
+  );
+}
+
+const mirrorAudioStyles = StyleSheet.create({
+  iconBtn: {
+    alignItems: 'center' as const,
+    justifyContent: 'center' as const,
+    backgroundColor: 'rgba(0,0,0,0.55)',
+    borderRadius: 14,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    gap: 2,
+    minWidth: 52,
+  },
+  iconBtnActive: {
+    backgroundColor: '#E74C3C',
+  },
+  transcriptOverlay: {
+    position: 'absolute' as const,
+    top: 0,
+    left: 0,
+    right: 0,
+    maxHeight: '60%' as unknown as number,
+    backgroundColor: 'rgba(0,0,0,0.78)',
+    borderBottomLeftRadius: 16,
+    borderBottomRightRadius: 16,
+    paddingHorizontal: 14,
+    paddingTop: 10,
+    paddingBottom: 14,
+    zIndex: 20,
+  },
+  transcriptHeader: {
+    flexDirection: 'row' as const,
+    justifyContent: 'space-between' as const,
+    alignItems: 'center' as const,
+    marginBottom: 6,
+  },
+  transcriptScroll: {
+    maxHeight: 180,
+  },
+  transcriptText: {
+    lineHeight: 22,
+  },
+});
 
 function SplitVideoLayerInner({ vimeoId, youtubeId }: { vimeoId: string | null; youtubeId: string | null }) {
   const [isPlaying, setIsPlaying] = useState(false);
@@ -416,6 +520,7 @@ export default function ExerciseScreen() {
   const [showRestPrompt, setShowRestPrompt] = useState(false);
   const [countdown, setCountdown] = useState<number | null>(null);
   const [showProcessing, setShowProcessing] = useState(false);
+  const [showTranscriptOverlay, setShowTranscriptOverlay] = useState(false);
   const [showFaceGuide, setShowFaceGuide] = useState(false);
   const [faceGuideForRecording, setFaceGuideForRecording] = useState(false);
   const [reviewRequirement, setReviewRequirement] = useState<ExerciseReviewRequirement | null>(null);
@@ -1050,6 +1155,23 @@ export default function ExerciseScreen() {
     [exercise, language]
   );
 
+  const mirrorAudioUrl = useMemo(
+    () => exercise ? getAudioInstructionUrl(exercise, language) : null,
+    [exercise, language]
+  );
+
+  const mirrorTranscript = useMemo(
+    () => exercise ? getAudioTranscript(exercise, language) : null,
+    [exercise, language]
+  );
+
+  const handleToggleTranscript = useCallback(() => {
+    setShowTranscriptOverlay(prev => !prev);
+    if (Platform.OS !== 'web') {
+      void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    }
+  }, []);
+
   if (exerciseQuery.isLoading || !exercise) {
     return (
       <View style={styles.root}>
@@ -1131,12 +1253,35 @@ export default function ExerciseScreen() {
                   </ScaledText>
                 </View>
                 <RecordingWatermark exerciseName={exerciseTitle} patientName={patientName ?? undefined} visible={true} />
+                {showTranscriptOverlay && mirrorTranscript && !isRecording && (
+                  <TranscriptOverlay transcript={mirrorTranscript} onClose={() => setShowTranscriptOverlay(false)} />
+                )}
                 {isRecording && (
                   <View style={styles.recordingIndicator}>
                     <Animated.View style={[styles.recordingDot, { opacity: recordPulse }]} />
                     <ScaledText size={14} weight="700" color={Colors.white}>
                       {formatElapsed(elapsed)}
                     </ScaledText>
+                  </View>
+                )}
+                {splitCameraReady && !isRecording && (mirrorAudioUrl || mirrorTranscript) && (
+                  <View style={styles.mirrorAudioControls}>
+                    {mirrorAudioUrl && (
+                      <MirrorAudioButton audioUrl={mirrorAudioUrl} label={t('playInstructions')} stopLabel={t('stopInstructions')} />
+                    )}
+                    {mirrorTranscript && (
+                      <TouchableOpacity
+                        style={[mirrorAudioStyles.iconBtn, showTranscriptOverlay && mirrorAudioStyles.iconBtnActive]}
+                        onPress={handleToggleTranscript}
+                        activeOpacity={0.7}
+                        testID="split-transcript-toggle"
+                      >
+                        <FileText size={16} color={Colors.white} />
+                        <ScaledText size={10} weight="600" color={Colors.white} numberOfLines={1}>
+                          {showTranscriptOverlay ? t('hideTranscript') : t('viewTranscript')}
+                        </ScaledText>
+                      </TouchableOpacity>
+                    )}
                   </View>
                 )}
                 {splitCameraReady && (
@@ -1207,12 +1352,37 @@ export default function ExerciseScreen() {
 
               <RecordingWatermark exerciseName={exerciseTitle} patientName={patientName ?? undefined} visible={true} />
 
+              {showTranscriptOverlay && mirrorTranscript && !isRecording && (
+                <TranscriptOverlay transcript={mirrorTranscript} onClose={() => setShowTranscriptOverlay(false)} />
+              )}
+
               {isRecording && (
                 <View style={styles.recordingIndicator}>
                   <Animated.View style={[styles.recordingDot, { opacity: recordPulse }]} />
                   <ScaledText size={14} weight="700" color={Colors.white}>
                     {formatElapsed(elapsed)}
                   </ScaledText>
+                </View>
+              )}
+
+              {cameraReady && !isRecording && (mirrorAudioUrl || mirrorTranscript) && (
+                <View style={styles.mirrorAudioControls}>
+                  {mirrorAudioUrl && (
+                    <MirrorAudioButton audioUrl={mirrorAudioUrl} label={t('playInstructions')} stopLabel={t('stopInstructions')} />
+                  )}
+                  {mirrorTranscript && (
+                    <TouchableOpacity
+                      style={[mirrorAudioStyles.iconBtn, showTranscriptOverlay && mirrorAudioStyles.iconBtnActive]}
+                      onPress={handleToggleTranscript}
+                      activeOpacity={0.7}
+                      testID="mirror-transcript-toggle"
+                    >
+                      <FileText size={16} color={Colors.white} />
+                      <ScaledText size={10} weight="600" color={Colors.white} numberOfLines={1}>
+                        {showTranscriptOverlay ? t('hideTranscript') : t('viewTranscript')}
+                      </ScaledText>
+                    </TouchableOpacity>
+                  )}
                 </View>
               )}
 
@@ -1402,18 +1572,7 @@ export default function ExerciseScreen() {
                 </View>
               </View>
 
-              {(() => {
-                const audioUrl = getAudioInstructionUrl(exercise, language);
-                const transcript = getAudioTranscript(exercise, language);
-                return audioUrl ? (
-                  <AudioInstructionPlayer
-                    audioUrl={audioUrl}
-                    label={t('playInstructions')}
-                    stopLabel={t('stopInstructions')}
-                    transcript={transcript}
-                  />
-                ) : null;
-              })()}
+
 
               <TouchableOpacity
                 style={styles.mirrorButton}
@@ -1706,6 +1865,14 @@ const styles = StyleSheet.create({
     bottom: 16,
     alignSelf: 'center',
     alignItems: 'center',
+  },
+  mirrorAudioControls: {
+    position: 'absolute' as const,
+    bottom: 16,
+    left: 12,
+    flexDirection: 'row' as const,
+    gap: 8,
+    zIndex: 15,
   },
   recordButton: {
     width: 64,

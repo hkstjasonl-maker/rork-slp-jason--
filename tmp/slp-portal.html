@@ -240,6 +240,9 @@ tr:hover td{background:rgba(224,122,58,.03)}
 <div class="nav-item" data-section="clinicians" onclick="sw('clinicians')">
 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="8.5" cy="7" r="4"/><path d="M20 8v6"/><path d="M23 11h-6"/></svg>
 <span>Clinicians</span></div>
+<div class="nav-item" data-section="splash_ads" onclick="sw('splash_ads')">
+<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="3" width="20" height="14" rx="2" ry="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>
+<span>Splash Ads</span></div>
 </nav>
 <div class="sidebar-footer">
 <div class="lang-toggle">
@@ -425,6 +428,13 @@ tr:hover td{background:rgba(224,122,58,.03)}
 <div class="card-body" style="padding:0" id="orgSupporterList"><div class="loading"><div class="spinner"></div></div></div></div></div>
 </div>
 
+<!-- SPLASH ADS -->
+<div class="section" id="sec-splash_ads">
+<div class="card"><div class="card-header"><h3>Splash Ads / Greeting Screens 啟動廣告 / 問候畫面</h3>
+<button class="btn btn-primary" onclick="openSplashAdModal()">+ New Splash Ad</button></div>
+<div class="card-body" style="padding:0" id="splashAdList"><div class="loading"><div class="spinner"></div></div></div></div>
+</div>
+
 <!-- CLINICIANS -->
 <div class="section" id="sec-clinicians">
 <div class="tab-bar">
@@ -484,7 +494,7 @@ daysActive:'Days Active',streak:'Current Streak',longestStreak:'Best Streak',tot
 mostPracticed:'Most Practiced',insights:'Clinical Insights',dailyAct:'Daily Activity (last 14d)',exBreakdown:'Exercise Breakdown',ratingTrend:'Self-Rating Trend',compOverview:'Compliance Overview',assessHist:'Assessment History',
 reinAudio:'Reinforcement Audio (YouTube IDs)',
 trainingObjectives:'Training Objectives',noObjectives:'No objectives set yet.',addObjective:'Add Objective',editObjective:'Edit Objective',objectiveEn:'Objective (EN)',objectiveHant:'Objective (繁中)',objectiveHans:'Objective (简中)',sortOrder:'Sort Order',
-knowVid:'Knowledge Videos',s_knowledge:'Knowledge Video Library',n_knowledge:'Knowledge Videos',s_notifications:'Notifications',n_notifications:'Notifications',s_organisations:'Organisations',n_organisations:'Organisations',s_clinicians:'Clinician Management',n_clinicians:'Clinicians',vidLib:'Video Library',pushedVid:'Pushed to Patients',addVid:'Add Video',pushVid:'Push to Patients',pushAll:'Push to All',pushSpecific:'Push to Specific',startDate:'Start Date',endDate:'End Date',targetType:'Target',educational:'Educational',condKnowledge:'Condition Knowledge',caregiverGuide:'Caregiver Guidance',
+knowVid:'Knowledge Videos',s_knowledge:'Knowledge Video Library',n_knowledge:'Knowledge Videos',s_notifications:'Notifications',n_notifications:'Notifications',s_organisations:'Organisations',n_organisations:'Organisations',s_clinicians:'Clinician Management',n_clinicians:'Clinicians',s_splash_ads:'Splash Ads Management',n_splash_ads:'Splash Ads',vidLib:'Video Library',pushedVid:'Pushed to Patients',addVid:'Add Video',pushVid:'Push to Patients',pushAll:'Push to All',pushSpecific:'Push to Specific',startDate:'Start Date',endDate:'End Date',targetType:'Target',educational:'Educational',condKnowledge:'Condition Knowledge',caregiverGuide:'Caregiver Guidance',
 s_feeding:'Feeding Skills Videos',n_feeding:'Feeding Skills',feedLib:'Video Library',feedPushed:'Pushed to Patients',addFeedVid:'Add Video',feedingSkills:'Feeding Skills',
 feedCat_texture_modified:'Texture Modified Diet',feedCat_thickened_fluids:'Thickened Fluids',feedCat_positioning:'Positioning',feedCat_feeding_technique:'Feeding Technique',feedCat_oral_care:'Oral Care',feedCat_safety_signs:'Safety Signs',feedCat_other:'Other',
 l7:'Last 7 Days',l14:'Last 14 Days',l30:'Last 30 Days',l90:'Last 90 Days',allTime:'All Time'},
@@ -511,7 +521,7 @@ daysActive:'活躍天數',streak:'目前連續天數',longestStreak:'最長連�
 mostPracticed:'最常練習',insights:'臨床洞察',dailyAct:'每日活動（最近14天）',exBreakdown:'運動分佈',ratingTrend:'自評分趨勢',compOverview:'依從率概覽',assessHist:'評估歷史',
 reinAudio:'正向鼓勵音頻 (YouTube ID)',
 trainingObjectives:'訓練目標',noObjectives:'暫未設定目標。',addObjective:'新增目標',editObjective:'編輯目標',objectiveEn:'目標（英文）',objectiveHant:'目標（繁中）',objectiveHans:'目標（简中）',sortOrder:'排序',
-knowVid:'知識影片',s_knowledge:'知識影片庫',n_knowledge:'知識影片',s_notifications:'通知管理',n_notifications:'通知',s_organisations:'機構管理',n_organisations:'合作機構',s_clinicians:'治療師管理',n_clinicians:'治療師',vidLib:'影片庫',pushedVid:'已推送給患者',addVid:'新增影片',pushVid:'推送給患者',pushAll:'推送給全部',pushSpecific:'推送給指定患者',startDate:'開始日期',endDate:'結束日期',targetType:'目標',educational:'教育性',condKnowledge:'病症知識',caregiverGuide:'照顧者指導',
+knowVid:'知識影片',s_knowledge:'知識影片庫',n_knowledge:'知識影片',s_notifications:'通知管理',n_notifications:'通知',s_organisations:'機構管理',n_organisations:'合作機構',s_clinicians:'治療師管理',n_clinicians:'治療師',s_splash_ads:'啟動廣告管理',n_splash_ads:'啟動廣告',vidLib:'影片庫',pushedVid:'已推送給患者',addVid:'新增影片',pushVid:'推送給患者',pushAll:'推送給全部',pushSpecific:'推送給指定患者',startDate:'開始日期',endDate:'結束日期',targetType:'目標',educational:'教育性',condKnowledge:'病症知識',caregiverGuide:'照顧者指導',
 s_feeding:'餵食技巧影片',n_feeding:'餵食技巧',feedLib:'影片庫',feedPushed:'已推送給患者',addFeedVid:'新增影片',feedingSkills:'餵食技巧',
 feedCat_texture_modified:'質地調整飲食',feedCat_thickened_fluids:'凝固粉水',feedCat_positioning:'擺位',feedCat_feeding_technique:'餵食技巧',feedCat_oral_care:'口腔護理',feedCat_safety_signs:'安全徵兆',feedCat_other:'其他',
 l7:'最近7天',l14:'最近14天',l30:'最近30天',l90:'最近90天',allTime:'全部時間'}
@@ -560,6 +570,7 @@ if(name==='dashboard')populateSelects();
 if(name==='notifications')loadNotifications();
 if(name==='organisations'){loadOrgs('partner');loadOrgs('supporter')}
 if(name==='clinicians'){loadClinicians();loadSharedEx();loadSharedAssess()}
+if(name==='splash_ads')loadSplashAds()
 }
 
 /* ═══ 1. PATIENTS ═══ */
@@ -588,6 +599,15 @@ const body=`<div class="form-row"><div class="form-group"><label>${t('name')} *<
 <div class="form-group"><label>${t('diagnosis')}</label><input class="form-input" id="pD" value="${esc(p?.diagnosis||'')}"></div>
 <div class="form-row"><div class="form-group"><label>${t('active')}</label><select class="form-select" id="pA"><option value="true" ${p?.is_active!==false?'selected':''}>${t('yes')}</option><option value="false" ${p?.is_active===false?'selected':''}>${t('no')}</option></select></div>
 <div class="form-group"><label>${t('frozen')}</label><select class="form-select" id="pF"><option value="false" ${p?.is_frozen!==true?'selected':''}>${t('no')}</option><option value="true" ${p?.is_frozen===true?'selected':''}>${t('yes')}</option></select></div></div>
+<h4 style="margin:18px 0 10px;font-size:.9rem;color:var(--accent);font-weight:700">Therapist Photo URLs 治療師照片</h4>
+<div class="form-row"><div class="form-group"><label>Photo URL (real photo)</label><div class="pick-wrap"><div class="field-with-btn"><input class="form-input" id="pThPhoto" value="${esc(p?.therapist_photo_url||'')}" placeholder="https://... or leave blank for default"><button type="button" class="btn btn-sm btn-primary" onclick="triggerUploadPatientPhoto('pThPhoto')">Upload</button></div></div></div>
+<div class="form-group"><label>Cartoon URL (cartoon avatar)</label><div class="pick-wrap"><div class="field-with-btn"><input class="form-input" id="pThCartoon" value="${esc(p?.therapist_cartoon_url||'')}" placeholder="https://... or leave blank for default"><button type="button" class="btn btn-sm btn-primary" onclick="triggerUploadPatientPhoto('pThCartoon')">Upload</button></div></div></div></div>
+<p style="font-size:.75rem;color:var(--text3);margin-bottom:10px">Leave blank to use your default photos. Set these only if another therapist manages this patient.</p>
+<h4 style="margin:18px 0 10px;font-size:.9rem;color:var(--accent);font-weight:700">Managing Organisation 管理機構</h4>
+<div class="form-row-3"><div class="form-group"><label>Org Name (EN)</label><input class="form-input" id="pMOrgEn" value="${esc(p?.managing_org_name_en||'')}" placeholder="e.g. ABC Therapy Centre"></div>
+<div class="form-group"><label>Org Name (繁中)</label><input class="form-input" id="pMOrgZh" value="${esc(p?.managing_org_name_zh||'')}" placeholder="e.g. ABC治療中心"></div>
+<div class="form-group"><label>Org Logo URL</label><div class="pick-wrap"><div class="field-with-btn"><input class="form-input" id="pMOrgLogo" value="${esc(p?.managing_org_logo_url||'')}" placeholder="https://..."><button type="button" class="btn btn-sm btn-primary" onclick="triggerUploadPatientPhoto('pMOrgLogo')">Upload</button></div></div></div></div>
+<p style="font-size:.75rem;color:var(--text3);margin-bottom:10px">If this patient is managed by an external organisation, fill this in. It shows in the patient's Settings screen.</p>
 <h4 style="margin:18px 0 10px;font-size:.9rem;color:var(--text2)">${t('reinAudio')}</h4>
 <div class="form-row-3"><div class="form-group"><label>English</label><input class="form-input" id="pAE" value="${esc(p?.reinforcement_audio_youtube_id||'')}"></div>
 <div class="form-group"><label>繁體中文</label><input class="form-input" id="pAH" value="${esc(p?.reinforcement_audio_youtube_id_zh_hant||'')}"></div>
@@ -597,6 +617,11 @@ openModal(id?t('edit')+' '+t('patient'):t('addPat'),body,`<button class="btn btn
 async function savePat(id){
 const o={patient_name:document.getElementById('pN').value.trim(),access_code:document.getElementById('pC').value.trim(),diagnosis:document.getElementById('pD').value.trim()||null,
 is_active:document.getElementById('pA').value==='true',is_frozen:document.getElementById('pF').value==='true',
+therapist_photo_url:document.getElementById('pThPhoto').value.trim()||null,
+therapist_cartoon_url:document.getElementById('pThCartoon').value.trim()||null,
+managing_org_name_en:document.getElementById('pMOrgEn').value.trim()||null,
+managing_org_name_zh:document.getElementById('pMOrgZh').value.trim()||null,
+managing_org_logo_url:document.getElementById('pMOrgLogo').value.trim()||null,
 reinforcement_audio_youtube_id:document.getElementById('pAE').value.trim()||null,
 reinforcement_audio_youtube_id_zh_hant:document.getElementById('pAH').value.trim()||null,
 reinforcement_audio_youtube_id_zh_hans:document.getElementById('pAS').value.trim()||null};
@@ -2024,6 +2049,86 @@ const{error:sErr}=await sb.storage.from('review-videos').remove([filePath]);if(s
 const{error}=await sb.from('feeding_skill_video_submissions').delete().eq('id',subId);
 if(error){toast('Error: '+error.message,'error');return}
 toast('Submission deleted ✓');const pid=document.getElementById('feedReviewPatientSelect').value;if(pid)loadFeedVideoSubs(pid)}
+
+/* ═══ 10. SPLASH ADS ═══ */
+let allSplashAds=[];
+
+async function loadSplashAds(){
+const{data,error}=await sb.from('splash_ads').select('*').order('created_at',{ascending:false});
+if(error){document.getElementById('splashAdList').innerHTML='<div class="empty"><p>'+esc(error.message)+'<br><br><strong>Create the table first:</strong><pre style="text-align:left;font-size:.72rem;background:var(--bg3);padding:12px;border-radius:8px;margin-top:8px;overflow-x:auto">CREATE TABLE IF NOT EXISTS splash_ads (\n  id UUID DEFAULT gen_random_uuid() PRIMARY KEY,\n  title TEXT NOT NULL,\n  image_url TEXT NOT NULL,\n  link_url TEXT,\n  duration_seconds INTEGER DEFAULT 5,\n  target_type TEXT DEFAULT \'all\',\n  start_date DATE NOT NULL,\n  end_date DATE NOT NULL,\n  is_active BOOLEAN DEFAULT true,\n  sort_order INTEGER DEFAULT 0,\n  created_at TIMESTAMPTZ DEFAULT NOW()\n);\nALTER TABLE splash_ads ENABLE ROW LEVEL SECURITY;\nCREATE POLICY "Allow all splash_ads" ON splash_ads FOR ALL USING (true) WITH CHECK (true);\n\nCREATE TABLE IF NOT EXISTS splash_ad_targets (\n  id UUID DEFAULT gen_random_uuid() PRIMARY KEY,\n  splash_ad_id UUID NOT NULL REFERENCES splash_ads(id) ON DELETE CASCADE,\n  patient_id UUID NOT NULL REFERENCES patients(id) ON DELETE CASCADE,\n  created_at TIMESTAMPTZ DEFAULT NOW(),\n  UNIQUE(splash_ad_id, patient_id)\n);\nALTER TABLE splash_ad_targets ENABLE ROW LEVEL SECURITY;\nCREATE POLICY "Allow all splash_ad_targets" ON splash_ad_targets FOR ALL USING (true) WITH CHECK (true);</pre></p></div>';return}
+allSplashAds=data||[];renderSplashAds()}
+
+function renderSplashAds(){
+if(!allSplashAds.length){document.getElementById('splashAdList').innerHTML='<div class="empty"><p>No splash ads created yet. Click "+ New Splash Ad" to create one.</p></div>';return}
+const today=new Date().toISOString().split('T')[0];
+let h='<table><thead><tr><th style="width:80px">Preview</th><th>Title</th><th>Target</th><th>Duration</th><th>Period</th><th>Status</th><th>Actions</th></tr></thead><tbody>';
+allSplashAds.forEach(a=>{
+const isExpired=a.end_date<today;const isUpcoming=a.start_date>today;
+const status=!a.is_active?'<span class="badge badge-red">Disabled</span>':isExpired?'<span class="badge badge-red">Expired</span>':isUpcoming?'<span class="badge badge-orange">Scheduled</span>':'<span class="badge badge-green">Active</span>';
+const targetBadge=a.target_type==='all'?'<span class="badge badge-purple">All Patients</span>':'<span class="badge badge-orange">Specific</span>';
+const preview=a.image_url?`<img src="${esc(a.image_url)}" style="width:72px;height:48px;object-fit:cover;border-radius:6px;background:var(--bg3)">`:'<div style="width:72px;height:48px;border-radius:6px;background:var(--bg3);display:flex;align-items:center;justify-content:center;color:var(--text3);font-size:.7rem">No image</div>';
+h+=`<tr style="${isExpired?'opacity:.5':''}"><td>${preview}</td><td><strong>${esc(a.title)}</strong>${a.link_url?'<br><a href="'+esc(a.link_url)+'" target="_blank" style="font-size:.72rem">Link ↗</a>':''}</td><td>${targetBadge}</td><td>${a.duration_seconds||5}s</td><td style="font-size:.8rem">${a.start_date} → ${a.end_date}</td><td>${status}</td><td style="white-space:nowrap"><button class="btn btn-sm btn-secondary" onclick="openSplashAdModal('${a.id}')">${t('edit')}</button> <button class="btn btn-sm btn-danger" onclick="delSplashAd('${a.id}')">${t('del')}</button></td></tr>`});
+h+='</tbody></table>';document.getElementById('splashAdList').innerHTML=h}
+
+function openSplashAdModal(id){
+const a=id?allSplashAds.find(x=>x.id===id):null;
+const td=new Date().toISOString().split('T')[0];
+const ed=new Date(Date.now()+30*864e5).toISOString().split('T')[0];
+const body=`<div class="form-group"><label>Title / Description *</label><input class="form-input" id="saTitle" value="${esc(a?.title||'')}" placeholder="e.g. Holiday Greeting, New Feature Announcement"></div>
+<div class="form-group"><label>Image URL * (full-screen splash image)</label><div class="pick-wrap"><div class="field-with-btn"><input class="form-input" id="saImg" value="${esc(a?.image_url||'')}" placeholder="https://..."><button type="button" class="btn btn-sm btn-primary" onclick="triggerUploadSplashAd()">Upload Image</button></div></div>${a?.image_url?'<img src="'+esc(a.image_url)+'" style="max-width:200px;max-height:120px;margin-top:8px;border-radius:8px;object-fit:contain">':''}</div>
+<div class="form-group"><label>Link URL (optional — tappable image opens this link)</label><input class="form-input" id="saLink" value="${esc(a?.link_url||'')}" placeholder="https://..."></div>
+<div class="form-row-3"><div class="form-group"><label>Duration (seconds)</label><select class="form-select" id="saDur"><option value="3" ${a?.duration_seconds===3?'selected':''}>3s</option><option value="5" ${!a||a?.duration_seconds===5?'selected':''}>5s (default)</option><option value="8" ${a?.duration_seconds===8?'selected':''}>8s</option><option value="10" ${a?.duration_seconds===10?'selected':''}>10s</option></select></div>
+<div class="form-group"><label>Target</label><select class="form-select" id="saTarget" onchange="toggleSplashPatients()"><option value="all" ${a?.target_type!=='specific'?'selected':''}>All Patients</option><option value="specific" ${a?.target_type==='specific'?'selected':''}>Specific Patients</option></select></div>
+<div class="form-group"><label>Active</label><select class="form-select" id="saActive"><option value="true" ${a?.is_active!==false?'selected':''}>Yes</option><option value="false" ${a?.is_active===false?'selected':''}>No</option></select></div></div>
+<div class="form-group" id="saPatientsWrap" style="display:${a?.target_type==='specific'?'block':'none'}"><label>Select Patients</label><div id="saPatientsList" style="max-height:160px;overflow-y:auto;border:1px solid var(--border);border-radius:var(--radius-sm);padding:8px"></div></div>
+<div class="form-row"><div class="form-group"><label>Start Date *</label><input type="date" class="form-input" id="saStart" value="${a?.start_date||td}"></div><div class="form-group"><label>End Date *</label><input type="date" class="form-input" id="saEnd" value="${a?.end_date||ed}"></div></div>
+<div class="form-group"><label>Sort Order (lower = shown first if multiple active)</label><input type="number" class="form-input" id="saSort" value="${a?.sort_order||0}"></div>`;
+openModal(id?'Edit Splash Ad':'New Splash Ad 新啟動廣告',body,`<button class="btn btn-secondary" onclick="closeModal()">${t('cancel')}</button><button class="btn btn-primary" onclick="saveSplashAd('${id||''}')">${id?t('update'):t('create')}</button>`,true);
+if(!allPatients.length)sb.from('patients').select('*').order('patient_name').then(({data})=>{allPatients=data||[];renderSplashAdPatients(id)});
+else renderSplashAdPatients(id)}
+
+function toggleSplashPatients(){document.getElementById('saPatientsWrap').style.display=document.getElementById('saTarget').value==='specific'?'block':'none'}
+
+async function renderSplashAdPatients(adId){
+let selectedIds=[];
+if(adId){const{data}=await sb.from('splash_ad_targets').select('patient_id').eq('splash_ad_id',adId);selectedIds=(data||[]).map(r=>r.patient_id)}
+document.getElementById('saPatientsList').innerHTML=allPatients.filter(p=>p.is_active!==false).map(p=>`<label style="display:flex;align-items:center;gap:8px;padding:3px 0;font-size:.85rem;cursor:pointer"><input type="checkbox" value="${p.id}" class="sa-pat-cb" ${selectedIds.includes(p.id)?'checked':''}> ${esc(p.patient_name)}</label>`).join('')}
+
+async function saveSplashAd(id){
+const o={title:document.getElementById('saTitle').value.trim(),image_url:document.getElementById('saImg').value.trim(),link_url:document.getElementById('saLink').value.trim()||null,duration_seconds:parseInt(document.getElementById('saDur').value)||5,target_type:document.getElementById('saTarget').value,is_active:document.getElementById('saActive').value==='true',start_date:document.getElementById('saStart').value,end_date:document.getElementById('saEnd').value,sort_order:parseInt(document.getElementById('saSort').value)||0};
+if(!o.title){toast('Title required','error');return}
+if(!o.image_url){toast('Image URL required','error');return}
+if(!o.start_date||!o.end_date){toast('Set start and end dates','error');return}
+let aId=id,error;
+if(id){({error}=await sb.from('splash_ads').update(o).eq('id',id))}
+else{const{data,error:e}=await sb.from('splash_ads').insert(o).select();error=e;if(data)aId=data[0].id}
+if(error){toast('Error: '+error.message,'error');return}
+if(o.target_type==='specific'&&aId){
+await sb.from('splash_ad_targets').delete().eq('splash_ad_id',aId);
+const pIds=[...document.querySelectorAll('.sa-pat-cb:checked')].map(cb=>cb.value);
+if(pIds.length){const rows=pIds.map(pid=>({splash_ad_id:aId,patient_id:pid}));await sb.from('splash_ad_targets').upsert(rows,{onConflict:'splash_ad_id,patient_id'})}}
+else if(aId){await sb.from('splash_ad_targets').delete().eq('splash_ad_id',aId)}
+toast(id?'Updated':'Splash ad created ✓');closeModal();loadSplashAds()}
+
+async function delSplashAd(id){if(!confirm('Delete this splash ad?'))return;await sb.from('splash_ads').delete().eq('id',id);toast('Deleted');loadSplashAds()}
+
+function triggerUploadSplashAd(){
+const fileInput=document.createElement('input');fileInput.type='file';fileInput.accept='.png,.jpg,.jpeg,.webp';
+fileInput.onchange=async(e)=>{const file=e.target.files[0];if(!file)return;
+const safeName='splash-ad-'+Date.now()+'-'+file.name.toLowerCase().replace(/\s+/g,'-').replace(/[^a-z0-9._-]/g,'');
+try{const{error}=await sb.storage.from('logos').upload(safeName,file,{cacheControl:'3600',upsert:true});
+if(error)throw error;const url=SUPABASE_URL+'/storage/v1/object/public/logos/'+safeName;
+document.getElementById('saImg').value=url;toast('Image uploaded ✓')}
+catch(err){toast('Upload failed: '+err.message+'. Ensure the "logos" bucket exists.','error')}};fileInput.click()}
+
+function triggerUploadPatientPhoto(inputId){
+const fileInput=document.createElement('input');fileInput.type='file';fileInput.accept='.png,.jpg,.jpeg,.webp';
+fileInput.onchange=async(e)=>{const file=e.target.files[0];if(!file)return;
+const safeName='patient-photo-'+Date.now()+'-'+file.name.toLowerCase().replace(/\s+/g,'-').replace(/[^a-z0-9._-]/g,'');
+try{const{error}=await sb.storage.from('logos').upload(safeName,file,{cacheControl:'3600',upsert:true});
+if(error)throw error;const url=SUPABASE_URL+'/storage/v1/object/public/logos/'+safeName;
+document.getElementById(inputId).value=url;toast('Photo uploaded ✓')}
+catch(err){toast('Upload failed: '+err.message,'error')}};fileInput.click()}
 
 /* ═══ INIT ═══ */
 (async()=>{await loadPatients();const{data}=await sb.from('exercise_library').select('*').order('title_en');allExercises=data||[]})();

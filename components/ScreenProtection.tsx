@@ -109,7 +109,7 @@ export function ScreenProtection({ children }: ScreenProtectionProps) {
               {t('contentProtected')}
             </ScaledText>
             <ScaledText size={13} color="rgba(255,255,255,0.7)" style={styles.privacySubtext}>
-              © Speech-Language Pathologist Jason Lai
+              © The copyright of this application is owned by Speech-Language Pathologist Jason Lai
             </ScaledText>
           </View>
         </Animated.View>

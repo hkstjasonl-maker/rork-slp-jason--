@@ -1286,35 +1286,12 @@ export default function ExerciseScreen() {
                   </ScaledText>
                 </View>
                 <RecordingWatermark exerciseName={exerciseTitle} patientName={patientName ?? undefined} visible={true} />
-                {showTranscriptOverlay && mirrorTranscript && !isRecording && (
-                  <TranscriptOverlay transcript={mirrorTranscript} onClose={() => setShowTranscriptOverlay(false)} />
-                )}
                 {isRecording && (
                   <View style={styles.recordingIndicator}>
                     <Animated.View style={[styles.recordingDot, { opacity: recordPulse }]} />
                     <ScaledText size={14} weight="700" color={Colors.white}>
                       {formatElapsed(elapsed)}
                     </ScaledText>
-                  </View>
-                )}
-                {splitCameraReady && !isRecording && (mirrorAudioUrl || mirrorTranscript) && (
-                  <View style={styles.mirrorAudioControls}>
-                    {mirrorAudioUrl && (
-                      <MirrorAudioButton audioUrl={mirrorAudioUrl} label={t('playInstructions')} stopLabel={t('stopInstructions')} />
-                    )}
-                    {mirrorTranscript && (
-                      <TouchableOpacity
-                        style={[mirrorAudioStyles.iconBtn, showTranscriptOverlay && mirrorAudioStyles.iconBtnActive]}
-                        onPress={handleToggleTranscript}
-                        activeOpacity={0.7}
-                        testID="split-transcript-toggle"
-                      >
-                        <FileText size={16} color={Colors.white} />
-                        <ScaledText size={10} weight="600" color={Colors.white} numberOfLines={1}>
-                          {showTranscriptOverlay ? t('hideTranscript') : t('viewTranscript')}
-                        </ScaledText>
-                      </TouchableOpacity>
-                    )}
                   </View>
                 )}
                 {splitCameraReady && (

@@ -32,6 +32,9 @@ export const [AppProvider, useApp] = createContextHook(() => {
   const [therapistCartoonUrl, setTherapistCartoonUrl] = useState<string | null>(null);
   const [therapistNameEn, setTherapistNameEn] = useState<string | null>(null);
   const [therapistNameZh, setTherapistNameZh] = useState<string | null>(null);
+  const [managingOrgNameEn, setManagingOrgNameEn] = useState<string | null>(null);
+  const [managingOrgNameZh, setManagingOrgNameZh] = useState<string | null>(null);
+  const [managingOrgLogoUrl, setManagingOrgLogoUrl] = useState<string | null>(null);
 
   useEffect(() => {
     void loadPersistedState();
@@ -91,6 +94,9 @@ export const [AppProvider, useApp] = createContextHook(() => {
     setTherapistCartoonUrl(null);
     setTherapistNameEn(null);
     setTherapistNameZh(null);
+    setManagingOrgNameEn(null);
+    setManagingOrgNameZh(null);
+    setManagingOrgLogoUrl(null);
     await Promise.all([
       AsyncStorage.removeItem(STORAGE_KEYS.PATIENT_ID),
       AsyncStorage.removeItem(STORAGE_KEYS.PATIENT_NAME),
@@ -146,7 +152,7 @@ export const [AppProvider, useApp] = createContextHook(() => {
 
         const { data: patientData, error: patientError } = await supabase
           .from('patients')
-          .select('reinforcement_audio_youtube_id, reinforcement_audio_youtube_id_zh_hant, reinforcement_audio_youtube_id_zh_hans, reinforcement_audio_url_en, reinforcement_audio_url_zh_hant, reinforcement_audio_url_zh_hans, therapist_photo_url, therapist_cartoon_url, therapist_name_en, therapist_name_zh')
+          .select('reinforcement_audio_youtube_id, reinforcement_audio_youtube_id_zh_hant, reinforcement_audio_youtube_id_zh_hans, reinforcement_audio_url_en, reinforcement_audio_url_zh_hant, reinforcement_audio_url_zh_hans, therapist_photo_url, therapist_cartoon_url, therapist_name_en, therapist_name_zh, managing_org_name_en, managing_org_name_zh, managing_org_logo_url')
           .eq('id', patientId)
           .single();
 
@@ -162,6 +168,9 @@ export const [AppProvider, useApp] = createContextHook(() => {
           setTherapistCartoonUrl(patientData.therapist_cartoon_url || null);
           setTherapistNameEn(patientData.therapist_name_en || null);
           setTherapistNameZh(patientData.therapist_name_zh || null);
+          setManagingOrgNameEn(patientData.managing_org_name_en || null);
+          setManagingOrgNameZh(patientData.managing_org_name_zh || null);
+          setManagingOrgLogoUrl(patientData.managing_org_logo_url || null);
 
           if (lang === 'zh_hant') {
             audioUrl = patientData.reinforcement_audio_url_zh_hant || patientData.reinforcement_audio_url_en || null;
@@ -227,6 +236,9 @@ export const [AppProvider, useApp] = createContextHook(() => {
     therapistCartoonUrl,
     therapistNameEn,
     therapistNameZh,
+    managingOrgNameEn,
+    managingOrgNameZh,
+    managingOrgLogoUrl,
     setLanguage,
     setTermsAccepted,
     setPatient,
@@ -240,6 +252,7 @@ export const [AppProvider, useApp] = createContextHook(() => {
     fontSizeLevel, fontScale, isReady, reinforcementAudioId,
     reinforcementAudioUrl, tutorialCompleted,
     therapistPhotoUrl, therapistCartoonUrl, therapistNameEn, therapistNameZh,
+    managingOrgNameEn, managingOrgNameZh, managingOrgLogoUrl,
     setLanguage,
     setTermsAccepted, setPatient, clearPatient, setFontSizeLevel,
     setTutorialCompleted, resetTutorial, t,

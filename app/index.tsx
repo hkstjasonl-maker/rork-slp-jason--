@@ -284,6 +284,7 @@ const styles = StyleSheet.create({
     letterSpacing: 0.8,
     marginBottom: 10,
     textTransform: 'uppercase',
+    alignSelf: 'flex-start',
   },
   orgLogosRow: {
     flexDirection: 'row',

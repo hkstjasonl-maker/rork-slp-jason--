@@ -7,7 +7,6 @@ import {
   SafeAreaView,
   ActivityIndicator,
   RefreshControl,
-  Image,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useQuery } from '@tanstack/react-query';
@@ -17,7 +16,7 @@ import { CopyrightFooter } from '@/components/CopyrightFooter';
 import { AppTutorial } from '@/components/AppTutorial';
 import { supabase } from '@/lib/supabase';
 import Colors from '@/constants/colors';
-import { JASON_CARTOON } from '@/constants/images';
+import { TherapistImage } from '@/components/TherapistImage';
 import { Exercise, ExerciseProgram, ExerciseLog, Language, ExerciseReviewRequirement, FeedingSkillAssignment, ProgramObjective } from '@/types';
 import { getDosageProgressText, getExerciseDosage } from '@/lib/dosage';
 import { log } from '@/lib/logger';
@@ -647,7 +646,7 @@ export default function HomeScreen() {
                   {patientName}
                 </ScaledText>
               </View>
-              <Image source={JASON_CARTOON} style={styles.welcomeAvatar} />
+              <TherapistImage type="cartoon" style={styles.welcomeAvatar} />
             </View>
           </View>
 

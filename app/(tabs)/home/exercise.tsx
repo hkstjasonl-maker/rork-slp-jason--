@@ -7,7 +7,6 @@ import {
   SafeAreaView,
   ActivityIndicator,
   Platform,
-  Image,
   Animated,
   Alert,
   Modal,
@@ -36,7 +35,7 @@ import { supabase } from '@/lib/supabase';
 import { getStarsForSession, calculateStars } from '@/lib/stars';
 import { getExerciseDosage } from '@/lib/dosage';
 import Colors from '@/constants/colors';
-import { JASON_CARTOON } from '@/constants/images';
+import { TherapistImage } from '@/components/TherapistImage';
 import { Exercise, ExerciseLog, Language, ExerciseReviewRequirement } from '@/types';
 import { log } from '@/lib/logger';
 import { FULLSCREEN_PREVENTION_CSS, FULLSCREEN_PREVENTION_JS, INJECTED_JS_BEFORE_LOAD } from '@/lib/fullscreenPrevention';
@@ -1353,7 +1352,7 @@ export default function ExerciseScreen() {
                     { opacity: bubbleFade, transform: [{ translateY: bubbleSlide }] },
                   ]}
                 >
-                  <Image source={JASON_CARTOON} style={styles.slpAvatar} />
+                  <TherapistImage type="cartoon" style={styles.slpAvatar} />
                   <View style={styles.speechBubble}>
                     <View style={styles.speechBubbleArrow} />
                     <ScaledText size={13} color={Colors.textPrimary} style={styles.speechBubbleText}>

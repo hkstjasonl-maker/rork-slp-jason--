@@ -50,6 +50,9 @@ export default function SettingsScreen() {
     setFontSizeLevel,
     setLanguage,
     clearPatient,
+    managingOrgNameEn,
+    managingOrgNameZh,
+    managingOrgLogoUrl,
   } = useApp();
   const [showTutorial, setShowTutorial] = useState(false);
   const router = useRouter();
@@ -222,6 +225,34 @@ export default function SettingsScreen() {
             </View>
           </View>
 
+          {(managingOrgNameEn || managingOrgNameZh) && (
+            <View style={styles.section}>
+              <View style={styles.managingOrgCard}>
+                {managingOrgLogoUrl ? (
+                  <Image
+                    source={{ uri: managingOrgLogoUrl }}
+                    style={styles.managingOrgLogo}
+                    resizeMode="contain"
+                  />
+                ) : (
+                  <View style={styles.managingOrgIconCircle}>
+                    <Building2 size={24} color={Colors.primary} />
+                  </View>
+                )}
+                <View style={styles.managingOrgInfo}>
+                  <ScaledText size={11} color={Colors.textSecondary} weight="600">
+                    {language === 'zh_hant' || language === 'zh_hans' ? '管理機構' : 'Managing Organisation'}
+                  </ScaledText>
+                  <ScaledText size={15} weight="700" color={Colors.textPrimary}>
+                    {language === 'zh_hant' || language === 'zh_hans'
+                      ? (managingOrgNameZh || managingOrgNameEn)
+                      : (managingOrgNameEn || managingOrgNameZh)}
+                  </ScaledText>
+                </View>
+              </View>
+            </View>
+          )}
+
           <View style={styles.section}>
             <View style={styles.infoCard}>
               <Info size={18} color={Colors.textSecondary} />
@@ -336,5 +367,34 @@ const styles = StyleSheet.create({
   versionText: {
     fontSize: 14,
     color: Colors.textSecondary,
+  },
+  managingOrgCard: {
+    backgroundColor: Colors.card,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: Colors.border,
+    padding: 18,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 14,
+  },
+  managingOrgLogo: {
+    width: 50,
+    height: 50,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: Colors.border,
+  },
+  managingOrgIconCircle: {
+    width: 50,
+    height: 50,
+    borderRadius: 10,
+    backgroundColor: Colors.primaryLight,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  managingOrgInfo: {
+    flex: 1,
+    gap: 3,
   },
 });

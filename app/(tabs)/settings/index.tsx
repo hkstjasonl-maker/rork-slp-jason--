@@ -29,6 +29,7 @@ import {
   BookOpen,
   Heart,
   Accessibility,
+  Shield,
 } from 'lucide-react-native';
 import { AppTutorial } from '@/components/AppTutorial';
 
@@ -239,6 +240,31 @@ export default function SettingsScreen() {
               </TouchableOpacity>
             </View>
           )}
+
+          <View style={styles.section}>
+            <TouchableOpacity
+              style={styles.actionCard}
+              onPress={() => {
+                void Linking.openURL('https://slpmedroom.com/privacy-policy');
+              }}
+              activeOpacity={0.7}
+            >
+              <Shield size={20} color={Colors.primary} />
+              <View style={styles.actionContent}>
+                <ScaledText size={15} weight="600" color={Colors.textPrimary}>
+                  {language === 'zh_hant' || language === 'zh_hans'
+                    ? '私隱政策'
+                    : 'Privacy Policy'}
+                </ScaledText>
+                <ScaledText size={13} color={Colors.textSecondary}>
+                  {language === 'zh_hant' || language === 'zh_hans'
+                    ? '了解我們如何保護您的個人資料'
+                    : 'Learn how we protect your personal data'}
+                </ScaledText>
+              </View>
+              <ChevronRight size={18} color={Colors.disabled} />
+            </TouchableOpacity>
+          </View>
 
           <View style={styles.section}>
             <View style={styles.therapistCard}>

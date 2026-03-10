@@ -18,6 +18,7 @@ function RootLayoutNav() {
   return (
     <Stack screenOptions={{ headerShown: false }}>
       <Stack.Screen name="index" />
+      <Stack.Screen name="splash-ad" options={{ headerShown: false, animation: 'fade' }} />
       <Stack.Screen name="language" />
       <Stack.Screen name="terms" />
       <Stack.Screen name="code-entry" />

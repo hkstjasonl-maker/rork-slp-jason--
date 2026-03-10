@@ -67,19 +67,65 @@ export default function IndexScreen() {
   useEffect(() => {
     if (!isReady) return;
 
-    const timer = setTimeout(() => {
+    const checkSplashAd = async () => {
+      let nextRoute = '/';
       if (!language) {
-        router.replace('/language');
+        nextRoute = '/language';
       } else if (!termsAccepted) {
-        router.replace('/terms');
+        nextRoute = '/terms';
       } else if (!patientId) {
-        router.replace('/code-entry');
+        nextRoute = '/code-entry';
       } else {
-        router.replace('/(tabs)/home');
+        nextRoute = '/(tabs)/home';
       }
-    }, 2500);
 
-    return () => clearTimeout(timer);
+      // Check for active splash ads (only if user has a patientId)
+      if (patientId) {
+        try {
+          const today = new Date().toISOString().split('T')[0];
+          const { data: ads } = await supabase
+            .from('splash_ads')
+            .select('*, splash_ad_targets(patient_id)')
+            .eq('is_active', true)
+            .lte('start_date', today)
+            .gte('end_date', today)
+            .order('sort_order', { ascending: true })
+            .limit(1);
+
+          if (ads && ads.length > 0) {
+            const ad = ads[0];
+            const isTargetedAll = ad.target_type === 'all';
+            const isTargetedToMe = ad.splash_ad_targets?.some(
+              (t: { patient_id: string }) => t.patient_id === patientId
+            );
+
+            if (isTargetedAll || isTargetedToMe) {
+              setTimeout(() => {
+                router.replace({
+                  pathname: '/splash-ad',
+                  params: {
+                    imageUrl: ad.image_url,
+                    linkUrl: ad.link_url || '',
+                    duration: String(ad.display_duration_seconds || 5),
+                    nextRoute: nextRoute,
+                  },
+                });
+              }, 2500);
+              return;
+            }
+          }
+        } catch (e) {
+          log('[Splash] Error checking splash ads:', e);
+        }
+      }
+
+      // No splash ad — navigate normally
+      setTimeout(() => {
+        router.replace(nextRoute as any);
+      }, 2500);
+    };
+
+    void checkSplashAd();
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isReady, language, termsAccepted, patientId]);
 

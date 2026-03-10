@@ -23,7 +23,7 @@ import { useApp } from '@/contexts/AppContext';
 import { ScaledText } from '@/components/ScaledText';
 import { YouTubePlayer } from '@/components/YouTubePlayer';
 import { VimeoPlayer } from '@/components/VimeoPlayer';
-import { useAudioPlayer, useAudioPlayerStatus } from 'expo-audio';
+
 import { EncouragementModal } from '@/components/EncouragementModal';
 import { SelfRatingModal } from '@/components/SelfRatingModal';
 import { CopyrightFooter } from '@/components/CopyrightFooter';
@@ -134,28 +134,61 @@ LiveCamera.displayName = 'LiveCamera';
 const MemoLiveCamera = memo(LiveCamera, (prev, next) => prev.cameraMode === next.cameraMode && prev.onCameraReady === next.onCameraReady);
 
 function MirrorAudioButtonInner({ audioUrl, label, stopLabel }: { audioUrl: string; label: string; stopLabel: string }) {
-  const player = useAudioPlayer({ uri: audioUrl });
-  const status = useAudioPlayerStatus(player);
-  const isPlaying = status.playing;
+  const soundRef = useRef<Audio.Sound | null>(null);
+  const [isPlaying, setIsPlaying] = useState(false);
 
-  const handleToggle = useCallback(() => {
-    if (isPlaying) {
-      log('[MirrorAudio] Pausing');
-      player.pause();
-    } else {
-      const duration = status.duration || 0;
-      const currentTime = status.currentTime || 0;
-      if (status.didJustFinish || (duration > 0 && currentTime >= duration - 0.1)) {
-        void player.seekTo(0);
-        player.play();
-      } else {
-        player.play();
+  useEffect(() => {
+    return () => {
+      if (soundRef.current) {
+        soundRef.current.unloadAsync().catch(() => {});
+        soundRef.current = null;
       }
+    };
+  }, []);
+
+  const handleToggle = useCallback(async () => {
+    try {
+      if (isPlaying && soundRef.current) {
+        log('[MirrorAudio] Pausing');
+        await soundRef.current.pauseAsync();
+        setIsPlaying(false);
+      } else {
+        if (!soundRef.current) {
+          log('[MirrorAudio] Creating sound from:', audioUrl);
+          await Audio.setAudioModeAsync({
+            allowsRecordingIOS: false,
+            playsInSilentModeIOS: true,
+            staysActiveInBackground: false,
+            shouldDuckAndroid: true,
+          });
+          const { sound } = await Audio.Sound.createAsync(
+            { uri: audioUrl },
+            { shouldPlay: true }
+          );
+          soundRef.current = sound;
+          sound.setOnPlaybackStatusUpdate((status) => {
+            if (status.isLoaded && status.didJustFinish) {
+              setIsPlaying(false);
+            }
+          });
+          setIsPlaying(true);
+        } else {
+          const status = await soundRef.current.getStatusAsync();
+          if (status.isLoaded && status.didJustFinish) {
+            await soundRef.current.replayAsync();
+          } else {
+            await soundRef.current.playAsync();
+          }
+          setIsPlaying(true);
+        }
+      }
+    } catch (e) {
+      log('[MirrorAudio] Error:', e);
     }
     if (Platform.OS !== 'web') {
       void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     }
-  }, [isPlaying, player, status.didJustFinish, status.duration, status.currentTime]);
+  }, [isPlaying, audioUrl]);
 
   return (
     <TouchableOpacity
@@ -1868,10 +1901,10 @@ const styles = StyleSheet.create({
   },
   mirrorAudioControls: {
     position: 'absolute' as const,
-    bottom: 16,
-    left: 12,
+    top: 36,
+    left: 10,
     flexDirection: 'row' as const,
-    gap: 8,
+    gap: 6,
     zIndex: 15,
   },
   recordButton: {

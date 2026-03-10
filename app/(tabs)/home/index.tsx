@@ -7,7 +7,10 @@ import {
   SafeAreaView,
   ActivityIndicator,
   RefreshControl,
+  Modal,
+  Platform,
 } from 'react-native';
+import * as Haptics from 'expo-haptics';
 import { useRouter } from 'expo-router';
 import { useQuery } from '@tanstack/react-query';
 import { useApp } from '@/contexts/AppContext';
@@ -52,6 +55,8 @@ import {
   UtensilsCrossed,
   Eye,
   Target,
+  Sparkles,
+  X,
 } from 'lucide-react-native';
 
 interface CategoryGroup {
@@ -506,6 +511,29 @@ export default function HomeScreen() {
 
   const objectives = objectivesQuery.data || [];
   const [objectivesExpanded, setObjectivesExpanded] = useState<boolean>(false);
+  const [showRecommendation, setShowRecommendation] = useState(false);
+
+  const recommendations = useMemo(() => {
+    if (exercises.length === 0) return [];
+    const recs: { exercise: Exercise; reason: string; count: number; target: number }[] = [];
+    for (const ex of exercises) {
+      const count = todayCounts[ex.id] || 0;
+      const target = ex.dosage_per_day ?? 1;
+      if (count === 0) {
+        recs.push({ exercise: ex, reason: 'notStartedToday', count, target });
+      } else if (ex.dosage_per_day && count < ex.dosage_per_day) {
+        recs.push({ exercise: ex, reason: 'belowTarget', count, target });
+      }
+    }
+    recs.sort((a, b) => {
+      if (a.count === 0 && b.count > 0) return -1;
+      if (a.count > 0 && b.count === 0) return 1;
+      const aRatio = a.target > 0 ? a.count / a.target : 1;
+      const bRatio = b.target > 0 ? b.count / b.target : 1;
+      return aRatio - bRatio;
+    });
+    return recs;
+  }, [exercises, todayCounts]);
 
   const feedingSkillsQuery = useQuery({
     queryKey: ['feedingSkillAssignments', patientId],
@@ -825,9 +853,27 @@ export default function HomeScreen() {
               <View style={[styles.sectionIconWrap, { backgroundColor: Colors.primaryLight }]}>
                 <Layers size={18} color={Colors.primary} />
               </View>
-              <ScaledText size={18} weight="bold" color={Colors.textPrimary}>
+              <ScaledText size={18} weight="bold" color={Colors.textPrimary} style={{ flex: 1 }}>
                 {t('exercises')}
               </ScaledText>
+              {exercises.length > 0 && !isExpired && (
+                <TouchableOpacity
+                  style={styles.assistantButton}
+                  onPress={() => {
+                    setShowRecommendation(true);
+                    if (Platform.OS !== 'web') {
+                      void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                    }
+                  }}
+                  activeOpacity={0.7}
+                  testID="personal-assistant-button"
+                >
+                  <Sparkles size={14} color="#F59E0B" />
+                  <ScaledText size={12} weight="600" color="#F59E0B">
+                    {t('personalAssistant')}
+                  </ScaledText>
+                </TouchableOpacity>
+              )}
             </View>
 
             {exercises.length === 0 ? (
@@ -1072,6 +1118,94 @@ export default function HomeScreen() {
         </ScrollView>
       </SafeAreaView>
       <AppTutorial visible={showTutorial} onComplete={handleTutorialComplete} />
+
+      <Modal
+        visible={showRecommendation}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setShowRecommendation(false)}
+      >
+        <TouchableOpacity
+          style={styles.recommendOverlay}
+          activeOpacity={1}
+          onPress={() => setShowRecommendation(false)}
+        >
+          <TouchableOpacity activeOpacity={1} style={styles.recommendBubble}>
+            <View style={styles.recommendBubbleArrowContainer}>
+              <View style={styles.recommendBubbleArrow} />
+            </View>
+            <View style={styles.recommendHeader}>
+              <View style={styles.recommendHeaderLeft}>
+                <Sparkles size={18} color="#F59E0B" />
+                <ScaledText size={16} weight="700" color={Colors.textPrimary}>
+                  {t('recommendedExercises')}
+                </ScaledText>
+              </View>
+              <TouchableOpacity
+                onPress={() => setShowRecommendation(false)}
+                hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+              >
+                <X size={18} color={Colors.textSecondary} />
+              </TouchableOpacity>
+            </View>
+            <ScaledText size={13} color={Colors.textSecondary} style={styles.recommendIntro}>
+              {t('recommendationIntro')}
+            </ScaledText>
+            {recommendations.length === 0 ? (
+              <View style={styles.recommendEmptyWrap}>
+                <ScaledText size={14} color={Colors.success} weight="600">
+                  {t('noRecommendations')}
+                </ScaledText>
+              </View>
+            ) : (
+              <ScrollView style={styles.recommendList} showsVerticalScrollIndicator={false}>
+                {recommendations.map((rec, idx) => (
+                  <TouchableOpacity
+                    key={rec.exercise.id}
+                    style={styles.recommendItem}
+                    onPress={() => {
+                      setShowRecommendation(false);
+                      handleExercisePress(rec.exercise.id);
+                    }}
+                    activeOpacity={0.7}
+                  >
+                    <View style={styles.recommendItemIndex}>
+                      <ScaledText size={12} weight="bold" color={Colors.primary}>
+                        {idx + 1}
+                      </ScaledText>
+                    </View>
+                    <View style={styles.recommendItemInfo}>
+                      <ScaledText size={14} weight="600" color={Colors.textPrimary} numberOfLines={2}>
+                        {getExerciseTitle(rec.exercise, language)}
+                      </ScaledText>
+                      <View style={styles.recommendItemMeta}>
+                        <View style={[
+                          styles.recommendReasonBadge,
+                          { backgroundColor: rec.count === 0 ? '#FEF3C7' : '#FEE2E2' },
+                        ]}>
+                          <ScaledText size={10} weight="600" color={rec.count === 0 ? '#D97706' : '#DC2626'}>
+                            {t(rec.reason)} ({rec.count}/{rec.target})
+                          </ScaledText>
+                        </View>
+                      </View>
+                    </View>
+                    <ChevronRight size={16} color={Colors.disabled} />
+                  </TouchableOpacity>
+                ))}
+              </ScrollView>
+            )}
+            <TouchableOpacity
+              style={styles.recommendCloseBtn}
+              onPress={() => setShowRecommendation(false)}
+              activeOpacity={0.8}
+            >
+              <ScaledText size={14} weight="600" color={Colors.white}>
+                {t('closeRecommendation')}
+              </ScaledText>
+            </TouchableOpacity>
+          </TouchableOpacity>
+        </TouchableOpacity>
+      </Modal>
     </View>
   );
 }
@@ -1609,5 +1743,112 @@ const styles = StyleSheet.create({
   objectiveText: {
     flex: 1,
     lineHeight: 22,
+  },
+  assistantButton: {
+    flexDirection: 'row' as const,
+    alignItems: 'center' as const,
+    gap: 4,
+    backgroundColor: '#FFFBEB',
+    borderWidth: 1,
+    borderColor: '#FDE68A',
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 20,
+  },
+  recommendOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.4)',
+    justifyContent: 'center' as const,
+    alignItems: 'center' as const,
+    paddingHorizontal: 24,
+  },
+  recommendBubble: {
+    backgroundColor: Colors.card,
+    borderRadius: 20,
+    padding: 20,
+    width: '100%' as const,
+    maxHeight: '75%' as unknown as number,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.15,
+    shadowRadius: 24,
+    elevation: 12,
+  },
+  recommendBubbleArrowContainer: {
+    alignItems: 'center' as const,
+    marginTop: -28,
+    marginBottom: 4,
+  },
+  recommendBubbleArrow: {
+    width: 0,
+    height: 0,
+    borderLeftWidth: 10,
+    borderRightWidth: 10,
+    borderBottomWidth: 10,
+    borderLeftColor: 'transparent',
+    borderRightColor: 'transparent',
+    borderBottomColor: Colors.card,
+  },
+  recommendHeader: {
+    flexDirection: 'row' as const,
+    alignItems: 'center' as const,
+    justifyContent: 'space-between' as const,
+    marginBottom: 8,
+  },
+  recommendHeaderLeft: {
+    flexDirection: 'row' as const,
+    alignItems: 'center' as const,
+    gap: 8,
+  },
+  recommendIntro: {
+    marginBottom: 14,
+    lineHeight: 20,
+  },
+  recommendEmptyWrap: {
+    paddingVertical: 20,
+    alignItems: 'center' as const,
+  },
+  recommendList: {
+    maxHeight: 300,
+  },
+  recommendItem: {
+    flexDirection: 'row' as const,
+    alignItems: 'center' as const,
+    backgroundColor: Colors.background,
+    borderRadius: 12,
+    padding: 12,
+    marginBottom: 8,
+    borderWidth: 1,
+    borderColor: Colors.border,
+  },
+  recommendItemIndex: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    backgroundColor: Colors.primaryLight,
+    justifyContent: 'center' as const,
+    alignItems: 'center' as const,
+    marginRight: 10,
+  },
+  recommendItemInfo: {
+    flex: 1,
+    gap: 4,
+  },
+  recommendItemMeta: {
+    flexDirection: 'row' as const,
+    flexWrap: 'wrap' as const,
+    gap: 6,
+  },
+  recommendReasonBadge: {
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 6,
+  },
+  recommendCloseBtn: {
+    backgroundColor: Colors.primary,
+    borderRadius: 14,
+    paddingVertical: 12,
+    alignItems: 'center' as const,
+    marginTop: 12,
   },
 });

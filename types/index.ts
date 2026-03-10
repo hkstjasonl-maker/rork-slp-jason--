@@ -243,6 +243,17 @@ export interface FeedingSkillVideoSubmission {
   feeding_skill_review_requirements?: FeedingSkillReviewRequirement;
 }
 
+export interface Acknowledgement {
+  id: string;
+  name_en: string | null;
+  name_zh: string | null;
+  role_en: string | null;
+  role_zh: string | null;
+  sort_order: number;
+  is_active: boolean;
+  created_at?: string;
+}
+
 export interface ProgramObjective {
   id: string;
   program_id: string;

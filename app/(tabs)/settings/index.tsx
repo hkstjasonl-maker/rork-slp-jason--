@@ -26,6 +26,7 @@ import {
   Check,
   Building2,
   BookOpen,
+  Heart,
 } from 'lucide-react-native';
 import { AppTutorial } from '@/components/AppTutorial';
 
@@ -53,6 +54,7 @@ export default function SettingsScreen() {
     managingOrgNameEn,
     managingOrgNameZh,
     managingOrgLogoUrl,
+    acknowledgements,
   } = useApp();
   const [showTutorial, setShowTutorial] = useState(false);
   const router = useRouter();
@@ -253,6 +255,45 @@ export default function SettingsScreen() {
             </View>
           )}
 
+          {acknowledgements.length > 0 && (
+            <View style={styles.section}>
+              <View style={styles.sectionHeader}>
+                <Heart size={18} color={Colors.primary} />
+                <ScaledText size={16} weight="600" color={Colors.textPrimary}>
+                  {language === 'zh_hant' || language === 'zh_hans' ? '鳴謝' : 'Acknowledgements'}
+                </ScaledText>
+              </View>
+              <View style={styles.card}>
+                {acknowledgements.map((ack, idx) => {
+                  const name = language === 'zh_hant' || language === 'zh_hans'
+                    ? (ack.name_zh || ack.name_en)
+                    : (ack.name_en || ack.name_zh);
+                  const role = language === 'zh_hant' || language === 'zh_hans'
+                    ? (ack.role_zh || ack.role_en)
+                    : (ack.role_en || ack.role_zh);
+                  return (
+                    <View
+                      key={ack.id}
+                      style={[
+                        styles.ackRow,
+                        idx < acknowledgements.length - 1 && styles.optionBorder,
+                      ]}
+                    >
+                      <ScaledText size={14} weight="600" color={Colors.textPrimary}>
+                        {name}
+                      </ScaledText>
+                      {role ? (
+                        <ScaledText size={12} color={Colors.textSecondary}>
+                          {role}
+                        </ScaledText>
+                      ) : null}
+                    </View>
+                  );
+                })}
+              </View>
+            </View>
+          )}
+
           <View style={styles.section}>
             <View style={styles.infoCard}>
               <Info size={18} color={Colors.textSecondary} />
@@ -396,5 +437,10 @@ const styles = StyleSheet.create({
   managingOrgInfo: {
     flex: 1,
     gap: 3,
+  },
+  ackRow: {
+    paddingVertical: 13,
+    paddingHorizontal: 18,
+    gap: 2,
   },
 });

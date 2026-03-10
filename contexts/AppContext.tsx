@@ -2,7 +2,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import createContextHook from '@nkzw/create-context-hook';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import translations from '@/constants/i18n';
-import { Language, FontSizeLevel, FONT_SCALES } from '@/types';
+import { Language, FontSizeLevel, FONT_SCALES, Acknowledgement } from '@/types';
 import { setupSessionTracking } from '@/lib/analytics';
 import { supabase } from '@/lib/supabase';
 import { log } from '@/lib/logger';
@@ -35,6 +35,7 @@ export const [AppProvider, useApp] = createContextHook(() => {
   const [managingOrgNameEn, setManagingOrgNameEn] = useState<string | null>(null);
   const [managingOrgNameZh, setManagingOrgNameZh] = useState<string | null>(null);
   const [managingOrgLogoUrl, setManagingOrgLogoUrl] = useState<string | null>(null);
+  const [acknowledgements, setAcknowledgements] = useState<Acknowledgement[]>([]);
 
   useEffect(() => {
     void loadPersistedState();
@@ -140,6 +141,27 @@ export const [AppProvider, useApp] = createContextHook(() => {
   }, [patientId]);
 
   useEffect(() => {
+    const fetchAcknowledgements = async () => {
+      try {
+        log('[AppContext] Fetching acknowledgements');
+        const { data, error } = await supabase
+          .from('acknowledgements')
+          .select('*')
+          .eq('is_active', true)
+          .order('sort_order');
+        if (error) {
+          log('[AppContext] Error fetching acknowledgements:', error);
+        } else {
+          setAcknowledgements(data || []);
+        }
+      } catch (e) {
+        log('[AppContext] Failed to fetch acknowledgements:', e);
+      }
+    };
+    void fetchAcknowledgements();
+  }, []);
+
+  useEffect(() => {
     if (!patientId) {
       setReinforcementAudioId(null);
       setReinforcementAudioUrl(null);
@@ -239,6 +261,7 @@ export const [AppProvider, useApp] = createContextHook(() => {
     managingOrgNameEn,
     managingOrgNameZh,
     managingOrgLogoUrl,
+    acknowledgements,
     setLanguage,
     setTermsAccepted,
     setPatient,
@@ -253,6 +276,7 @@ export const [AppProvider, useApp] = createContextHook(() => {
     reinforcementAudioUrl, tutorialCompleted,
     therapistPhotoUrl, therapistCartoonUrl, therapistNameEn, therapistNameZh,
     managingOrgNameEn, managingOrgNameZh, managingOrgLogoUrl,
+    acknowledgements,
     setLanguage,
     setTermsAccepted, setPatient, clearPatient, setFontSizeLevel,
     setTutorialCompleted, resetTutorial, t,

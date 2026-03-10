@@ -240,6 +240,9 @@ tr:hover td{background:rgba(224,122,58,.03)}
 <div class="nav-item" data-section="clinicians" onclick="sw('clinicians')">
 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="8.5" cy="7" r="4"/><path d="M20 8v6"/><path d="M23 11h-6"/></svg>
 <span>Clinicians</span></div>
+<div class="nav-item" data-section="acknowledgements" onclick="sw('acknowledgements')">
+<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg>
+<span>Acknowledgements</span></div>
 </nav>
 <div class="sidebar-footer">
 <div class="lang-toggle">
@@ -443,6 +446,13 @@ tr:hover td{background:rgba(224,122,58,.03)}
 <div class="card-body" style="padding:0" id="sharedAssessList"><div class="loading"><div class="spinner"></div></div></div></div></div>
 </div>
 
+<!-- ACKNOWLEDGEMENTS -->
+<div class="section" id="sec-acknowledgements">
+<div class="card"><div class="card-header"><h3>Acknowledgements 鳴謝</h3>
+<button class="btn btn-primary" onclick="openAckModal()">+ Add</button></div>
+<div class="card-body" style="padding:0" id="ackList"><div class="loading"><div class="spinner"></div></div></div></div>
+</div>
+
 </div></main>
 
 <div class="modal-overlay" id="modalOverlay" onclick="if(event.target===this)closeModal()">
@@ -484,7 +494,7 @@ daysActive:'Days Active',streak:'Current Streak',longestStreak:'Best Streak',tot
 mostPracticed:'Most Practiced',insights:'Clinical Insights',dailyAct:'Daily Activity (last 14d)',exBreakdown:'Exercise Breakdown',ratingTrend:'Self-Rating Trend',compOverview:'Compliance Overview',assessHist:'Assessment History',
 reinAudio:'Reinforcement Audio (YouTube IDs)',
 trainingObjectives:'Training Objectives',noObjectives:'No objectives set yet.',addObjective:'Add Objective',editObjective:'Edit Objective',objectiveEn:'Objective (EN)',objectiveHant:'Objective (繁中)',objectiveHans:'Objective (简中)',sortOrder:'Sort Order',
-knowVid:'Knowledge Videos',s_knowledge:'Knowledge Video Library',n_knowledge:'Knowledge Videos',s_notifications:'Notifications',n_notifications:'Notifications',s_organisations:'Organisations',n_organisations:'Organisations',s_clinicians:'Clinician Management',n_clinicians:'Clinicians',vidLib:'Video Library',pushedVid:'Pushed to Patients',addVid:'Add Video',pushVid:'Push to Patients',pushAll:'Push to All',pushSpecific:'Push to Specific',startDate:'Start Date',endDate:'End Date',targetType:'Target',educational:'Educational',condKnowledge:'Condition Knowledge',caregiverGuide:'Caregiver Guidance',
+knowVid:'Knowledge Videos',s_knowledge:'Knowledge Video Library',n_knowledge:'Knowledge Videos',s_notifications:'Notifications',n_notifications:'Notifications',s_organisations:'Organisations',n_organisations:'Organisations',s_clinicians:'Clinician Management',n_clinicians:'Clinicians',s_acknowledgements:'Acknowledgements',n_acknowledgements:'Acknowledgements',vidLib:'Video Library',pushedVid:'Pushed to Patients',addVid:'Add Video',pushVid:'Push to Patients',pushAll:'Push to All',pushSpecific:'Push to Specific',startDate:'Start Date',endDate:'End Date',targetType:'Target',educational:'Educational',condKnowledge:'Condition Knowledge',caregiverGuide:'Caregiver Guidance',
 s_feeding:'Feeding Skills Videos',n_feeding:'Feeding Skills',feedLib:'Video Library',feedPushed:'Pushed to Patients',addFeedVid:'Add Video',feedingSkills:'Feeding Skills',
 feedCat_texture_modified:'Texture Modified Diet',feedCat_thickened_fluids:'Thickened Fluids',feedCat_positioning:'Positioning',feedCat_feeding_technique:'Feeding Technique',feedCat_oral_care:'Oral Care',feedCat_safety_signs:'Safety Signs',feedCat_other:'Other',
 l7:'Last 7 Days',l14:'Last 14 Days',l30:'Last 30 Days',l90:'Last 90 Days',allTime:'All Time'},
@@ -511,7 +521,7 @@ daysActive:'活躍天數',streak:'目前連續天數',longestStreak:'最長連�
 mostPracticed:'最常練習',insights:'臨床洞察',dailyAct:'每日活動（最近14天）',exBreakdown:'運動分佈',ratingTrend:'自評分趨勢',compOverview:'依從率概覽',assessHist:'評估歷史',
 reinAudio:'正向鼓勵音頻 (YouTube ID)',
 trainingObjectives:'訓練目標',noObjectives:'暫未設定目標。',addObjective:'新增目標',editObjective:'編輯目標',objectiveEn:'目標（英文）',objectiveHant:'目標（繁中）',objectiveHans:'目標（简中）',sortOrder:'排序',
-knowVid:'知識影片',s_knowledge:'知識影片庫',n_knowledge:'知識影片',s_notifications:'通知管理',n_notifications:'通知',s_organisations:'機構管理',n_organisations:'合作機構',s_clinicians:'治療師管理',n_clinicians:'治療師',vidLib:'影片庫',pushedVid:'已推送給患者',addVid:'新增影片',pushVid:'推送給患者',pushAll:'推送給全部',pushSpecific:'推送給指定患者',startDate:'開始日期',endDate:'結束日期',targetType:'目標',educational:'教育性',condKnowledge:'病症知識',caregiverGuide:'照顧者指導',
+knowVid:'知識影片',s_knowledge:'知識影片庫',n_knowledge:'知識影片',s_notifications:'通知管理',n_notifications:'通知',s_organisations:'機構管理',n_organisations:'合作機構',s_clinicians:'治療師管理',n_clinicians:'治療師',s_acknowledgements:'鳴謝',n_acknowledgements:'鳴謝',vidLib:'影片庫',pushedVid:'已推送給患者',addVid:'新增影片',pushVid:'推送給患者',pushAll:'推送給全部',pushSpecific:'推送給指定患者',startDate:'開始日期',endDate:'結束日期',targetType:'目標',educational:'教育性',condKnowledge:'病症知識',caregiverGuide:'照顧者指導',
 s_feeding:'餵食技巧影片',n_feeding:'餵食技巧',feedLib:'影片庫',feedPushed:'已推送給患者',addFeedVid:'新增影片',feedingSkills:'餵食技巧',
 feedCat_texture_modified:'質地調整飲食',feedCat_thickened_fluids:'凝固粉水',feedCat_positioning:'擺位',feedCat_feeding_technique:'餵食技巧',feedCat_oral_care:'口腔護理',feedCat_safety_signs:'安全徵兆',feedCat_other:'其他',
 l7:'最近7天',l14:'最近14天',l30:'最近30天',l90:'最近90天',allTime:'全部時間'}
@@ -560,6 +570,7 @@ if(name==='dashboard')populateSelects();
 if(name==='notifications')loadNotifications();
 if(name==='organisations'){loadOrgs('partner');loadOrgs('supporter')}
 if(name==='clinicians'){loadClinicians();loadSharedEx();loadSharedAssess()}
+if(name==='acknowledgements')loadAcknowledgements()
 }
 
 /* ═══ 1. PATIENTS ═══ */
@@ -2024,6 +2035,35 @@ const{error:sErr}=await sb.storage.from('review-videos').remove([filePath]);if(s
 const{error}=await sb.from('feeding_skill_video_submissions').delete().eq('id',subId);
 if(error){toast('Error: '+error.message,'error');return}
 toast('Submission deleted ✓');const pid=document.getElementById('feedReviewPatientSelect').value;if(pid)loadFeedVideoSubs(pid)}
+
+/* ═══ 10. ACKNOWLEDGEMENTS ═══ */
+let allAcks=[];
+
+async function loadAcknowledgements(){
+const{data,error}=await sb.from('acknowledgements').select('*').order('sort_order').order('name_en');
+if(error){document.getElementById('ackList').innerHTML='<div class="empty"><p>'+esc(error.message)+'</p></div>';return}
+allAcks=data||[];
+if(!allAcks.length){document.getElementById('ackList').innerHTML='<div class="empty"><p>'+t('noData')+'</p></div>';return}
+let h='<table><thead><tr><th>Name (EN)</th><th>Name (繁中/简中)</th><th>Role (EN)</th><th>Role (繁中/简中)</th><th>Order</th><th>Active</th><th>Actions</th></tr></thead><tbody>';
+allAcks.forEach(a=>{
+const active=a.is_active!==false?'<span class="badge badge-green">Yes</span>':'<span class="badge badge-red">No</span>';
+h+=`<tr><td><strong>${esc(a.name_en)||'—'}</strong></td><td>${esc(a.name_zh)||'—'}</td><td>${esc(a.role_en)||'—'}</td><td>${esc(a.role_zh)||'—'}</td><td>${a.sort_order||0}</td><td>${active}</td><td style="white-space:nowrap"><button class="btn btn-sm btn-secondary" onclick="openAckModal('${a.id}')">${t('edit')}</button> <button class="btn btn-sm btn-danger" onclick="delAck('${a.id}')">${t('del')}</button></td></tr>`});
+h+='</tbody></table>';document.getElementById('ackList').innerHTML=h}
+
+function openAckModal(id){
+const a=id?allAcks.find(x=>x.id===id):null;
+const body=`<div class="form-row"><div class="form-group"><label>Name (English)</label><input class="form-input" id="ackNE" value="${esc(a?.name_en||'')}" placeholder="e.g. John Smith"></div><div class="form-group"><label>Name (中文)</label><input class="form-input" id="ackNZ" value="${esc(a?.name_zh||'')}" placeholder="e.g. 陳大文"></div></div>
+<div class="form-row"><div class="form-group"><label>Role / Title (English)</label><input class="form-input" id="ackRE" value="${esc(a?.role_en||'')}" placeholder="e.g. Volunteer, Advisor"></div><div class="form-group"><label>Role / Title (中文)</label><input class="form-input" id="ackRZ" value="${esc(a?.role_zh||'')}" placeholder="e.g. 義工, 顧問"></div></div>
+<div class="form-row"><div class="form-group"><label>Sort Order (lower = first)</label><input type="number" class="form-input" id="ackSort" value="${a?.sort_order||0}"></div><div class="form-group"><label>Active</label><select class="form-select" id="ackActive"><option value="true" ${a?.is_active!==false?'selected':''}>Yes</option><option value="false" ${a?.is_active===false?'selected':''}>No</option></select></div></div>`;
+openModal(id?'Edit Acknowledgement 編輯鳴謝':'Add Acknowledgement 新增鳴謝',body,`<button class="btn btn-secondary" onclick="closeModal()">${t('cancel')}</button><button class="btn btn-primary" onclick="saveAck('${id||''}')">${id?t('update'):t('create')}</button>`)}
+
+async function saveAck(id){
+const o={name_en:document.getElementById('ackNE').value.trim()||null,name_zh:document.getElementById('ackNZ').value.trim()||null,role_en:document.getElementById('ackRE').value.trim()||null,role_zh:document.getElementById('ackRZ').value.trim()||null,sort_order:parseInt(document.getElementById('ackSort').value)||0,is_active:document.getElementById('ackActive').value==='true'};
+if(!o.name_en&&!o.name_zh){toast('At least one name is required','error');return}
+let error;if(id){({error}=await sb.from('acknowledgements').update(o).eq('id',id))}else{({error}=await sb.from('acknowledgements').insert(o))}
+if(error){toast('Error: '+error.message,'error');return}toast(id?'Updated':'Created');closeModal();loadAcknowledgements()}
+
+async function delAck(id){if(!confirm(t('confirmDel')))return;await sb.from('acknowledgements').delete().eq('id',id);toast('Deleted');loadAcknowledgements()}
 
 /* ═══ INIT ═══ */
 (async()=>{await loadPatients();const{data}=await sb.from('exercise_library').select('*').order('title_en');allExercises=data||[]})();

@@ -16,7 +16,7 @@
     "ios": {
       "supportsTablet": true,
       "requireFullScreen": true,
-      "bundleIdentifier": "app.rork.slp-jason",
+      "bundleIdentifier": "com.dravive.slpjason",
       "buildNumber": "1",
       "infoPlist": {
         "UISupportedInterfaceOrientations": [
@@ -36,7 +36,7 @@
         "foregroundImage": "./assets/images/adaptive-icon.png",
         "backgroundColor": "#ffffff"
       },
-      "package": "app.rork.slp_jason"
+      "package": "com.dravive.slpjason"
     },
     "web": {
       "favicon": "./assets/images/favicon.png"

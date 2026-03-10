@@ -212,6 +212,9 @@ export default function SettingsScreen() {
                 <ScaledText size={13} color={Colors.primary} weight="600">
                   {t('slpTitle')}
                 </ScaledText>
+                <ScaledText size={12} color={Colors.secondary} weight="600" style={{ marginTop: 1 }}>
+                  {language === 'zh_hant' || language === 'zh_hans' ? '研發創辦人' : 'Founder & Developer'}
+                </ScaledText>
                 <ScaledText size={12} color={Colors.textSecondary} style={styles.therapistHint}>
                   {t('aboutTherapistDesc')}
                 </ScaledText>

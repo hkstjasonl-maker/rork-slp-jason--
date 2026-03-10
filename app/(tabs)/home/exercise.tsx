@@ -116,12 +116,12 @@ function getYouTubeId(exercise: Exercise): string | null {
 const LiveCamera = forwardRef<CameraView, { onCameraReady?: () => void; cameraMode?: 'picture' | 'video' }>(
   function LiveCamera({ onCameraReady, cameraMode = 'picture' }, ref) {
     return (
-      <View style={[StyleSheet.absoluteFill, { transform: [{ scaleX: -1 }] }]}>
+      <View style={StyleSheet.absoluteFill}>
         <CameraView
           ref={ref}
           style={StyleSheet.absoluteFill}
           facing="front"
-          mirror={false}
+          mirror={true}
           mode={cameraMode}
           videoQuality="720p"
           onCameraReady={onCameraReady}

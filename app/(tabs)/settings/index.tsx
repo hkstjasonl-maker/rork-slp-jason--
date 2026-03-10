@@ -30,6 +30,7 @@ import {
   Heart,
   Accessibility,
   Shield,
+  Trash2,
 } from 'lucide-react-native';
 import { AppTutorial } from '@/components/AppTutorial';
 
@@ -169,6 +170,33 @@ export default function SettingsScreen() {
                 </ScaledText>
                 <ScaledText size={13} color={Colors.textSecondary}>
                   {t('reEnterCodeDesc')}
+                </ScaledText>
+              </View>
+              <ChevronRight size={18} color={Colors.disabled} />
+            </TouchableOpacity>
+          </View>
+
+          <View style={styles.section}>
+            <TouchableOpacity
+              style={styles.actionCard}
+              onPress={() => {
+                const subject = encodeURIComponent('Data Deletion Request / 資料刪除要求');
+                const body = encodeURIComponent('I would like to request deletion of my personal data from the SLP Jason app.\n\n我希望要求刪除我在SLP Jason應用程式中的個人資料。');
+                void Linking.openURL(`mailto:YOUR_EMAIL@example.com?subject=${subject}&body=${body}`);
+              }}
+              activeOpacity={0.7}
+            >
+              <Trash2 size={20} color={Colors.error} />
+              <View style={styles.actionContent}>
+                <ScaledText size={15} weight="600" color={Colors.error}>
+                  {language === 'zh_hant' || language === 'zh_hans'
+                    ? '要求刪除資料'
+                    : 'Request Data Deletion'}
+                </ScaledText>
+                <ScaledText size={13} color={Colors.textSecondary}>
+                  {language === 'zh_hant' || language === 'zh_hans'
+                    ? '要求刪除您的個人資料'
+                    : 'Request deletion of your personal data'}
                 </ScaledText>
               </View>
               <ChevronRight size={18} color={Colors.disabled} />

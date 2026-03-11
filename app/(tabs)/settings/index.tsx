@@ -10,6 +10,7 @@ import {
   Platform,
   Image,
   Linking,
+  Switch,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useApp } from '@/contexts/AppContext';
@@ -58,6 +59,8 @@ export default function SettingsScreen() {
     managingOrgNameEn,
     managingOrgNameZh,
     managingOrgLogoUrl,
+    liveSubtitlesEnabled,
+    setLiveSubtitlesEnabled,
     acknowledgements,
   } = useApp();
   const [showTutorial, setShowTutorial] = useState(false);
@@ -238,36 +241,62 @@ export default function SettingsScreen() {
             </TouchableOpacity>
           </View>
 
-          {Platform.OS !== 'web' && (
-            <View style={styles.section}>
-              <TouchableOpacity
-                style={styles.actionCard}
-                onPress={() => {
-                  if (Platform.OS === 'ios') {
-                    void Linking.openURL('App-prefs:ACCESSIBILITY');
-                  } else {
-                    void Linking.openSettings();
-                  }
-                }}
-                activeOpacity={0.7}
-              >
-                <Accessibility size={20} color={Colors.primary} />
-                <View style={styles.actionContent}>
-                  <ScaledText size={15} weight="600" color={Colors.textPrimary}>
-                    {language === 'zh_hant' || language === 'zh_hans'
-                      ? '無障礙設定'
-                      : 'Accessibility Settings'}
-                  </ScaledText>
-                  <ScaledText size={13} color={Colors.textSecondary}>
-                    {language === 'zh_hant' || language === 'zh_hans'
-                      ? '開啟裝置的無障礙設定（如即時字幕）'
-                      : 'Open device accessibility settings (e.g. Live Captions)'}
+          <View style={styles.section}>
+            <View style={styles.sectionHeader}>
+              <Accessibility size={18} color={Colors.primary} />
+              <ScaledText size={16} weight="600" color={Colors.textPrimary}>
+                {language === 'zh_hant' || language === 'zh_hans'
+                  ? '無障礙'
+                  : 'Accessibility'}
+              </ScaledText>
+            </View>
+            <View style={styles.card}>
+              <View style={[styles.optionRow, styles.optionBorder]}>
+                <View style={{ flex: 1, gap: 2 }}>
+                  <ScaledText size={15} color={Colors.textPrimary}>
+                    {language === 'zh_hant'
+                      ? '即時字幕（聽障輔助）'
+                      : language === 'zh_hans'
+                        ? '即时字幕（听障辅助）'
+                        : 'Live Subtitles (Hearing Accessibility)'}
                   </ScaledText>
                 </View>
-                <ChevronRight size={18} color={Colors.disabled} />
-              </TouchableOpacity>
+                <Switch
+                  value={liveSubtitlesEnabled}
+                  onValueChange={(val) => void setLiveSubtitlesEnabled(val)}
+                  trackColor={{ false: Colors.border, true: Colors.primary }}
+                  thumbColor="#fff"
+                />
+              </View>
+              {Platform.OS !== 'web' && (
+                <TouchableOpacity
+                  style={styles.optionRow}
+                  onPress={() => {
+                    if (Platform.OS === 'ios') {
+                      void Linking.openURL('App-prefs:ACCESSIBILITY');
+                    } else {
+                      void Linking.openSettings();
+                    }
+                  }}
+                  activeOpacity={0.6}
+                >
+                  <View style={{ flex: 1, gap: 2 }}>
+                    <ScaledText size={15} color={Colors.textPrimary}>
+                      {language === 'zh_hant' || language === 'zh_hans'
+                        ? '裝置無障礙設定'
+                        : 'Device Accessibility Settings'}
+                    </ScaledText>
+                    <ScaledText size={12} color={Colors.textSecondary}>
+                      {language === 'zh_hant' || language === 'zh_hans'
+                        ? '開啟裝置的無障礙設定（如即時字幕）'
+                        : 'Open device settings (e.g. Live Captions)'}
+                    </ScaledText>
+                  </View>
+                  <ChevronRight size={18} color={Colors.disabled} />
+                </TouchableOpacity>
+              )}
             </View>
-          )}
+          </View>
 
           <View style={styles.section}>
             <TouchableOpacity

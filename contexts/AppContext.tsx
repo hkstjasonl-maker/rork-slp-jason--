@@ -36,6 +36,7 @@ export const [AppProvider, useApp] = createContextHook(() => {
   const [managingOrgNameZh, setManagingOrgNameZh] = useState<string | null>(null);
   const [managingOrgLogoUrl, setManagingOrgLogoUrl] = useState<string | null>(null);
   const [acknowledgements, setAcknowledgements] = useState<Acknowledgement[]>([]);
+  const [liveSubtitlesEnabled, setLiveSubtitlesEnabledState] = useState<boolean>(false);
 
   useEffect(() => {
     void loadPersistedState();
@@ -174,7 +175,7 @@ export const [AppProvider, useApp] = createContextHook(() => {
 
         const { data: patientData, error: patientError } = await supabase
           .from('patients')
-          .select('reinforcement_audio_youtube_id, reinforcement_audio_youtube_id_zh_hant, reinforcement_audio_youtube_id_zh_hans, reinforcement_audio_url_en, reinforcement_audio_url_zh_hant, reinforcement_audio_url_zh_hans, therapist_photo_url, therapist_cartoon_url, therapist_name_en, therapist_name_zh, managing_org_name_en, managing_org_name_zh, managing_org_logo_url')
+          .select('reinforcement_audio_youtube_id, reinforcement_audio_youtube_id_zh_hant, reinforcement_audio_youtube_id_zh_hans, reinforcement_audio_url_en, reinforcement_audio_url_zh_hant, reinforcement_audio_url_zh_hans, therapist_photo_url, therapist_cartoon_url, therapist_name_en, therapist_name_zh, managing_org_name_en, managing_org_name_zh, managing_org_logo_url, live_subtitles_enabled')
           .eq('id', patientId)
           .single();
 
@@ -193,6 +194,7 @@ export const [AppProvider, useApp] = createContextHook(() => {
           setManagingOrgNameEn(patientData.managing_org_name_en || null);
           setManagingOrgNameZh(patientData.managing_org_name_zh || null);
           setManagingOrgLogoUrl(patientData.managing_org_logo_url || null);
+          setLiveSubtitlesEnabledState(patientData.live_subtitles_enabled === true);
 
           if (lang === 'zh_hant') {
             audioUrl = patientData.reinforcement_audio_url_zh_hant || patientData.reinforcement_audio_url_en || null;
@@ -240,6 +242,18 @@ export const [AppProvider, useApp] = createContextHook(() => {
     void fetchReinforcementAudio();
   }, [patientId, language]);
 
+  const setLiveSubtitlesEnabled = useCallback(async (value: boolean) => {
+    setLiveSubtitlesEnabledState(value);
+    if (patientId) {
+      try {
+        log('[AppContext] Updating live_subtitles_enabled to', value, 'for patient:', patientId);
+        await supabase.from('patients').update({ live_subtitles_enabled: value }).eq('id', patientId);
+      } catch (e) {
+        log('[AppContext] Failed to update live_subtitles_enabled:', e);
+      }
+    }
+  }, [patientId]);
+
   const fontScale = FONT_SCALES[fontSizeLevel];
 
   return useMemo(() => ({
@@ -261,12 +275,14 @@ export const [AppProvider, useApp] = createContextHook(() => {
     managingOrgNameEn,
     managingOrgNameZh,
     managingOrgLogoUrl,
+    liveSubtitlesEnabled,
     acknowledgements,
     setLanguage,
     setTermsAccepted,
     setPatient,
     clearPatient,
     setFontSizeLevel,
+    setLiveSubtitlesEnabled,
     setTutorialCompleted,
     resetTutorial,
     t,
@@ -276,9 +292,11 @@ export const [AppProvider, useApp] = createContextHook(() => {
     reinforcementAudioUrl, tutorialCompleted,
     therapistPhotoUrl, therapistCartoonUrl, therapistNameEn, therapistNameZh,
     managingOrgNameEn, managingOrgNameZh, managingOrgLogoUrl,
+    liveSubtitlesEnabled,
     acknowledgements,
     setLanguage,
     setTermsAccepted, setPatient, clearPatient, setFontSizeLevel,
+    setLiveSubtitlesEnabled,
     setTutorialCompleted, resetTutorial, t,
   ]);
 });

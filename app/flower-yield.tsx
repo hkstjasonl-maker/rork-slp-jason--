@@ -13,7 +13,7 @@ import {
   Image,
   Dimensions,
 } from 'react-native';
-import { Stack, useRouter, useFocusEffect } from 'expo-router';
+import { Stack, useRouter } from 'expo-router';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Sparkles, Gift, X, ChevronLeft } from 'lucide-react-native';
 
@@ -204,7 +204,7 @@ export default function FlowerYieldScreen() {
       }) as PatientGardenData;
     },
     enabled: !!patientId,
-    staleTime: 30 * 1000,
+    staleTime: 5 * 1000,
   });
 
   const flowersQuery = useQuery({
@@ -224,7 +224,7 @@ export default function FlowerYieldScreen() {
       return (data || []) as PatientFlower[];
     },
     enabled: !!patientId,
-    staleTime: 30 * 1000,
+    staleTime: 5 * 1000,
   });
 
   const flowerTypesQuery = useQuery({
@@ -264,16 +264,6 @@ export default function FlowerYieldScreen() {
     if (isZh) return ft.name_zh || ft.name_en;
     return ft.name_en;
   }, [isZh]);
-
-  const { refetch: refetchPatientData } = patientDataQuery;
-  const { refetch: refetchFlowers } = flowersQuery;
-
-  useFocusEffect(
-    useCallback(() => {
-      void refetchPatientData();
-      void refetchFlowers();
-    }, [refetchPatientData, refetchFlowers])
-  );
 
   const patientData = patientDataQuery.data;
   const flowers = flowersQuery.data || [];

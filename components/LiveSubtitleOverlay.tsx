@@ -30,25 +30,27 @@ export default function LiveSubtitleOverlay({
 
     let cancelled = false;
 
-    const fetchVTT = async () => {
+    const loadSubtitles = async () => {
       try {
-        console.log('[LiveSubtitleOverlay] Fetching VTT from:', subtitleUrl);
         const response = await fetch(subtitleUrl);
+        if (!response.ok) {
+          console.warn('Subtitle fetch failed:', response.status, subtitleUrl);
+          if (!cancelled) setCues([]);
+          return;
+        }
         const text = await response.text();
         if (!cancelled) {
           const parsed = parseVTT(text);
-          console.log('[LiveSubtitleOverlay] Parsed', parsed.length, 'cues');
+          console.log('Parsed', parsed.length, 'subtitle cues from', subtitleUrl);
           setCues(parsed);
         }
       } catch (err) {
-        console.error('[LiveSubtitleOverlay] Failed to fetch VTT:', err);
-        if (!cancelled) {
-          setCues([]);
-        }
+        console.warn('Subtitle load error:', err);
+        if (!cancelled) setCues([]);
       }
     };
 
-    void fetchVTT();
+    void loadSubtitles();
 
     return () => {
       cancelled = true;

@@ -574,7 +574,6 @@ export default function ExerciseScreen() {
   const [liveSubAudioPlaying, setLiveSubAudioPlaying] = useState(false);
   const [liveSubAudioTime, setLiveSubAudioTime] = useState(0);
   const liveSubSoundRef = useRef<Audio.Sound | null>(null);
-  const liveSubIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const [faceGuideForRecording, setFaceGuideForRecording] = useState(false);
   const [reviewRequirement, setReviewRequirement] = useState<ExerciseReviewRequirement | null>(null);
   const [todaySubmissionCount, setTodaySubmissionCount] = useState<number>(0);
@@ -1304,10 +1303,6 @@ export default function ExerciseScreen() {
   }, []);
 
   const cleanupLiveSubAudio = useCallback(() => {
-    if (liveSubIntervalRef.current) {
-      clearInterval(liveSubIntervalRef.current);
-      liveSubIntervalRef.current = null;
-    }
     if (liveSubSoundRef.current) {
       liveSubSoundRef.current.unloadAsync().catch(() => {});
       liveSubSoundRef.current = null;
@@ -1340,30 +1335,19 @@ export default function ExerciseScreen() {
 
       const { sound } = await Audio.Sound.createAsync(
         { uri: mirrorAudioUrl },
-        { shouldPlay: true }
+        { shouldPlay: true, progressUpdateIntervalMillis: 200 },
+        (status) => {
+          if (status.isLoaded && status.isPlaying) {
+            setLiveSubAudioTime(status.positionMillis / 1000);
+          }
+          if (status.isLoaded && status.didJustFinish) {
+            cleanupLiveSubAudio();
+            setShowLiveSubtitles(false);
+          }
+        }
       );
       liveSubSoundRef.current = sound;
       setLiveSubAudioPlaying(true);
-
-      liveSubIntervalRef.current = setInterval(async () => {
-        try {
-          if (liveSubSoundRef.current) {
-            const status = await liveSubSoundRef.current.getStatusAsync();
-            if (status.isLoaded) {
-              setLiveSubAudioTime(status.positionMillis / 1000);
-            }
-          }
-        } catch (e) {
-          log('[LiveSub] Position poll error:', e);
-        }
-      }, 200);
-
-      sound.setOnPlaybackStatusUpdate((status) => {
-        if (status.isLoaded && status.didJustFinish) {
-          cleanupLiveSubAudio();
-          setShowLiveSubtitles(false);
-        }
-      });
     } catch (e) {
       log('[LiveSub] Error starting audio+subtitles:', e);
       cleanupLiveSubAudio();
@@ -1373,9 +1357,6 @@ export default function ExerciseScreen() {
 
   useEffect(() => {
     return () => {
-      if (liveSubIntervalRef.current) {
-        clearInterval(liveSubIntervalRef.current);
-      }
       if (liveSubSoundRef.current) {
         liveSubSoundRef.current.unloadAsync().catch(() => {});
       }

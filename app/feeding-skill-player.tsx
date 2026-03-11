@@ -22,6 +22,8 @@ import { CameraView, useCameraPermissions, useMicrophonePermissions } from 'expo
 
 import { useApp } from '@/contexts/AppContext';
 import { supabase } from '@/lib/supabase';
+import MarketingDrawModal from '@/components/MarketingDrawModal';
+import { checkAndQueueCampaigns, QueuedCampaign } from '@/lib/marketingDraw';
 import { ScaledText } from '@/components/ScaledText';
 import { VimeoPlayer } from '@/components/VimeoPlayer';
 import { YouTubePlayer } from '@/components/YouTubePlayer';
@@ -162,6 +164,8 @@ export default function FeedingSkillPlayerScreen() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [lastRecordedUri, setLastRecordedUri] = useState<string | null>(null);
   const [submissionSuccess, setSubmissionSuccess] = useState(false);
+  const [marketingQueue, setMarketingQueue] = useState<QueuedCampaign[]>([]);
+  const [showMarketingDraw, setShowMarketingDraw] = useState<boolean>(false);
 
   const cameraRef = useRef<CameraView>(null);
   const splitCameraRef = useRef<CameraView>(null);
@@ -567,6 +571,20 @@ export default function FeedingSkillPlayerScreen() {
         if (Platform.OS !== 'web') void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
         void queryClient.invalidateQueries({ queryKey: ['feedingReviewRequirements'] });
         void queryClient.invalidateQueries({ queryKey: ['feedingTodaySubmissions'] });
+
+        if (patientId) {
+          void (async () => {
+            try {
+              const queued = await checkAndQueueCampaigns(patientId, 'video_submit');
+              if (queued.length > 0) {
+                setMarketingQueue(queued);
+                setTimeout(() => setShowMarketingDraw(true), 2000);
+              }
+            } catch {
+              // silently fail
+            }
+          })();
+        }
       } else {
         setToastType('error');
         setToastMessage(result.errorDetail || t('submissionFailed'));
@@ -957,6 +975,15 @@ export default function FeedingSkillPlayerScreen() {
             </ScrollView>
           )}
         </View>
+        <MarketingDrawModal
+          visible={showMarketingDraw}
+          queue={marketingQueue}
+          patientId={patientId || ''}
+          onClose={() => {
+            setShowMarketingDraw(false);
+            setMarketingQueue([]);
+          }}
+        />
       </SafeAreaView>
     </View>
   );

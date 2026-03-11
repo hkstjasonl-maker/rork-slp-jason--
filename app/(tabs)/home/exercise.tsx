@@ -24,6 +24,8 @@ import { ScaledText } from '@/components/ScaledText';
 import { YouTubePlayer } from '@/components/YouTubePlayer';
 import { VimeoPlayer } from '@/components/VimeoPlayer';
 import LiveSubtitleOverlay from '@/components/LiveSubtitleOverlay';
+import MarketingDrawModal from '@/components/MarketingDrawModal';
+import { checkAndQueueCampaigns, getTodayExerciseCount, QueuedCampaign } from '@/lib/marketingDraw';
 
 import { EncouragementModal } from '@/components/EncouragementModal';
 import { SelfRatingModal } from '@/components/SelfRatingModal';
@@ -580,6 +582,8 @@ export default function ExerciseScreen() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [lastRecordedUri, setLastRecordedUri] = useState<string | null>(null);
   const [submissionSuccess, setSubmissionSuccess] = useState(false);
+  const [marketingQueue, setMarketingQueue] = useState<QueuedCampaign[]>([]);
+  const [showMarketingDraw, setShowMarketingDraw] = useState<boolean>(false);
   const countdownFade = useRef(new Animated.Value(0)).current;
   const countdownScale = useRef(new Animated.Value(0.5)).current;
 
@@ -856,6 +860,21 @@ export default function ExerciseScreen() {
       void queryClient.invalidateQueries({ queryKey: ['patientRewards'] });
       setCompletedThisSession((prev) => new Set(prev).add(activeExerciseId));
       setShowEncouragement(true);
+
+      if (patientId) {
+        void (async () => {
+          try {
+            const todayCount = await getTodayExerciseCount(patientId);
+            const queued = await checkAndQueueCampaigns(patientId, 'exercise_count', todayCount);
+            if (queued.length > 0) {
+              setMarketingQueue(queued);
+              setTimeout(() => setShowMarketingDraw(true), 3000);
+            }
+          } catch {
+            // silently fail
+          }
+        })();
+      }
     },
     onError: (error) => {
       log('Complete exercise error:', error);
@@ -1226,6 +1245,20 @@ export default function ExerciseScreen() {
         void queryClient.invalidateQueries({ queryKey: ['reviewRequirements'] });
         void queryClient.invalidateQueries({ queryKey: ['videoSubmissions'] });
         void queryClient.invalidateQueries({ queryKey: ['todaySubmissions'] });
+
+        if (patientId) {
+          void (async () => {
+            try {
+              const queued = await checkAndQueueCampaigns(patientId, 'video_submit');
+              if (queued.length > 0) {
+                setMarketingQueue(queued);
+                setTimeout(() => setShowMarketingDraw(true), 2000);
+              }
+            } catch {
+              // silently fail
+            }
+          })();
+        }
       } else {
         setToastType('error');
         setToastMessage(t('submissionFailed'));
@@ -1925,6 +1958,16 @@ export default function ExerciseScreen() {
             </View>
           </Modal>
         )}
+
+        <MarketingDrawModal
+          visible={showMarketingDraw}
+          queue={marketingQueue}
+          patientId={patientId || ''}
+          onClose={() => {
+            setShowMarketingDraw(false);
+            setMarketingQueue([]);
+          }}
+        />
       </SafeAreaView>
     </View>
   );

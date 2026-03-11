@@ -243,7 +243,7 @@ function FlowerReveal({
 }
 
 export default function GachaDrawScreen() {
-  const { patientId, language } = useApp();
+  const { patientId, language, refreshPatient: refreshPatientCtx } = useApp();
   const router = useRouter();
   const queryClient = useQueryClient();
 
@@ -431,6 +431,7 @@ export default function GachaDrawScreen() {
         }
 
         refreshAfterDraw();
+        void refreshPatientCtx();
 
         setPendingDraws(0);
         setDrawResults([]);
@@ -473,6 +474,7 @@ export default function GachaDrawScreen() {
         }
 
         refreshAfterDraw();
+        void refreshPatientCtx();
 
         setPendingDraws(1);
         setDrawResults([]);
@@ -486,7 +488,7 @@ export default function GachaDrawScreen() {
     } finally {
       setIsStartingDraw(false);
     }
-  }, [flowerTypesQuery.data, patientId, isZh, resetAnimations, runDrawAnimation, refreshAfterDraw]);
+  }, [flowerTypesQuery.data, patientId, isZh, resetAnimations, runDrawAnimation, refreshAfterDraw, refreshPatientCtx]);
 
   useEffect(() => {
     if (drawPhase === 'done' && pendingDraws > 0) {

@@ -28,6 +28,7 @@ interface MarketingDrawModalProps {
   queue: QueuedCampaign[];
   patientId: string;
   onClose: () => void;
+  onPrizeClaimed?: () => void;
 }
 
 function getCampaignTitle(campaign: QueuedCampaign['campaign'], language: Language | null): string {
@@ -51,6 +52,7 @@ export default function MarketingDrawModal({
   queue,
   patientId,
   onClose,
+  onPrizeClaimed,
 }: MarketingDrawModalProps) {
   const { language, t } = useApp();
   const router = useRouter();
@@ -100,6 +102,7 @@ export default function MarketingDrawModal({
       );
       if (success) {
         log('[MarketingDrawModal] Prize recorded for campaign:', currentItem.campaign.id);
+        onPrizeClaimed?.();
       } else {
         log('[MarketingDrawModal] Failed to record prize');
       }
@@ -109,7 +112,7 @@ export default function MarketingDrawModal({
       setSaving(false);
       setPhase('revealed');
     }
-  }, [currentItem, patientId, saving]);
+  }, [currentItem, patientId, saving, onPrizeClaimed]);
 
   const handleNext = useCallback(() => {
     if (currentIndex < queue.length - 1) {

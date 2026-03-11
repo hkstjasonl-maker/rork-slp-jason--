@@ -1,4 +1,4 @@
-import React, { useMemo, useCallback, useState, useEffect, useRef } from 'react';
+import React, { useMemo, useCallback, useState, useEffect } from 'react';
 import {
   View,
   ScrollView,
@@ -13,7 +13,6 @@ import {
 import * as Haptics from 'expo-haptics';
 import { useRouter } from 'expo-router';
 import { useQuery } from '@tanstack/react-query';
-import { checkAndQueueCampaigns, QueuedCampaign } from '@/lib/marketingDraw';
 import MarketingDrawModal from '@/components/MarketingDrawModal';
 import { useApp } from '@/contexts/AppContext';
 import { ScaledText } from '@/components/ScaledText';
@@ -454,23 +453,7 @@ export default function HomeScreen() {
     }
   }, [tutorialCompleted, patientId]);
 
-  useEffect(() => {
-    if (!patientId || marketingCheckedRef.current) return;
-    marketingCheckedRef.current = true;
-    const checkAppOpenCampaigns = async () => {
-      try {
-        const queued = await checkAndQueueCampaigns(patientId, 'app_open');
-        if (queued.length > 0) {
-          setMarketingQueue(queued);
-          setShowMarketingDraw(true);
-        }
-      } catch {
-        // silently fail
-      }
-    };
-    const timer = setTimeout(checkAppOpenCampaigns, 2000);
-    return () => clearTimeout(timer);
-  }, [patientId]);
+
 
   const handleTutorialComplete = useCallback(() => {
     setShowTutorial(false);
@@ -532,9 +515,7 @@ export default function HomeScreen() {
   const objectives = objectivesQuery.data || [];
   const [objectivesExpanded, setObjectivesExpanded] = useState<boolean>(false);
   const [showRecommendation, setShowRecommendation] = useState(false);
-  const [marketingQueue, setMarketingQueue] = useState<QueuedCampaign[]>([]);
-  const [showMarketingDraw, setShowMarketingDraw] = useState<boolean>(false);
-  const marketingCheckedRef = useRef<boolean>(false);
+  const { currentDraw, dismissCurrentDraw, refreshPatient: refreshPatientCtx } = useApp();
 
   const recommendations = useMemo(() => {
     if (exercises.length === 0) return [];
@@ -1142,15 +1123,15 @@ export default function HomeScreen() {
       </SafeAreaView>
       <AppTutorial visible={showTutorial} onComplete={handleTutorialComplete} />
 
-      <MarketingDrawModal
-        visible={showMarketingDraw}
-        queue={marketingQueue}
-        patientId={patientId || ''}
-        onClose={() => {
-          setShowMarketingDraw(false);
-          setMarketingQueue([]);
-        }}
-      />
+      {currentDraw && (
+        <MarketingDrawModal
+          visible={!!currentDraw}
+          queue={currentDraw ? [currentDraw] : []}
+          patientId={patientId || ''}
+          onClose={dismissCurrentDraw}
+          onPrizeClaimed={refreshPatientCtx}
+        />
+      )}
 
       <Modal
         visible={showRecommendation}

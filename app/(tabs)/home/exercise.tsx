@@ -25,7 +25,7 @@ import { YouTubePlayer } from '@/components/YouTubePlayer';
 import { VimeoPlayer } from '@/components/VimeoPlayer';
 import LiveSubtitleOverlay from '@/components/LiveSubtitleOverlay';
 import MarketingDrawModal from '@/components/MarketingDrawModal';
-import { checkAndQueueCampaigns, getTodayExerciseCount, QueuedCampaign } from '@/lib/marketingDraw';
+import { checkAndQueueCampaigns, getTodayExerciseCount } from '@/lib/marketingDraw';
 
 import { EncouragementModal } from '@/components/EncouragementModal';
 import { SelfRatingModal } from '@/components/SelfRatingModal';
@@ -536,7 +536,7 @@ export default function ExerciseScreen() {
   }>();
   const router = useRouter();
   const queryClient = useQueryClient();
-  const { t, patientId, patientName, language, reinforcementAudioId, reinforcementAudioUrl, liveSubtitlesEnabled } = useApp();
+  const { t, patientId, patientName, language, reinforcementAudioId, reinforcementAudioUrl, liveSubtitlesEnabled, refreshPatient: refreshPatientCtx, addToDrawQueue, currentDraw, dismissCurrentDraw } = useApp();
 
   const allIds: string[] = useMemo(() => {
     if (params.allExerciseIds) {
@@ -581,8 +581,7 @@ export default function ExerciseScreen() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [lastRecordedUri, setLastRecordedUri] = useState<string | null>(null);
   const [submissionSuccess, setSubmissionSuccess] = useState(false);
-  const [marketingQueue, setMarketingQueue] = useState<QueuedCampaign[]>([]);
-  const [showMarketingDraw, setShowMarketingDraw] = useState<boolean>(false);
+
   const countdownFade = useRef(new Animated.Value(0)).current;
   const countdownScale = useRef(new Animated.Value(0.5)).current;
 
@@ -873,13 +872,13 @@ export default function ExerciseScreen() {
       setShowEncouragement(true);
 
       if (patientId) {
+        void refreshPatientCtx();
         void (async () => {
           try {
             const todayCount = await getTodayExerciseCount(patientId);
             const queued = await checkAndQueueCampaigns(patientId, 'exercise_count', todayCount);
             if (queued.length > 0) {
-              setMarketingQueue(queued);
-              setTimeout(() => setShowMarketingDraw(true), 3000);
+              addToDrawQueue(queued);
             }
           } catch {
             // silently fail
@@ -1262,8 +1261,7 @@ export default function ExerciseScreen() {
             try {
               const queued = await checkAndQueueCampaigns(patientId, 'video_submit');
               if (queued.length > 0) {
-                setMarketingQueue(queued);
-                setTimeout(() => setShowMarketingDraw(true), 2000);
+                addToDrawQueue(queued);
               }
             } catch {
               // silently fail
@@ -1281,7 +1279,7 @@ export default function ExerciseScreen() {
     } finally {
       setIsSubmitting(false);
     }
-  }, [lastRecordedUri, patientId, reviewRequirement, exercise, t, queryClient]);
+  }, [lastRecordedUri, patientId, reviewRequirement, exercise, t, queryClient, addToDrawQueue]);
   const narrativeAudioId = useMemo(
     () => exercise ? getNarrativeAudioId(exercise, language) : null,
     [exercise, language]
@@ -1952,15 +1950,15 @@ export default function ExerciseScreen() {
           </Modal>
         )}
 
-        <MarketingDrawModal
-          visible={showMarketingDraw}
-          queue={marketingQueue}
-          patientId={patientId || ''}
-          onClose={() => {
-            setShowMarketingDraw(false);
-            setMarketingQueue([]);
-          }}
-        />
+        {currentDraw && (
+          <MarketingDrawModal
+            visible={!!currentDraw}
+            queue={currentDraw ? [currentDraw] : []}
+            patientId={patientId || ''}
+            onClose={dismissCurrentDraw}
+            onPrizeClaimed={refreshPatientCtx}
+          />
+        )}
       </SafeAreaView>
     </View>
   );

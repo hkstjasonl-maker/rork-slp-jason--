@@ -1,9 +1,11 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import createContextHook from '@nkzw/create-context-hook';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { AppState, AppStateStatus } from 'react-native';
 import translations from '@/constants/i18n';
 import { Language, FontSizeLevel, FONT_SCALES, Acknowledgement } from '@/types';
 import { setupSessionTracking } from '@/lib/analytics';
+import { checkAndQueueCampaigns, QueuedCampaign } from '@/lib/marketingDraw';
 import { supabase } from '@/lib/supabase';
 import { log } from '@/lib/logger';
 
@@ -38,6 +40,9 @@ export const [AppProvider, useApp] = createContextHook(() => {
   const [acknowledgements, setAcknowledgements] = useState<Acknowledgement[]>([]);
   const [liveSubtitlesEnabled, setLiveSubtitlesEnabledState] = useState<boolean>(false);
   const [flowersJustStolen, setFlowersJustStolen] = useState<number>(0);
+  const [drawQueue, setDrawQueue] = useState<QueuedCampaign[]>([]);
+  const [currentDraw, setCurrentDraw] = useState<QueuedCampaign | null>(null);
+  const appOpenMarketingChecked = useRef<boolean>(false);
 
   useEffect(() => {
     void loadPersistedState();
@@ -337,6 +342,99 @@ export const [AppProvider, useApp] = createContextHook(() => {
 
   const clearFlowersStolen = useCallback(() => setFlowersJustStolen(0), []);
 
+  const patientIdRef = useRef(patientId);
+  useEffect(() => { patientIdRef.current = patientId; }, [patientId]);
+
+  const refreshPatient = useCallback(async () => {
+    if (!patientId) return;
+    try {
+      log('[AppContext] Refreshing patient data for:', patientId);
+      const { data, error } = await supabase
+        .from('patients')
+        .select('*')
+        .eq('id', patientId)
+        .single();
+      if (error) {
+        log('[AppContext] refreshPatient error:', error);
+        return;
+      }
+      if (data) {
+        setTherapistPhotoUrl(data.therapist_photo_url || null);
+        setTherapistCartoonUrl(data.therapist_cartoon_url || null);
+        setTherapistNameEn(data.therapist_name_en || null);
+        setTherapistNameZh(data.therapist_name_zh || null);
+        setManagingOrgNameEn(data.managing_org_name_en || null);
+        setManagingOrgNameZh(data.managing_org_name_zh || null);
+        setManagingOrgLogoUrl(data.managing_org_logo_url || null);
+        setLiveSubtitlesEnabledState(data.live_subtitles_enabled === true);
+        log('[AppContext] Patient data refreshed successfully');
+      }
+    } catch (e) {
+      log('[AppContext] refreshPatient exception:', e);
+    }
+  }, [patientId]);
+
+  const addToDrawQueue = useCallback((campaigns: QueuedCampaign[]) => {
+    if (campaigns.length === 0) return;
+    log('[AppContext] Adding', campaigns.length, 'campaigns to draw queue');
+    setDrawQueue(prev => [...prev, ...campaigns]);
+  }, []);
+
+  const dismissCurrentDraw = useCallback(() => {
+    log('[AppContext] Dismissing current draw');
+    setCurrentDraw(null);
+  }, []);
+
+  useEffect(() => {
+    if (!currentDraw && drawQueue.length > 0) {
+      log('[AppContext] Dequeuing next draw campaign');
+      setCurrentDraw(drawQueue[0]);
+      setDrawQueue(prev => prev.slice(1));
+    }
+  }, [currentDraw, drawQueue]);
+
+  useEffect(() => {
+    if (!patientId || !isReady) return;
+    const expirePrizes = async () => {
+      try {
+        log('[AppContext] Expiring old prizes for patient:', patientId);
+        await supabase.rpc('expire_patient_prizes', { p_patient_id: patientId });
+      } catch (e) {
+        log('[AppContext] expire_patient_prizes error:', e);
+      }
+    };
+    void expirePrizes();
+  }, [patientId, isReady]);
+
+  useEffect(() => {
+    if (!patientId || !isReady || appOpenMarketingChecked.current) return;
+    appOpenMarketingChecked.current = true;
+    const checkAppOpenCampaigns = async () => {
+      try {
+        log('[AppContext] Checking app-open marketing campaigns');
+        const queued = await checkAndQueueCampaigns(patientId, 'app_open');
+        if (queued.length > 0) {
+          addToDrawQueue(queued);
+        }
+      } catch (e) {
+        log('[AppContext] App-open campaign check error:', e);
+      }
+    };
+    const timer = setTimeout(checkAppOpenCampaigns, 2000);
+    return () => clearTimeout(timer);
+  }, [patientId, isReady, addToDrawQueue]);
+
+  useEffect(() => {
+    const handleAppState = (nextState: AppStateStatus) => {
+      if (nextState === 'active' && patientIdRef.current) {
+        log('[AppContext] App returned to foreground, refreshing patient');
+        void refreshPatient();
+      }
+    };
+    const sub = AppState.addEventListener('change', handleAppState);
+    return () => sub.remove();
+  }, [refreshPatient]);
+
   const fontScale = FONT_SCALES[fontSizeLevel];
 
   return useMemo(() => ({
@@ -362,6 +460,11 @@ export const [AppProvider, useApp] = createContextHook(() => {
     acknowledgements,
     flowersJustStolen,
     clearFlowersStolen,
+    refreshPatient,
+    drawQueue,
+    currentDraw,
+    addToDrawQueue,
+    dismissCurrentDraw,
     setLanguage,
     setTermsAccepted,
     setPatient,
@@ -381,6 +484,8 @@ export const [AppProvider, useApp] = createContextHook(() => {
     acknowledgements,
     flowersJustStolen,
     clearFlowersStolen,
+    refreshPatient,
+    drawQueue, currentDraw, addToDrawQueue, dismissCurrentDraw,
     setLanguage,
     setTermsAccepted, setPatient, clearPatient, setFontSizeLevel,
     setLiveSubtitlesEnabled,

@@ -136,6 +136,37 @@ export async function recordDrawAndAwardPrize(
   prize: MarketingPrize
 ): Promise<boolean> {
   try {
+    log('[MarketingDraw] Claiming prize via RPC:', prize.id, 'campaign:', campaignId);
+    const { data: success, error } = await supabase.rpc('claim_marketing_prize', {
+      p_patient_id: patientId,
+      p_campaign_id: campaignId,
+      p_prize_id: prize.id,
+    });
+
+    if (error) {
+      log('[MarketingDraw] RPC claim_marketing_prize error:', error);
+      return fallbackRecordDraw(patientId, campaignId, prize);
+    }
+
+    if (!success) {
+      log('[MarketingDraw] Prize claim returned false (already claimed or out of stock)');
+      return false;
+    }
+
+    log('[MarketingDraw] Prize claimed successfully via RPC:', prize.name_en);
+    return true;
+  } catch (e) {
+    log('[MarketingDraw] Exception in RPC claim, trying fallback:', e);
+    return fallbackRecordDraw(patientId, campaignId, prize);
+  }
+}
+
+async function fallbackRecordDraw(
+  patientId: string,
+  campaignId: string,
+  prize: MarketingPrize
+): Promise<boolean> {
+  try {
     const now = new Date().toISOString();
     let expiryDate: string | null = null;
     if (prize.expiry_days) {
@@ -157,7 +188,7 @@ export async function recordDrawAndAwardPrize(
       });
 
     if (prizeError) {
-      log('[MarketingDraw] Error inserting patient_prizes:', prizeError);
+      log('[MarketingDraw] Fallback insert patient_prizes error:', prizeError);
       return false;
     }
 
@@ -171,7 +202,7 @@ export async function recordDrawAndAwardPrize(
       });
 
     if (logError) {
-      log('[MarketingDraw] Error inserting draw log:', logError);
+      log('[MarketingDraw] Fallback insert draw log error:', logError);
     }
 
     await supabase
@@ -179,10 +210,10 @@ export async function recordDrawAndAwardPrize(
       .update({ quantity_remaining: Math.max(0, prize.quantity_remaining - 1) })
       .eq('id', prize.id);
 
-    log('[MarketingDraw] Prize awarded successfully:', prize.name_en);
+    log('[MarketingDraw] Fallback prize award successful:', prize.name_en);
     return true;
   } catch (e) {
-    log('[MarketingDraw] Exception recording draw:', e);
+    log('[MarketingDraw] Fallback exception:', e);
     return false;
   }
 }

@@ -15,7 +15,7 @@ import {
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import * as Haptics from 'expo-haptics';
-import { ArrowLeft, CheckCircle, Clock, Repeat, AlertCircle, Tag, Camera, X, Maximize2, SplitSquareHorizontal, Headphones, VideoOff, Coffee, Play, Pause, FileText } from 'lucide-react-native';
+import { ArrowLeft, CheckCircle, Clock, Repeat, AlertCircle, Tag, Camera, X, Maximize2, SplitSquareHorizontal, Headphones, VideoOff, Coffee, Play, Pause, FileText, Captions } from 'lucide-react-native';
 import * as MediaLibrary from 'expo-media-library';
 
 
@@ -23,6 +23,7 @@ import { useApp } from '@/contexts/AppContext';
 import { ScaledText } from '@/components/ScaledText';
 import { YouTubePlayer } from '@/components/YouTubePlayer';
 import { VimeoPlayer } from '@/components/VimeoPlayer';
+import LiveSubtitleOverlay from '@/components/LiveSubtitleOverlay';
 
 import { EncouragementModal } from '@/components/EncouragementModal';
 import { SelfRatingModal } from '@/components/SelfRatingModal';
@@ -73,6 +74,18 @@ function getAudioInstructionUrl(exercise: Exercise, language: Language | null): 
       return exercise.audio_instruction_url_zh_hans || exercise.audio_instruction_url_en || null;
     default:
       return exercise.audio_instruction_url_en || null;
+  }
+}
+
+function getSubtitleUrl(exercise: Exercise, language: Language | null): string | null {
+  const lang = language || 'en';
+  switch (lang) {
+    case 'zh_hant':
+      return exercise.subtitle_url_zh_hant || exercise.subtitle_url_en || null;
+    case 'zh_hans':
+      return exercise.subtitle_url_zh_hans || exercise.subtitle_url_en || null;
+    default:
+      return exercise.subtitle_url_en || null;
   }
 }
 
@@ -521,7 +534,7 @@ export default function ExerciseScreen() {
   }>();
   const router = useRouter();
   const queryClient = useQueryClient();
-  const { t, patientId, patientName, language, reinforcementAudioId, reinforcementAudioUrl } = useApp();
+  const { t, patientId, patientName, language, reinforcementAudioId, reinforcementAudioUrl, liveSubtitlesEnabled } = useApp();
 
   const allIds: string[] = useMemo(() => {
     if (params.allExerciseIds) {
@@ -555,6 +568,11 @@ export default function ExerciseScreen() {
   const [showProcessing, setShowProcessing] = useState(false);
   const [showTranscriptOverlay, setShowTranscriptOverlay] = useState(false);
   const [showFaceGuide, setShowFaceGuide] = useState(false);
+  const [showLiveSubtitles, setShowLiveSubtitles] = useState(false);
+  const [liveSubAudioPlaying, setLiveSubAudioPlaying] = useState(false);
+  const [liveSubAudioTime, setLiveSubAudioTime] = useState(0);
+  const liveSubSoundRef = useRef<Audio.Sound | null>(null);
+  const liveSubIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const [faceGuideForRecording, setFaceGuideForRecording] = useState(false);
   const [reviewRequirement, setReviewRequirement] = useState<ExerciseReviewRequirement | null>(null);
   const [todaySubmissionCount, setTodaySubmissionCount] = useState<number>(0);
@@ -1198,12 +1216,103 @@ export default function ExerciseScreen() {
     [exercise, language]
   );
 
+  const subtitleUrl = useMemo(
+    () => exercise ? getSubtitleUrl(exercise, language) : null,
+    [exercise, language]
+  );
+
   const handleToggleTranscript = useCallback(() => {
     setShowTranscriptOverlay(prev => !prev);
     if (Platform.OS !== 'web') {
       void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     }
   }, []);
+
+  const cleanupLiveSubAudio = useCallback(() => {
+    if (liveSubIntervalRef.current) {
+      clearInterval(liveSubIntervalRef.current);
+      liveSubIntervalRef.current = null;
+    }
+    if (liveSubSoundRef.current) {
+      liveSubSoundRef.current.unloadAsync().catch(() => {});
+      liveSubSoundRef.current = null;
+    }
+    setLiveSubAudioPlaying(false);
+    setLiveSubAudioTime(0);
+  }, []);
+
+  const handleToggleLiveSubtitles = useCallback(async () => {
+    if (Platform.OS !== 'web') {
+      void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    }
+
+    if (liveSubAudioPlaying) {
+      cleanupLiveSubAudio();
+      setShowLiveSubtitles(false);
+      return;
+    }
+
+    if (!mirrorAudioUrl) return;
+
+    try {
+      setShowLiveSubtitles(true);
+      await Audio.setAudioModeAsync({
+        allowsRecordingIOS: false,
+        playsInSilentModeIOS: true,
+        staysActiveInBackground: false,
+        shouldDuckAndroid: true,
+      });
+
+      const { sound } = await Audio.Sound.createAsync(
+        { uri: mirrorAudioUrl },
+        { shouldPlay: true }
+      );
+      liveSubSoundRef.current = sound;
+      setLiveSubAudioPlaying(true);
+
+      liveSubIntervalRef.current = setInterval(async () => {
+        try {
+          if (liveSubSoundRef.current) {
+            const status = await liveSubSoundRef.current.getStatusAsync();
+            if (status.isLoaded) {
+              setLiveSubAudioTime(status.positionMillis / 1000);
+            }
+          }
+        } catch (e) {
+          log('[LiveSub] Position poll error:', e);
+        }
+      }, 200);
+
+      sound.setOnPlaybackStatusUpdate((status) => {
+        if (status.isLoaded && status.didJustFinish) {
+          cleanupLiveSubAudio();
+          setShowLiveSubtitles(false);
+        }
+      });
+    } catch (e) {
+      log('[LiveSub] Error starting audio+subtitles:', e);
+      cleanupLiveSubAudio();
+      setShowLiveSubtitles(false);
+    }
+  }, [liveSubAudioPlaying, mirrorAudioUrl, cleanupLiveSubAudio]);
+
+  useEffect(() => {
+    return () => {
+      if (liveSubIntervalRef.current) {
+        clearInterval(liveSubIntervalRef.current);
+      }
+      if (liveSubSoundRef.current) {
+        liveSubSoundRef.current.unloadAsync().catch(() => {});
+      }
+    };
+  }, []);
+
+  useEffect(() => {
+    if (mediaMode === 'video') {
+      cleanupLiveSubAudio();
+      setShowLiveSubtitles(false);
+    }
+  }, [mediaMode, cleanupLiveSubAudio]);
 
   if (exerciseQuery.isLoading || !exercise) {
     return (
@@ -1366,6 +1475,15 @@ export default function ExerciseScreen() {
                 <TranscriptOverlay transcript={mirrorTranscript} onClose={() => setShowTranscriptOverlay(false)} />
               )}
 
+              {liveSubtitlesEnabled && showLiveSubtitles && !isRecording && (
+                <LiveSubtitleOverlay
+                  subtitleUrl={subtitleUrl}
+                  isPlaying={liveSubAudioPlaying}
+                  audioCurrentTime={liveSubAudioTime}
+                  visible={showLiveSubtitles}
+                />
+              )}
+
               {isRecording && (
                 <View style={styles.recordingIndicator}>
                   <Animated.View style={[styles.recordingDot, { opacity: recordPulse }]} />
@@ -1380,7 +1498,21 @@ export default function ExerciseScreen() {
                   {mirrorAudioUrl && (
                     <MirrorAudioButton audioUrl={mirrorAudioUrl} label={t('playInstructions')} stopLabel={t('stopInstructions')} />
                   )}
-                  {mirrorTranscript && (
+                  {liveSubtitlesEnabled && mirrorAudioUrl ? (
+                    <TouchableOpacity
+                      style={[mirrorAudioStyles.iconBtn, liveSubAudioPlaying && mirrorAudioStyles.iconBtnActive]}
+                      onPress={handleToggleLiveSubtitles}
+                      activeOpacity={0.7}
+                      testID="mirror-live-subtitle-toggle"
+                    >
+                      <Captions size={16} color={Colors.white} />
+                      <ScaledText size={10} weight="600" color={Colors.white} numberOfLines={1}>
+                        {liveSubAudioPlaying
+                          ? (language === 'zh_hant' || language === 'zh_hans' ? '停止字幕' : 'Stop')
+                          : (language === 'zh_hant' || language === 'zh_hans' ? '即時字幕' : 'Live Subtitles')}
+                      </ScaledText>
+                    </TouchableOpacity>
+                  ) : mirrorTranscript ? (
                     <TouchableOpacity
                       style={[mirrorAudioStyles.iconBtn, showTranscriptOverlay && mirrorAudioStyles.iconBtnActive]}
                       onPress={handleToggleTranscript}
@@ -1392,7 +1524,7 @@ export default function ExerciseScreen() {
                         {showTranscriptOverlay ? t('hideTranscript') : t('viewTranscript')}
                       </ScaledText>
                     </TouchableOpacity>
-                  )}
+                  ) : null}
                 </View>
               )}
 

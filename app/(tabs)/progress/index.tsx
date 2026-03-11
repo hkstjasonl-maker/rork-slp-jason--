@@ -7,8 +7,10 @@ import {
   ActivityIndicator,
   RefreshControl,
   Pressable,
+  TouchableOpacity,
 } from 'react-native';
 import { useQuery } from '@tanstack/react-query';
+
 import { useApp } from '@/contexts/AppContext';
 import { ScaledText } from '@/components/ScaledText';
 import { CopyrightFooter } from '@/components/CopyrightFooter';
@@ -18,7 +20,7 @@ import { fetchExerciseCompliance } from '@/lib/analytics';
 import Colors from '@/constants/colors';
 import { ExerciseLog, ExerciseProgram, Language } from '@/types';
 import { log } from '@/lib/logger';
-import { TrendingUp, Calendar, Award, Zap, CheckCircle2, Star, Flame, Trophy, Activity, ClipboardCheck, ThumbsUp, Gauge, Info, ChevronDown, ChevronUp } from 'lucide-react-native';
+import { TrendingUp, Calendar, Award, Zap, CheckCircle2, Star, Flame, Trophy, Activity, ClipboardCheck, ThumbsUp, Gauge, Info, ChevronDown, ChevronUp, Flower2 } from 'lucide-react-native';
 
 function getLogTitle(log: ExerciseLog, language: Language | null): string {
   const lang = language || 'en';
@@ -64,9 +66,35 @@ interface GroupedLogs {
   logs: ExerciseLog[];
 }
 
+interface PatientRewards {
+  stars_total: number;
+  stars_available: number;
+  fires_total: number;
+  fires_available: number;
+}
+
 export default function ProgressScreen() {
   const { t, patientId, language } = useApp();
   const [showHowToEarn, setShowHowToEarn] = React.useState<boolean>(false);
+
+  const rewardsQuery = useQuery({
+    queryKey: ['patientRewards', patientId],
+    queryFn: async () => {
+      log('Fetching patient rewards for:', patientId);
+      const { data, error } = await supabase
+        .from('patients')
+        .select('stars_total, stars_available, fires_total, fires_available')
+        .eq('id', patientId!)
+        .single();
+      if (error) {
+        log('Patient rewards fetch error:', error);
+        throw error;
+      }
+      return (data || { stars_total: 0, stars_available: 0, fires_total: 0, fires_available: 0 }) as PatientRewards;
+    },
+    enabled: !!patientId,
+    staleTime: 30 * 1000,
+  });
 
   const programQuery = useQuery({
     queryKey: ['program', patientId],
@@ -216,15 +244,19 @@ export default function ProgressScreen() {
     }
   }, [language]);
 
+  const rewards = rewardsQuery.data;
+
   const { refetch: refetchLogs } = logsQuery;
   const { refetch: refetchCompliance } = complianceQuery;
   const { refetch: refetchProgram } = programQuery;
+  const { refetch: refetchRewards } = rewardsQuery;
 
   const onRefresh = useCallback(() => {
     void refetchLogs();
     void refetchCompliance();
     void refetchProgram();
-  }, [refetchLogs, refetchCompliance, refetchProgram]);
+    void refetchRewards();
+  }, [refetchLogs, refetchCompliance, refetchProgram, refetchRewards]);
 
   return (
     <View style={styles.root}>
@@ -261,38 +293,85 @@ export default function ProgressScreen() {
                   </ScaledText>
                 </View>
 
-                <View style={styles.starTotalRow}>
-                  <View style={styles.starTotalCircle}>
-                    <ScaledText size={32} weight="bold" color="#B8860B">
-                      {starSummary.totalStars}
-                    </ScaledText>
-                    <ScaledText size={11} weight="600" color="#B8860B">
-                      {t('totalStars')}
-                    </ScaledText>
+                <View style={styles.rewardsGrid}>
+                  <View style={styles.rewardItem}>
+                    <View style={styles.starTotalCircle}>
+                      <ScaledText size={28} weight="bold" color="#B8860B">
+                        {rewards?.stars_total ?? starSummary.totalStars}
+                      </ScaledText>
+                      <ScaledText size={10} weight="600" color="#B8860B">
+                        {t('totalStars')}
+                      </ScaledText>
+                    </View>
                   </View>
 
-                  <View style={styles.starDetailsColumn}>
-                    <View style={styles.streakRow}>
-                      <Flame size={18} color="#FF6B35" />
-                      <View style={styles.streakTextCol}>
-                        <ScaledText size={14} weight="600" color={Colors.textPrimary}>
-                          {starSummary.currentStreak} {t('days')}
-                        </ScaledText>
-                        <ScaledText size={11} color={Colors.textSecondary}>
-                          {t('currentStreak')}
-                        </ScaledText>
-                      </View>
+                  <View style={styles.rewardItem}>
+                    <View style={[styles.rewardCircle, { borderColor: '#81C784', backgroundColor: '#E8F5E9' }]}>
+                      <ScaledText size={28} weight="bold" color="#2E7D32">
+                        {rewards?.stars_available ?? 0}
+                      </ScaledText>
+                      <ScaledText size={10} weight="600" color="#2E7D32">
+                        {t('availableStars')}
+                      </ScaledText>
                     </View>
-                    <View style={styles.streakRow}>
-                      <Trophy size={18} color={Colors.secondary} />
-                      <View style={styles.streakTextCol}>
-                        <ScaledText size={14} weight="600" color={Colors.textPrimary}>
-                          {starSummary.longestStreak} {t('days')}
-                        </ScaledText>
-                        <ScaledText size={11} color={Colors.textSecondary}>
-                          {t('longestStreak')}
-                        </ScaledText>
-                      </View>
+                    <TouchableOpacity
+                      style={styles.drawFlowersBtn}
+                      activeOpacity={0.7}
+                      testID="draw-flowers-btn"
+                    >
+                      <Flower2 size={14} color="#E91E63" />
+                      <ScaledText size={11} weight="700" color="#E91E63">
+                        {t('drawFlowers')}
+                      </ScaledText>
+                    </TouchableOpacity>
+                  </View>
+                </View>
+
+                <View style={styles.rewardsGrid}>
+                  <View style={styles.rewardItem}>
+                    <View style={[styles.rewardCircle, { borderColor: '#FFCC80', backgroundColor: '#FFF3E0' }]}>
+                      <ScaledText size={28} weight="bold" color="#E65100">
+                        {rewards?.fires_total ?? 0}
+                      </ScaledText>
+                      <ScaledText size={10} weight="600" color="#E65100">
+                        {t('totalFires')}
+                      </ScaledText>
+                    </View>
+                  </View>
+
+                  <View style={styles.rewardItem}>
+                    <View style={[styles.rewardCircle, { borderColor: '#FFB74D', backgroundColor: '#FFF8E1' }]}>
+                      <ScaledText size={28} weight="bold" color="#F57F17">
+                        {rewards?.fires_available ?? 0}
+                      </ScaledText>
+                      <ScaledText size={10} weight="600" color="#F57F17">
+                        {t('availableFires')}
+                      </ScaledText>
+                    </View>
+                  </View>
+                </View>
+
+                <View style={styles.streakSection}>
+                  <View style={styles.streakRow}>
+                    <Flame size={18} color="#FF6B35" />
+                    <View style={styles.streakTextCol}>
+                      <ScaledText size={14} weight="600" color={Colors.textPrimary}>
+                        {starSummary.currentStreak} {t('days')}
+                      </ScaledText>
+                      <ScaledText size={11} color={Colors.textSecondary}>
+                        {t('currentStreak')}
+                      </ScaledText>
+                    </View>
+                  </View>
+                  <View style={styles.streakRow}>
+                    <Trophy size={18} color={Colors.secondary} />
+                    <View style={styles.streakTextCol}>
+                      <ScaledText size={14} weight="600" color={Colors.textPrimary}>
+                        {starSummary.longestStreak} {t('days')}
+                      </ScaledText>
+                      <ScaledText size={11} color={Colors.textSecondary}>
+                        {t('longestStreak')}
+                      </ScaledText>
                     </View>
                   </View>
                 </View>
@@ -305,7 +384,7 @@ export default function ProgressScreen() {
                   </View>
                 )}
 
-                {starSummary.totalStars === 0 && (
+                {starSummary.totalStars === 0 && !rewards?.stars_total && (
                   <ScaledText size={13} color={Colors.textSecondary} style={styles.noStarsText}>
                     {t('noStarsYet')}
                   </ScaledText>
@@ -764,6 +843,40 @@ const styles = StyleSheet.create({
   },
   howToEarnDesc: {
     paddingLeft: 4,
+    marginBottom: 4,
+  },
+  rewardsGrid: {
+    flexDirection: 'row',
+    gap: 12,
+    marginBottom: 12,
+  },
+  rewardItem: {
+    flex: 1,
+    alignItems: 'center',
+    gap: 8,
+  },
+  rewardCircle: {
+    width: 100,
+    height: 100,
+    borderRadius: 50,
+    borderWidth: 3,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  drawFlowersBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: '#FCE4EC',
+    paddingVertical: 6,
+    paddingHorizontal: 12,
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: '#F48FB1',
+  },
+  streakSection: {
+    flexDirection: 'row',
+    gap: 20,
     marginBottom: 4,
   },
   statsRow: {

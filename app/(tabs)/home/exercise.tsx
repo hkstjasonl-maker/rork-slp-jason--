@@ -33,7 +33,7 @@ import { RecordingWatermark } from '@/components/RecordingWatermark';
 import { FacePositionGuide } from '@/components/FacePositionGuide';
 import { VideoProtectionOverlay } from '@/components/VideoProtectionOverlay';
 import { supabase } from '@/lib/supabase';
-import { getStarsForSession, calculateStars } from '@/lib/stars';
+import { getStarsForSession, calculateStars, calculateStarsAndFires } from '@/lib/stars';
 import { getExerciseDosage } from '@/lib/dosage';
 import Colors from '@/constants/colors';
 import { TherapistImage } from '@/components/TherapistImage';
@@ -793,6 +793,10 @@ export default function ExerciseScreen() {
   const completeMutation = useMutation({
     mutationFn: async () => {
       log('Logging exercise completion:', activeExerciseId);
+
+      const oldLogs = allLogsQuery.data || [];
+      const oldResult = calculateStarsAndFires(oldLogs, totalExercises);
+
       const { data, error } = await supabase
         .from('exercise_logs')
         .insert({
@@ -803,6 +807,43 @@ export default function ExerciseScreen() {
         .select('id')
         .single();
       if (error) throw error;
+
+      const newFakeLog = {
+        id: data?.id || 'temp',
+        patient_id: patientId!,
+        exercise_id: activeExerciseId,
+        completed_at: new Date().toISOString(),
+      };
+      const newLogs = [...oldLogs, newFakeLog];
+      const newResult = calculateStarsAndFires(newLogs, totalExercises);
+
+      const deltaStars = newResult.totalSessionStars - oldResult.totalSessionStars;
+      const deltaFires = newResult.totalFires - oldResult.totalFires;
+
+      if ((deltaStars > 0 || deltaFires > 0) && patientId) {
+        try {
+          const { data: patientData } = await supabase
+            .from('patients')
+            .select('stars_total, stars_available, fires_total, fires_available')
+            .eq('id', patientId)
+            .single();
+
+          const cur = patientData || { stars_total: 0, stars_available: 0, fires_total: 0, fires_available: 0 };
+          await supabase
+            .from('patients')
+            .update({
+              stars_total: (cur.stars_total || 0) + deltaStars,
+              stars_available: (cur.stars_available || 0) + deltaStars,
+              fires_total: (cur.fires_total || 0) + deltaFires,
+              fires_available: (cur.fires_available || 0) + deltaFires,
+            })
+            .eq('id', patientId);
+          log('[Exercise] Updated patient stars/fires:', { deltaStars, deltaFires });
+        } catch (e) {
+          log('[Exercise] Failed to update patient stars/fires:', e);
+        }
+      }
+
       return data;
     },
     onSuccess: (data) => {
@@ -812,6 +853,7 @@ export default function ExerciseScreen() {
       setPendingLogId(data?.id ?? null);
       void queryClient.invalidateQueries({ queryKey: ['todayLogs'] });
       void queryClient.invalidateQueries({ queryKey: ['exerciseLogs'] });
+      void queryClient.invalidateQueries({ queryKey: ['patientRewards'] });
       setCompletedThisSession((prev) => new Set(prev).add(activeExerciseId));
       setShowEncouragement(true);
     },

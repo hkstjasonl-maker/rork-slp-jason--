@@ -138,6 +138,21 @@ export function calculateStars(
   };
 }
 
+export interface StarsAndFires {
+  totalSessionStars: number;
+  totalFires: number;
+}
+
+export function calculateStarsAndFires(
+  logs: ExerciseLog[],
+  totalExercisesInProgram: number,
+): StarsAndFires {
+  const summary = calculateStars(logs, totalExercisesInProgram);
+  const totalSessionStars = summary.dailyBreakdown.reduce((sum, d) => sum + d.sessionStars, 0);
+  const totalFires = summary.dailyBreakdown.reduce((sum, d) => sum + d.streakBonus, 0);
+  return { totalSessionStars, totalFires };
+}
+
 export function getStarsForSession(
   uniqueExercisesToday: number,
   totalExercisesInProgram: number,

@@ -13,7 +13,7 @@ import {
   Image,
   Dimensions,
 } from 'react-native';
-import { Stack, useRouter } from 'expo-router';
+import { Stack, useRouter, useFocusEffect } from 'expo-router';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Sparkles, Gift, X, ChevronLeft } from 'lucide-react-native';
 
@@ -60,7 +60,6 @@ interface PatientFlower {
 }
 
 interface PatientGardenData {
-  garden_background_url: string | null;
   consecutive_inactive_days: number;
   stars_available: number;
   fires_available: number;
@@ -191,7 +190,7 @@ export default function FlowerYieldScreen() {
       log('[FlowerYield] Fetching patient garden data for:', patientId);
       const { data, error } = await supabase
         .from('patients')
-        .select('garden_background_url, consecutive_inactive_days, stars_available, fires_available')
+        .select('consecutive_inactive_days, stars_available, fires_available')
         .eq('id', patientId!)
         .single();
       if (error) {
@@ -199,7 +198,6 @@ export default function FlowerYieldScreen() {
         throw error;
       }
       return (data || {
-        garden_background_url: null,
         consecutive_inactive_days: 0,
         stars_available: 0,
         fires_available: 0,
@@ -267,6 +265,16 @@ export default function FlowerYieldScreen() {
     return ft.name_en;
   }, [isZh]);
 
+  const { refetch: refetchPatientData } = patientDataQuery;
+  const { refetch: refetchFlowers } = flowersQuery;
+
+  useFocusEffect(
+    useCallback(() => {
+      void refetchPatientData();
+      void refetchFlowers();
+    }, [refetchPatientData, refetchFlowers])
+  );
+
   const patientData = patientDataQuery.data;
   const flowers = flowersQuery.data || [];
   const isLoading = patientDataQuery.isLoading || flowersQuery.isLoading || flowerTypesQuery.isLoading;
@@ -327,6 +335,7 @@ export default function FlowerYieldScreen() {
               style={styles.luckyDrawBtn}
               activeOpacity={0.75}
               testID="lucky-draw-btn"
+              onPress={() => router.push('/gacha-draw')}
             >
               <Sparkles size={18} color="#FFF" />
               <ScaledText size={14} weight="700" color="#FFF">
@@ -338,6 +347,7 @@ export default function FlowerYieldScreen() {
               style={styles.treasureBtn}
               activeOpacity={0.75}
               testID="treasure-chest-btn"
+              onPress={() => router.push('/treasure-chest')}
             >
               <Gift size={18} color="#8B4513" />
               <ScaledText size={14} weight="700" color="#8B4513">
@@ -360,14 +370,7 @@ export default function FlowerYieldScreen() {
                 }
               }}
             >
-              {patientData?.garden_background_url ? (
-                <Image
-                  source={{ uri: patientData.garden_background_url }}
-                  style={styles.gardenBackground}
-                  resizeMode="cover"
-                />
-              ) : (
-                <View style={styles.gardenDefaultBg}>
+              <View style={styles.gardenDefaultBg}>
                   {Array.from({ length: TOTAL_SLOTS }).map((_, i) => {
                     const col = i % GRID_COLS;
                     const row = Math.floor(i / GRID_COLS);
@@ -410,8 +413,7 @@ export default function FlowerYieldScreen() {
                       />
                     );
                   })}
-                </View>
-              )}
+              </View>
 
               {flowers.map((flower) => {
                 const ft = flower.flower_types || flowerTypeMap[flower.flower_type_id];

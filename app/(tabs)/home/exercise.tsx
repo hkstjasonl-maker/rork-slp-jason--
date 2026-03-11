@@ -71,11 +71,11 @@ function getAudioInstructionUrl(exercise: Exercise, language: Language | null): 
   const lang = language || 'en';
   switch (lang) {
     case 'zh_hant':
-      return exercise.audio_instruction_url_zh_hant || exercise.audio_instruction_url_en || null;
+      return exercise.audio_instruction_url_zh_hant || exercise.audio_instruction_url_zh_hans || exercise.audio_instruction_url_en || null;
     case 'zh_hans':
-      return exercise.audio_instruction_url_zh_hans || exercise.audio_instruction_url_en || null;
+      return exercise.audio_instruction_url_zh_hans || exercise.audio_instruction_url_zh_hant || exercise.audio_instruction_url_en || null;
     default:
-      return exercise.audio_instruction_url_en || null;
+      return exercise.audio_instruction_url_en || exercise.audio_instruction_url_zh_hant || exercise.audio_instruction_url_zh_hans || null;
   }
 }
 
@@ -83,11 +83,11 @@ function getSubtitleUrl(exercise: Exercise, language: Language | null): string |
   const lang = language || 'en';
   switch (lang) {
     case 'zh_hant':
-      return exercise.subtitle_url_zh_hant || exercise.subtitle_url_en || null;
+      return exercise.subtitle_url_zh_hant || exercise.subtitle_url_zh_hans || exercise.subtitle_url_en || null;
     case 'zh_hans':
-      return exercise.subtitle_url_zh_hans || exercise.subtitle_url_en || null;
+      return exercise.subtitle_url_zh_hans || exercise.subtitle_url_zh_hant || exercise.subtitle_url_en || null;
     default:
-      return exercise.subtitle_url_en || null;
+      return exercise.subtitle_url_en || exercise.subtitle_url_zh_hant || exercise.subtitle_url_zh_hans || null;
   }
 }
 
@@ -95,11 +95,11 @@ function getAudioTranscript(exercise: Exercise, language: Language | null): stri
   const lang = language || 'en';
   switch (lang) {
     case 'zh_hant':
-      return exercise.audio_transcript_zh_hant || exercise.audio_transcript_en || null;
+      return exercise.audio_transcript_zh_hant || exercise.audio_transcript_zh_hans || exercise.audio_transcript_en || null;
     case 'zh_hans':
-      return exercise.audio_transcript_zh_hans || exercise.audio_transcript_en || null;
+      return exercise.audio_transcript_zh_hans || exercise.audio_transcript_zh_hant || exercise.audio_transcript_en || null;
     default:
-      return exercise.audio_transcript_en || null;
+      return exercise.audio_transcript_en || exercise.audio_transcript_zh_hant || exercise.audio_transcript_zh_hans || null;
   }
 }
 

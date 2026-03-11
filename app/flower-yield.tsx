@@ -7,6 +7,7 @@ import {
   ActivityIndicator,
   TouchableOpacity,
   Animated,
+  Easing,
   Modal,
   Pressable,
   Image,
@@ -93,35 +94,41 @@ function FlowerItem({ flowerType, slotIndex, gardenWidth, gardenHeight, onPress 
   const swayAnim = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
-    const randomDelay = Math.random() * 1500;
-    const randomDuration = 2000 + Math.random() * 1000;
+    const delay = Math.random() * 1000;
+    const duration = 1500 + Math.random() * 1000;
 
-    const timeout = setTimeout(() => {
-      Animated.loop(
-        Animated.sequence([
-          Animated.timing(swayAnim, {
-            toValue: 1,
-            duration: randomDuration,
-            useNativeDriver: true,
-          }),
-          Animated.timing(swayAnim, {
-            toValue: -1,
-            duration: randomDuration,
-            useNativeDriver: true,
-          }),
-          Animated.timing(swayAnim, {
-            toValue: 0,
-            duration: randomDuration,
-            useNativeDriver: true,
-          }),
-        ])
-      ).start();
-    }, randomDelay);
+    const animation = Animated.loop(
+      Animated.sequence([
+        Animated.timing(swayAnim, {
+          toValue: 1,
+          duration: duration,
+          easing: Easing.inOut(Easing.sin),
+          useNativeDriver: true,
+        }),
+        Animated.timing(swayAnim, {
+          toValue: -1,
+          duration: duration,
+          easing: Easing.inOut(Easing.sin),
+          useNativeDriver: true,
+        }),
+        Animated.timing(swayAnim, {
+          toValue: 0,
+          duration: duration,
+          easing: Easing.inOut(Easing.sin),
+          useNativeDriver: true,
+        }),
+      ])
+    );
 
-    return () => clearTimeout(timeout);
+    const timer = setTimeout(() => animation.start(), delay);
+
+    return () => {
+      clearTimeout(timer);
+      animation.stop();
+    };
   }, [swayAnim]);
 
-  const rotation = swayAnim.interpolate({
+  const rotate = swayAnim.interpolate({
     inputRange: [-1, 0, 1],
     outputRange: ['-3deg', '0deg', '3deg'],
   });
@@ -131,7 +138,9 @@ function FlowerItem({ flowerType, slotIndex, gardenWidth, gardenHeight, onPress 
   const pos = getFlowerPosition(slotIndex, gardenWidth, gardenHeight);
 
   return (
-    <Animated.View
+    <TouchableOpacity
+      onPress={onPress}
+      activeOpacity={0.8}
       style={[
         styles.flowerSlot,
         {
@@ -139,23 +148,20 @@ function FlowerItem({ flowerType, slotIndex, gardenWidth, gardenHeight, onPress 
           top: pos.top,
           width: pos.cellWidth * 0.7,
           height: pos.cellHeight * 0.85,
-          transform: [{ rotate: rotation }],
         },
       ]}
+      testID={`flower-slot-${slotIndex}`}
     >
-      <TouchableOpacity
-        activeOpacity={0.8}
-        onPress={onPress}
-        style={styles.flowerTouchable}
-        testID={`flower-slot-${slotIndex}`}
-      >
-        <Image
-          source={{ uri: flowerType.image_url }}
-          style={styles.flowerImage}
-          resizeMode="contain"
-        />
-      </TouchableOpacity>
-    </Animated.View>
+      <Animated.Image
+        source={{ uri: flowerType.image_url }}
+        style={{
+          width: '80%',
+          height: '80%',
+          resizeMode: 'contain' as const,
+          transform: [{ rotate }],
+        }}
+      />
+    </TouchableOpacity>
   );
 }
 
@@ -515,6 +521,16 @@ export default function FlowerYieldScreen() {
                     </ScaledText>
                   </View>
                 )}
+                {selectedFlower?.obtained_at && (
+                  <ScaledText size={12} color={Colors.textSecondary} style={styles.tooltipDate}>
+                    {isZh ? '獲得日期：' : 'Acquired on: '}
+                    {new Date(selectedFlower.obtained_at).toLocaleDateString(isZh ? 'zh-TW' : 'en-US', {
+                      year: 'numeric',
+                      month: 'short',
+                      day: 'numeric',
+                    })}
+                  </ScaledText>
+                )}
               </>
             )}
           </View>
@@ -772,5 +788,8 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     paddingVertical: 5,
     borderRadius: 10,
+  },
+  tooltipDate: {
+    marginTop: 10,
   },
 });

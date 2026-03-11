@@ -24,7 +24,8 @@ function parseTimestamp(timestamp: string): number {
 
 export function parseVTT(vttText: string): SubtitleCue[] {
   const cues: SubtitleCue[] = [];
-  const blocks = vttText.replace(/\r\n/g, '\n').split(/\n\n+/);
+  const clean = vttText.replace(/^\uFEFF/, '').replace(/\r\n/g, '\n');
+  const blocks = clean.split(/\n\n+/);
 
   for (const block of blocks) {
     const lines = block.trim().split('\n');

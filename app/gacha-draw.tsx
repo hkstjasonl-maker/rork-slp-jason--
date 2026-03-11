@@ -9,9 +9,10 @@ import {
   Image,
   Dimensions,
   Platform,
+  Alert,
 } from 'react-native';
 import { Stack, useRouter } from 'expo-router';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { ChevronLeft, Sparkles } from 'lucide-react-native';
 import * as Haptics from 'expo-haptics';
 
@@ -55,11 +56,6 @@ interface FlowerType {
   rarity: string;
   rarity_weight: number;
   is_active: boolean;
-}
-
-interface PatientFlower {
-  id: string;
-  slot_index: number;
 }
 
 interface DrawResult {
@@ -258,6 +254,9 @@ export default function GachaDrawScreen() {
   const [drawResults, setDrawResults] = useState<DrawResult[]>([]);
   const [pendingDraws, setPendingDraws] = useState<number>(0);
   const [showResultModal, setShowResultModal] = useState<boolean>(false);
+  const [isStartingDraw, setIsStartingDraw] = useState<boolean>(false);
+
+  const secondFlowerRef = useRef<FlowerType | null>(null);
 
   const shakeAnim = useRef(new Animated.Value(0)).current;
   const capsuleDropAnim = useRef(new Animated.Value(0)).current;
@@ -296,97 +295,13 @@ export default function GachaDrawScreen() {
     staleTime: 10 * 60 * 1000,
   });
 
-  const existingFlowersQuery = useQuery({
-    queryKey: ['patientFlowerSlots', patientId],
-    queryFn: async () => {
-      log('[GachaDraw] Fetching existing flower slots');
-      const { data, error } = await supabase
-        .from('patient_flowers')
-        .select('id, slot_index')
-        .eq('patient_id', patientId!)
-        .eq('is_stolen', false);
-      if (error) throw error;
-      return (data || []) as PatientFlower[];
-    },
-    enabled: !!patientId,
-    staleTime: 10 * 1000,
-  });
-
-  const getNextSlot = useCallback((): number => {
-    const used = new Set((existingFlowersQuery.data || []).map((f) => f.slot_index));
-    const resultsUsed = drawResults.length;
-    for (let i = 0; i < TOTAL_SLOTS; i++) {
-      if (!used.has(i)) {
-        let alreadyAssigned = false;
-        for (let r = 0; r < resultsUsed; r++) {
-          if (i === r) alreadyAssigned = true;
-        }
-        if (!alreadyAssigned) return i;
-      }
-    }
-    return Math.floor(Math.random() * TOTAL_SLOTS);
-  }, [existingFlowersQuery.data, drawResults]);
-
-  const deductStarsMutation = useMutation({
-    mutationFn: async () => {
-      log('[GachaDraw] Deducting 5 stars');
-      const current = patientDataQuery.data?.stars_available ?? 0;
-      const { error } = await supabase
-        .from('patients')
-        .update({ stars_available: current - 5 })
-        .eq('id', patientId!);
-      if (error) throw error;
-    },
-    onSuccess: () => {
-      void queryClient.invalidateQueries({ queryKey: ['gachaPatientData', patientId] });
-      void queryClient.invalidateQueries({ queryKey: ['gardenPatientData', patientId] });
-    },
-  });
-
-  const deductFiresMutation = useMutation({
-    mutationFn: async () => {
-      log('[GachaDraw] Deducting 10 fires');
-      const current = patientDataQuery.data?.fires_available ?? 0;
-      const { error } = await supabase
-        .from('patients')
-        .update({ fires_available: current - 10 })
-        .eq('id', patientId!);
-      if (error) throw error;
-    },
-    onSuccess: () => {
-      void queryClient.invalidateQueries({ queryKey: ['gachaPatientData', patientId] });
-      void queryClient.invalidateQueries({ queryKey: ['gardenPatientData', patientId] });
-    },
-  });
-
-  const insertFlowerMutation = useMutation({
-    mutationFn: async ({ flowerTypeId, slotIndex }: { flowerTypeId: string; slotIndex: number }) => {
-      log('[GachaDraw] Inserting flower into garden, slot:', slotIndex);
-      const { error: flowerError } = await supabase
-        .from('patient_flowers')
-        .insert({
-          patient_id: patientId!,
-          flower_type_id: flowerTypeId,
-          slot_index: slotIndex,
-          is_stolen: false,
-          obtained_at: new Date().toISOString(),
-        });
-      if (flowerError) throw flowerError;
-
-      const { error: logError } = await supabase
-        .from('gacha_draws')
-        .insert({
-          patient_id: patientId!,
-          flower_type_id: flowerTypeId,
-          drawn_at: new Date().toISOString(),
-        });
-      if (logError) log('[GachaDraw] Failed to log gacha draw:', logError);
-    },
-    onSuccess: () => {
-      void queryClient.invalidateQueries({ queryKey: ['patientFlowerSlots', patientId] });
-      void queryClient.invalidateQueries({ queryKey: ['patientFlowers', patientId] });
-    },
-  });
+  const refreshAfterDraw = useCallback(() => {
+    log('[GachaDraw] Refreshing data after draw');
+    void queryClient.invalidateQueries({ queryKey: ['gachaPatientData', patientId] });
+    void queryClient.invalidateQueries({ queryKey: ['gardenPatientData', patientId] });
+    void queryClient.invalidateQueries({ queryKey: ['patientFlowerSlots', patientId] });
+    void queryClient.invalidateQueries({ queryKey: ['patientFlowers', patientId] });
+  }, [queryClient, patientId]);
 
   const resetAnimations = useCallback(() => {
     shakeAnim.setValue(0);
@@ -450,9 +365,6 @@ export default function GachaDrawScreen() {
                 tension: 40,
                 useNativeDriver: true,
               }).start(() => {
-                const slot = getNextSlot();
-                insertFlowerMutation.mutate({ flowerTypeId: flower.id, slotIndex: slot });
-
                 setDrawResults((prev) => [...prev, { flower, isSecondDraw }]);
                 setDrawPhase('done');
               });
@@ -461,47 +373,131 @@ export default function GachaDrawScreen() {
         });
       });
     });
-  }, [shakeAnim, capsuleDropAnim, capsuleSplitAnim, revealAnim, getNextSlot, insertFlowerMutation]);
+  }, [shakeAnim, capsuleDropAnim, capsuleSplitAnim, revealAnim]);
 
-  const startDraw = useCallback((type: 'stars' | 'fires') => {
+  const startDraw = useCallback(async (type: 'stars' | 'fires') => {
     const flowers = flowerTypesQuery.data;
     if (!flowers || flowers.length === 0) return;
+    if (!patientId) return;
 
-    if (Platform.OS !== 'web') {
-      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
+    setIsStartingDraw(true);
+
+    try {
+      if (Platform.OS !== 'web') {
+        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
+      }
+
+      log('[GachaDraw] Fetching existing flowers for grid position calculation');
+      const { data: existingFlowers } = await supabase
+        .from('patient_flowers')
+        .select('grid_position')
+        .eq('patient_id', patientId)
+        .eq('is_stolen', false);
+
+      const usedPositions = new Set((existingFlowers || []).map((f: { grid_position: number }) => f.grid_position));
+
+      if (type === 'stars') {
+        let nextPosition = -1;
+        for (let i = 0; i < TOTAL_SLOTS; i++) {
+          if (!usedPositions.has(i)) {
+            nextPosition = i;
+            break;
+          }
+        }
+
+        if (nextPosition === -1) {
+          Alert.alert(
+            isZh ? '花田已滿！' : 'Garden Full!',
+            isZh ? '你的花田已種滿20朵花。' : 'Your garden has 20 flowers. Remove or wait for theft.'
+          );
+          return;
+        }
+
+        const selectedFlower = weightedRandomPick(flowers);
+        log('[GachaDraw] Single draw: flower=', selectedFlower.id, 'position=', nextPosition);
+
+        const { data: success, error } = await supabase.rpc('perform_gacha_draw', {
+          p_patient_id: patientId,
+          p_cost_type: 'stars',
+          p_cost_amount: 5,
+          p_flower_type_id: selectedFlower.id,
+          p_grid_position: nextPosition,
+        });
+
+        if (error || !success) {
+          log('[GachaDraw] Single draw RPC failed:', error);
+          Alert.alert(isZh ? '星星不足' : 'Not enough stars');
+          return;
+        }
+
+        refreshAfterDraw();
+
+        setPendingDraws(0);
+        setDrawResults([]);
+        resetAnimations();
+        secondFlowerRef.current = null;
+        runDrawAnimation(selectedFlower, false);
+      } else {
+        const positions: number[] = [];
+        for (let i = 0; i < TOTAL_SLOTS; i++) {
+          if (!usedPositions.has(i)) {
+            positions.push(i);
+            if (positions.length >= 2) break;
+          }
+        }
+
+        if (positions.length < 2) {
+          Alert.alert(
+            isZh ? '花田空間不足' : 'Not enough garden space',
+            isZh ? '需要至少2個空位來種2朵花。' : 'Need at least 2 empty slots for 2 flowers.'
+          );
+          return;
+        }
+
+        const flower1 = weightedRandomPick(flowers);
+        const flower2 = weightedRandomPick(flowers);
+        log('[GachaDraw] Multi draw: flowers=', flower1.id, flower2.id, 'positions=', positions[0], positions[1]);
+
+        const { data: success, error } = await supabase.rpc('perform_gacha_draw_multi', {
+          p_patient_id: patientId,
+          p_cost_type: 'fires',
+          p_cost_amount: 10,
+          p_flower_type_ids: [flower1.id, flower2.id],
+          p_grid_positions: [positions[0], positions[1]],
+        });
+
+        if (error || !success) {
+          log('[GachaDraw] Multi draw RPC failed:', error);
+          Alert.alert(isZh ? '火焰不足' : 'Not enough fires');
+          return;
+        }
+
+        refreshAfterDraw();
+
+        setPendingDraws(1);
+        setDrawResults([]);
+        resetAnimations();
+        secondFlowerRef.current = flower2;
+        runDrawAnimation(flower1, false);
+      }
+    } catch (err) {
+      log('[GachaDraw] Draw error:', err);
+      Alert.alert(isZh ? '抽獎失敗' : 'Draw failed', isZh ? '請稍後再試。' : 'Please try again.');
+    } finally {
+      setIsStartingDraw(false);
     }
-
-    const drawCount = type === 'stars' ? 1 : 2;
-    setPendingDraws(drawCount);
-    setDrawResults([]);
-    resetAnimations();
-
-    if (type === 'stars') {
-      deductStarsMutation.mutate();
-    } else {
-      deductFiresMutation.mutate();
-    }
-
-    const selectedFlower = weightedRandomPick(flowers);
-    runDrawAnimation(selectedFlower, false);
-
-    if (drawCount === 2) {
-      setPendingDraws(1);
-    } else {
-      setPendingDraws(0);
-    }
-  }, [flowerTypesQuery.data, resetAnimations, deductStarsMutation, deductFiresMutation, runDrawAnimation]);
+  }, [flowerTypesQuery.data, patientId, isZh, resetAnimations, runDrawAnimation, refreshAfterDraw]);
 
   useEffect(() => {
     if (drawPhase === 'done' && pendingDraws > 0) {
       const timeout = setTimeout(() => {
-        const flowers = flowerTypesQuery.data;
-        if (!flowers || flowers.length === 0) return;
+        const secondFlower = secondFlowerRef.current;
+        if (!secondFlower) return;
 
         resetAnimations();
         setPendingDraws(0);
+        secondFlowerRef.current = null;
 
-        const secondFlower = weightedRandomPick(flowers);
         runDrawAnimation(secondFlower, true);
       }, 2000);
 
@@ -515,13 +511,13 @@ export default function GachaDrawScreen() {
       }, 1500);
       return () => clearTimeout(timeout);
     }
-  }, [drawPhase, pendingDraws, flowerTypesQuery.data, resetAnimations, runDrawAnimation]);
+  }, [drawPhase, pendingDraws, resetAnimations, runDrawAnimation]);
 
   const starsAvailable = patientDataQuery.data?.stars_available ?? 0;
   const firesAvailable = patientDataQuery.data?.fires_available ?? 0;
   const canDrawStars = starsAvailable >= 5;
   const canDrawFires = firesAvailable >= 10;
-  const isDrawing = drawPhase !== 'idle' && drawPhase !== 'complete';
+  const isDrawing = isStartingDraw || (drawPhase !== 'idle' && drawPhase !== 'complete');
 
   const handleBackToGarden = useCallback(() => {
     setShowResultModal(false);

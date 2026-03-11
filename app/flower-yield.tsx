@@ -28,8 +28,8 @@ const GRID_COLS = 4;
 const GRID_ROWS = 5;
 const TOTAL_SLOTS = GRID_COLS * GRID_ROWS;
 
-const CELL_SIZE = (SCREEN_WIDTH - 40) / GRID_COLS;
-const GARDEN_HEIGHT = CELL_SIZE * GRID_ROWS;
+const DEFAULT_GARDEN_WIDTH = SCREEN_WIDTH - 40;
+const DEFAULT_GARDEN_HEIGHT = (DEFAULT_GARDEN_WIDTH / GRID_COLS) * GRID_ROWS;
 
 const RARITY_COLORS: Record<string, { bg: string; text: string; label: string }> = {
   common: { bg: '#E8F5E9', text: '#2E7D32', label: '★' },
@@ -65,14 +65,32 @@ interface PatientGardenData {
   fires_available: number;
 }
 
-function FlowerItem({ flowerType, slotIndex, onPress }: {
+function getFlowerPosition(gridPosition: number, gardenWidth: number, gardenHeight: number) {
+  const col = gridPosition % GRID_COLS;
+  const row = Math.floor(gridPosition / GRID_COLS);
+
+  const paddingX = gardenWidth * 0.08;
+  const paddingY = gardenHeight * 0.08;
+  const cellWidth = (gardenWidth - paddingX * 2) / GRID_COLS;
+  const cellHeight = (gardenHeight - paddingY * 2) / GRID_ROWS;
+
+  return {
+    left: paddingX + col * cellWidth + cellWidth * 0.15,
+    top: paddingY + row * cellHeight + cellHeight * 0.05,
+    cellWidth,
+    cellHeight,
+  };
+}
+
+function FlowerItem({ flowerType, slotIndex, gardenWidth, gardenHeight, onPress }: {
   flower: PatientFlower;
   flowerType: FlowerType | undefined;
   slotIndex: number;
+  gardenWidth: number;
+  gardenHeight: number;
   onPress: () => void;
 }) {
   const swayAnim = useRef(new Animated.Value(0)).current;
-  const fadeAnim = useRef(new Animated.Value(1)).current;
 
   useEffect(() => {
     const randomDelay = Math.random() * 1500;
@@ -108,22 +126,20 @@ function FlowerItem({ flowerType, slotIndex, onPress }: {
     outputRange: ['-3deg', '0deg', '3deg'],
   });
 
-  const col = slotIndex % GRID_COLS;
-  const row = Math.floor(slotIndex / GRID_COLS);
-
   if (!flowerType) return null;
+
+  const pos = getFlowerPosition(slotIndex, gardenWidth, gardenHeight);
 
   return (
     <Animated.View
       style={[
         styles.flowerSlot,
         {
-          left: col * CELL_SIZE,
-          top: row * CELL_SIZE,
-          width: CELL_SIZE,
-          height: CELL_SIZE,
+          left: pos.left,
+          top: pos.top,
+          width: pos.cellWidth * 0.7,
+          height: pos.cellHeight * 0.85,
           transform: [{ rotate: rotation }],
-          opacity: fadeAnim,
         },
       ]}
     >
@@ -154,6 +170,7 @@ export default function FlowerYieldScreen() {
 
   const [selectedFlower, setSelectedFlower] = useState<PatientFlower | null>(null);
   const [theftModalVisible, setTheftModalVisible] = useState<boolean>(false);
+  const [gardenSize, setGardenSize] = useState({ width: DEFAULT_GARDEN_WIDTH, height: DEFAULT_GARDEN_HEIGHT });
 
   const isZh = language === 'zh_hant' || language === 'zh_hans';
 
@@ -328,7 +345,15 @@ export default function FlowerYieldScreen() {
               <ActivityIndicator size="large" color={Colors.primary} />
             </View>
           ) : (
-            <View style={styles.gardenContainer}>
+            <View
+              style={styles.gardenContainer}
+              onLayout={(e) => {
+                const { width, height } = e.nativeEvent.layout;
+                if (width > 0 && height > 0) {
+                  setGardenSize({ width, height });
+                }
+              }}
+            >
               {patientData?.garden_background_url ? (
                 <Image
                   source={{ uri: patientData.garden_background_url }}
@@ -341,16 +366,18 @@ export default function FlowerYieldScreen() {
                     const col = i % GRID_COLS;
                     const row = Math.floor(i / GRID_COLS);
                     const isEven = (col + row) % 2 === 0;
+                    const cellW = gardenSize.width / GRID_COLS;
+                    const cellH = gardenSize.height / GRID_ROWS;
                     return (
                       <View
                         key={`grass-${i}`}
                         style={[
                           styles.grassCell,
                           {
-                            left: col * CELL_SIZE,
-                            top: row * CELL_SIZE,
-                            width: CELL_SIZE,
-                            height: CELL_SIZE,
+                            left: col * cellW,
+                            top: row * cellH,
+                            width: cellW,
+                            height: cellH,
                             backgroundColor: isEven ? '#A8D5A2' : '#96C990',
                           },
                         ]}
@@ -361,15 +388,17 @@ export default function FlowerYieldScreen() {
                   {Array.from({ length: TOTAL_SLOTS }).map((_, i) => {
                     const col = i % GRID_COLS;
                     const row = Math.floor(i / GRID_COLS);
+                    const cellW = gardenSize.width / GRID_COLS;
+                    const cellH = gardenSize.height / GRID_ROWS;
                     return (
                       <View
                         key={`iso-${i}`}
                         style={[
                           styles.isoOverlay,
                           {
-                            left: col * CELL_SIZE + 2,
-                            top: row * CELL_SIZE + CELL_SIZE - 8,
-                            width: CELL_SIZE - 4,
+                            left: col * cellW + 2,
+                            top: row * cellH + cellH - 8,
+                            width: cellW - 4,
                           },
                         ]}
                       />
@@ -378,19 +407,20 @@ export default function FlowerYieldScreen() {
                 </View>
               )}
 
-              {flowers
-                .map((flower) => {
-                  const ft = flower.flower_types || flowerTypeMap[flower.flower_type_id];
-                  return (
-                    <MemoFlowerItem
-                      key={flower.id}
-                      flower={flower}
-                      flowerType={ft}
-                      slotIndex={flower.slot_index}
-                      onPress={() => setSelectedFlower(flower)}
-                    />
-                  );
-                })}
+              {flowers.map((flower) => {
+                const ft = flower.flower_types || flowerTypeMap[flower.flower_type_id];
+                return (
+                  <MemoFlowerItem
+                    key={flower.id}
+                    flower={flower}
+                    flowerType={ft}
+                    slotIndex={flower.slot_index}
+                    gardenWidth={gardenSize.width}
+                    gardenHeight={gardenSize.height}
+                    onPress={() => setSelectedFlower(flower)}
+                  />
+                );
+              })}
 
               {flowers.length === 0 && (
                 <View style={styles.emptyGardenOverlay}>
@@ -600,7 +630,7 @@ const styles = StyleSheet.create({
   },
   gardenContainer: {
     marginHorizontal: 20,
-    height: GARDEN_HEIGHT,
+    aspectRatio: GRID_COLS / GRID_ROWS,
     borderRadius: 20,
     overflow: 'hidden',
     borderWidth: 2,

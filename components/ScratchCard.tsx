@@ -17,7 +17,6 @@ const CELL_W = CARD_WIDTH / COLS;
 const CELL_H = CARD_HEIGHT / ROWS;
 const TOTAL_CELLS = COLS * ROWS;
 const REVEAL_THRESHOLD = 0.6;
-const TOUCH_RADIUS = 22;
 
 interface ScratchCardProps {
   prizeImageUrl: string | null;
@@ -48,7 +47,7 @@ export default function ScratchCard({
   const [sparkles, setSparkles] = useState<Sparkle[]>([]);
   const cellsRef = useRef<boolean[]>(new Array(TOTAL_CELLS).fill(false));
   const revealedRef = useRef<boolean>(false);
-  const layoutRef = useRef<{ x: number; y: number }>({ x: 0, y: 0 });
+  const [layout, setLayout] = useState({ width: CARD_WIDTH, height: CARD_HEIGHT });
   const coatingOpacity = useRef(new Animated.Value(1)).current;
   const prizeScale = useRef(new Animated.Value(0.8)).current;
   const prizeOpacity = useRef(new Animated.Value(0)).current;
@@ -119,25 +118,28 @@ export default function ScratchCard({
     onRevealed();
   }, [onRevealed, coatingOpacity, prizeScale, prizeOpacity, spawnSparkles]);
 
-  const scratchAt = useCallback((pageX: number, pageY: number) => {
+  const handleTouch = useCallback((evt: GestureResponderEvent) => {
     if (revealedRef.current) return;
 
-    const relX = pageX - layoutRef.current.x;
-    const relY = pageY - layoutRef.current.y;
+    const touchX = evt.nativeEvent.locationX;
+    const touchY = evt.nativeEvent.locationY;
+
+    const cellW = layout.width / COLS;
+    const cellH = layout.height / ROWS;
+    const col = Math.floor(touchX / cellW);
+    const row = Math.floor(touchY / cellH);
 
     const updated = [...cellsRef.current];
     let changed = false;
 
-    for (let r = 0; r < ROWS; r++) {
-      for (let c = 0; c < COLS; c++) {
-        const idx = r * COLS + c;
-        if (updated[idx]) continue;
-        const cx = c * CELL_W + CELL_W / 2;
-        const cy = r * CELL_H + CELL_H / 2;
-        const dist = Math.sqrt((relX - cx) ** 2 + (relY - cy) ** 2);
-        if (dist < TOUCH_RADIUS) {
-          updated[idx] = true;
-          changed = true;
+    for (let r = row - 1; r <= row + 1; r++) {
+      for (let c = col - 1; c <= col + 1; c++) {
+        if (r >= 0 && r < ROWS && c >= 0 && c < COLS) {
+          const idx = r * COLS + c;
+          if (!updated[idx]) {
+            updated[idx] = true;
+            changed = true;
+          }
         }
       }
     }
@@ -152,17 +154,20 @@ export default function ScratchCard({
         triggerReveal();
       }
     }
-  }, [triggerReveal]);
+  }, [layout, triggerReveal]);
+
+  const handleTouchRef = useRef(handleTouch);
+  handleTouchRef.current = handleTouch;
 
   const panResponder = useRef(
     PanResponder.create({
       onStartShouldSetPanResponder: () => true,
       onMoveShouldSetPanResponder: () => true,
       onPanResponderGrant: (evt: GestureResponderEvent) => {
-        scratchAt(evt.nativeEvent.pageX, evt.nativeEvent.pageY);
+        handleTouchRef.current(evt);
       },
       onPanResponderMove: (evt: GestureResponderEvent) => {
-        scratchAt(evt.nativeEvent.pageX, evt.nativeEvent.pageY);
+        handleTouchRef.current(evt);
       },
     })
   ).current;
@@ -173,9 +178,8 @@ export default function ScratchCard({
     <View
       style={styles.cardOuter}
       onLayout={(e) => {
-        e.target.measure((_x, _y, _w, _h, pageX, pageY) => {
-          layoutRef.current = { x: pageX, y: pageY };
-        });
+        const { width, height } = e.nativeEvent.layout;
+        setLayout({ width, height });
       }}
     >
       <View style={styles.card}>

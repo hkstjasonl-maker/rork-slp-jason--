@@ -13,7 +13,7 @@ import {
   Dimensions,
 } from 'react-native';
 import { Stack, useRouter } from 'expo-router';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Sparkles, Gift, X, ChevronLeft } from 'lucide-react-native';
 
 import { useApp } from '@/contexts/AppContext';
@@ -145,58 +145,15 @@ function FlowerItem({ flowerType, slotIndex, onPress }: {
 
 const MemoFlowerItem = React.memo(FlowerItem);
 
-function StolenFlowerOverlay({ flowerType, slotIndex }: {
-  flower: PatientFlower;
-  flowerType: FlowerType | undefined;
-  slotIndex: number;
-}) {
-  const fadeAnim = useRef(new Animated.Value(1)).current;
 
-  useEffect(() => {
-    Animated.timing(fadeAnim, {
-      toValue: 0,
-      duration: 1500,
-      useNativeDriver: true,
-    }).start();
-  }, [fadeAnim]);
-
-  const col = slotIndex % GRID_COLS;
-  const row = Math.floor(slotIndex / GRID_COLS);
-
-  if (!flowerType) return null;
-
-  return (
-    <Animated.View
-      style={[
-        styles.flowerSlot,
-        {
-          left: col * CELL_SIZE,
-          top: row * CELL_SIZE,
-          width: CELL_SIZE,
-          height: CELL_SIZE,
-          opacity: fadeAnim,
-        },
-      ]}
-    >
-      <Image
-        source={{ uri: flowerType.image_url }}
-        style={[styles.flowerImage, { tintColor: '#8B7355' }]}
-        resizeMode="contain"
-      />
-    </Animated.View>
-  );
-}
 
 export default function FlowerYieldScreen() {
-  const { patientId, patientName, language } = useApp();
+  const { patientId, patientName, language, flowersJustStolen, clearFlowersStolen } = useApp();
   const router = useRouter();
   const queryClient = useQueryClient();
 
   const [selectedFlower, setSelectedFlower] = useState<PatientFlower | null>(null);
   const [theftModalVisible, setTheftModalVisible] = useState<boolean>(false);
-  const [stolenCount, setStolenCount] = useState<number>(0);
-  const [stolenFlowers, setStolenFlowers] = useState<PatientFlower[]>([]);
-  const [theftProcessed, setTheftProcessed] = useState<boolean>(false);
 
   const isZh = language === 'zh_hant' || language === 'zh_hans';
 
@@ -273,55 +230,13 @@ export default function FlowerYieldScreen() {
     return map;
   }, [flowerTypesQuery.data]);
 
-  const theftMutation = useMutation({
-    mutationFn: async ({ flowersToSteal }: { flowersToSteal: PatientFlower[] }) => {
-      log('[FlowerYield] Stealing', flowersToSteal.length, 'flowers');
-      const ids = flowersToSteal.map((f) => f.id);
-      const now = new Date().toISOString();
-
-      const { error: updateError } = await supabase
-        .from('patient_flowers')
-        .update({ is_stolen: true, stolen_at: now })
-        .in('id', ids);
-      if (updateError) throw updateError;
-
-      const { error: resetError } = await supabase
-        .from('patients')
-        .update({ consecutive_inactive_days: 0 })
-        .eq('id', patientId!);
-      if (resetError) throw resetError;
-
-      return flowersToSteal;
-    },
-    onSuccess: () => {
+  useEffect(() => {
+    if (flowersJustStolen > 0) {
+      setTheftModalVisible(true);
       void queryClient.invalidateQueries({ queryKey: ['patientFlowers', patientId] });
       void queryClient.invalidateQueries({ queryKey: ['gardenPatientData', patientId] });
-    },
-  });
-
-  useEffect(() => {
-    if (theftProcessed) return;
-    const patientData = patientDataQuery.data;
-    const flowers = flowersQuery.data;
-    if (!patientData || !flowers) return;
-
-    const inactiveDays = patientData.consecutive_inactive_days || 0;
-    const nonStolenFlowers = flowers.filter((f) => !f.is_stolen);
-
-    if (inactiveDays >= 3 && nonStolenFlowers.length > 1) {
-      const maxToSteal = Math.floor(inactiveDays / 3);
-      const canSteal = Math.min(maxToSteal, nonStolenFlowers.length - 1);
-
-      if (canSteal > 0) {
-        const toSteal = nonStolenFlowers.slice(-canSteal);
-        setStolenCount(canSteal);
-        setStolenFlowers(toSteal);
-        setTheftModalVisible(true);
-        theftMutation.mutate({ flowersToSteal: toSteal });
-      }
     }
-    setTheftProcessed(true);
-  }, [patientDataQuery.data, flowersQuery.data, theftProcessed, theftMutation, patientId]);
+  }, [flowersJustStolen, queryClient, patientId]);
 
   const getFlowerName = useCallback((ft: FlowerType | undefined): string => {
     if (!ft) return '';
@@ -337,7 +252,7 @@ export default function FlowerYieldScreen() {
     ? (selectedFlower.flower_types || flowerTypeMap[selectedFlower.flower_type_id])
     : undefined;
 
-  const stolenFlowerIds = useMemo(() => new Set(stolenFlowers.map((f) => f.id)), [stolenFlowers]);
+
 
   return (
     <View style={styles.root}>
@@ -464,7 +379,6 @@ export default function FlowerYieldScreen() {
               )}
 
               {flowers
-                .filter((f) => !stolenFlowerIds.has(f.id))
                 .map((flower) => {
                   const ft = flower.flower_types || flowerTypeMap[flower.flower_type_id];
                   return (
@@ -477,18 +391,6 @@ export default function FlowerYieldScreen() {
                     />
                   );
                 })}
-
-              {stolenFlowers.map((flower) => {
-                const ft = flower.flower_types || flowerTypeMap[flower.flower_type_id];
-                return (
-                  <StolenFlowerOverlay
-                    key={`stolen-${flower.id}`}
-                    flower={flower}
-                    flowerType={ft}
-                    slotIndex={flower.slot_index}
-                  />
-                );
-              })}
 
               {flowers.length === 0 && (
                 <View style={styles.emptyGardenOverlay}>
@@ -503,7 +405,7 @@ export default function FlowerYieldScreen() {
           {flowers.length > 0 && (
             <View style={styles.flowerCount}>
               <ScaledText size={13} color={Colors.textSecondary}>
-                🌸 {flowers.filter((f) => !stolenFlowerIds.has(f.id)).length} / {TOTAL_SLOTS} {isZh ? '朵花' : 'flowers'}
+                🌸 {flowers.length} / {TOTAL_SLOTS} {isZh ? '朵花' : 'flowers'}
               </ScaledText>
             </View>
           )}
@@ -524,12 +426,15 @@ export default function FlowerYieldScreen() {
             </ScaledText>
             <ScaledText size={15} color="#795548" style={styles.theftBody}>
               {isZh
-                ? `Oh no! 你的花田被偷了 ${stolenCount} 朵花！\n記得每天做練習保護花田！`
-                : `Oh no! ${stolenCount} flower${stolenCount > 1 ? 's were' : ' was'} stolen from your garden!\nPractice daily to protect your flowers!`}
+                ? `Oh no! 😢 你的花田被偷了 ${flowersJustStolen} 朵花！\n記得每天做練習保護花田！`
+                : `Oh no! 😢 ${flowersJustStolen} flower${flowersJustStolen > 1 ? 's were' : ' was'} stolen from your garden!\nPractice daily to protect your flowers!`}
             </ScaledText>
             <TouchableOpacity
               style={styles.theftCloseBtn}
-              onPress={() => setTheftModalVisible(false)}
+              onPress={() => {
+                setTheftModalVisible(false);
+                clearFlowersStolen();
+              }}
               testID="theft-modal-close"
             >
               <ScaledText size={15} weight="700" color="#FFF">

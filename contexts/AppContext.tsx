@@ -37,6 +37,7 @@ export const [AppProvider, useApp] = createContextHook(() => {
   const [managingOrgLogoUrl, setManagingOrgLogoUrl] = useState<string | null>(null);
   const [acknowledgements, setAcknowledgements] = useState<Acknowledgement[]>([]);
   const [liveSubtitlesEnabled, setLiveSubtitlesEnabledState] = useState<boolean>(false);
+  const [flowersJustStolen, setFlowersJustStolen] = useState<number>(0);
 
   useEffect(() => {
     void loadPersistedState();
@@ -140,6 +141,86 @@ export const [AppProvider, useApp] = createContextHook(() => {
       }
     };
   }, [patientId]);
+
+  useEffect(() => {
+    if (!patientId || !isReady) return;
+
+    const checkFlowerTheft = async () => {
+      try {
+        log('[AppContext] Checking flower theft for patient:', patientId);
+
+        const { data: patientData, error: pErr } = await supabase
+          .from('patients')
+          .select('last_exercise_date, consecutive_inactive_days')
+          .eq('id', patientId)
+          .single();
+
+        if (pErr || !patientData) {
+          log('[AppContext] Failed to fetch patient for theft check:', pErr);
+          return;
+        }
+
+        const today = new Date().toISOString().split('T')[0];
+        const lastExDate = patientData.last_exercise_date;
+
+        let inactiveDays = 0;
+        if (lastExDate) {
+          const last = new Date(lastExDate);
+          const now = new Date(today);
+          inactiveDays = Math.floor((now.getTime() - last.getTime()) / (1000 * 60 * 60 * 24));
+        }
+
+        if (inactiveDays !== patientData.consecutive_inactive_days) {
+          log('[AppContext] Updating consecutive_inactive_days from', patientData.consecutive_inactive_days, 'to', inactiveDays);
+          await supabase.from('patients').update({
+            consecutive_inactive_days: inactiveDays,
+          }).eq('id', patientId);
+        }
+
+        if (inactiveDays >= 3) {
+          const { data: flowers } = await supabase
+            .from('patient_flowers')
+            .select('id, flower_type_id')
+            .eq('patient_id', patientId)
+            .eq('is_stolen', false);
+
+          if (flowers && flowers.length > 1) {
+            const toSteal = Math.min(
+              Math.floor(inactiveDays / 3),
+              3,
+              flowers.length - 1
+            );
+
+            if (toSteal > 0) {
+              const shuffled = [...flowers].sort(() => Math.random() - 0.5);
+              const stolen = shuffled.slice(0, toSteal);
+
+              for (const f of stolen) {
+                await supabase.from('patient_flowers').update({
+                  is_stolen: true,
+                  stolen_at: new Date().toISOString(),
+                }).eq('id', f.id);
+
+                await supabase.from('flower_theft_log').insert({
+                  patient_id: patientId,
+                  flower_id: f.id,
+                  flower_type_id: f.flower_type_id,
+                  days_inactive: inactiveDays,
+                });
+              }
+
+              log('[AppContext] Stole', toSteal, 'flowers due to', inactiveDays, 'days inactive');
+              setFlowersJustStolen(toSteal);
+            }
+          }
+        }
+      } catch (e) {
+        log('[AppContext] Flower theft check error:', e);
+      }
+    };
+
+    void checkFlowerTheft();
+  }, [patientId, isReady]);
 
   useEffect(() => {
     const fetchAcknowledgements = async () => {
@@ -254,6 +335,8 @@ export const [AppProvider, useApp] = createContextHook(() => {
     }
   }, [patientId]);
 
+  const clearFlowersStolen = useCallback(() => setFlowersJustStolen(0), []);
+
   const fontScale = FONT_SCALES[fontSizeLevel];
 
   return useMemo(() => ({
@@ -277,6 +360,8 @@ export const [AppProvider, useApp] = createContextHook(() => {
     managingOrgLogoUrl,
     liveSubtitlesEnabled,
     acknowledgements,
+    flowersJustStolen,
+    clearFlowersStolen,
     setLanguage,
     setTermsAccepted,
     setPatient,
@@ -294,6 +379,8 @@ export const [AppProvider, useApp] = createContextHook(() => {
     managingOrgNameEn, managingOrgNameZh, managingOrgLogoUrl,
     liveSubtitlesEnabled,
     acknowledgements,
+    flowersJustStolen,
+    clearFlowersStolen,
     setLanguage,
     setTermsAccepted, setPatient, clearPatient, setFontSizeLevel,
     setLiveSubtitlesEnabled,

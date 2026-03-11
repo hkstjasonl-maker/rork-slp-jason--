@@ -847,6 +847,18 @@ export default function ExerciseScreen() {
         }
       }
 
+      if (patientId) {
+        try {
+          await supabase.from('patients').update({
+            consecutive_inactive_days: 0,
+            last_exercise_date: new Date().toISOString().split('T')[0],
+          }).eq('id', patientId);
+          log('[Exercise] Reset inactive days and updated last_exercise_date');
+        } catch (e) {
+          log('[Exercise] Failed to reset inactive days:', e);
+        }
+      }
+
       return data;
     },
     onSuccess: (data) => {

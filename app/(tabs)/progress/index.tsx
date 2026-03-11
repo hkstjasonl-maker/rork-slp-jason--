@@ -18,6 +18,7 @@ import { supabase } from '@/lib/supabase';
 import { calculateStars } from '@/lib/stars';
 import { fetchExerciseCompliance } from '@/lib/analytics';
 import Colors from '@/constants/colors';
+import { useRouter } from 'expo-router';
 import { ExerciseLog, ExerciseProgram, Language } from '@/types';
 import { log } from '@/lib/logger';
 import { TrendingUp, Calendar, Award, Zap, CheckCircle2, Star, Flame, Trophy, Activity, ClipboardCheck, ThumbsUp, Gauge, Info, ChevronDown, ChevronUp, Flower2 } from 'lucide-react-native';
@@ -75,6 +76,7 @@ interface PatientRewards {
 
 export default function ProgressScreen() {
   const { t, patientId, language } = useApp();
+  const router = useRouter();
   const [showHowToEarn, setShowHowToEarn] = React.useState<boolean>(false);
 
   const rewardsQuery = useQuery({
@@ -318,6 +320,7 @@ export default function ProgressScreen() {
                       style={styles.drawFlowersBtn}
                       activeOpacity={0.7}
                       testID="draw-flowers-btn"
+                      onPress={() => router.push('/flower-yield')}
                     >
                       <Flower2 size={14} color="#E91E63" />
                       <ScaledText size={11} weight="700" color="#E91E63">

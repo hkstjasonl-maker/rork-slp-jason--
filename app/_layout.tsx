@@ -29,6 +29,7 @@ function RootLayoutNav() {
       <Stack.Screen name="my-submissions" options={{ headerShown: false, presentation: 'card' }} />
       <Stack.Screen name="feeding-skill-player" options={{ headerShown: false, presentation: 'card' }} />
       <Stack.Screen name="flower-yield" options={{ headerShown: false, presentation: 'card' }} />
+      <Stack.Screen name="gacha-draw" options={{ headerShown: false, presentation: 'card' }} />
     </Stack>
   );
 }

@@ -598,6 +598,21 @@ export default function HomeScreen() {
 
   const submissions = submissionsQuery.data || [];
 
+  const rewardsQuery = useQuery({
+    queryKey: ['patientRewards', patientId],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('patients')
+        .select('stars_total, stars_available, fires_total, fires_available')
+        .eq('id', patientId!)
+        .single();
+      if (error) throw error;
+      return data || { stars_total: 0, stars_available: 0, fires_total: 0, fires_available: 0 };
+    },
+    enabled: !!patientId,
+    staleTime: 30 * 1000,
+  });
+
   const { refetch: refetchObjectives } = objectivesQuery;
   const { refetch: refetchProgram } = programQuery;
   const { refetch: refetchLogs } = todayLogsQuery;
@@ -608,6 +623,7 @@ export default function HomeScreen() {
   const { refetch: refetchFeedingSkills } = feedingSkillsQuery;
   const { refetch: refetchFeedingReviewReqs } = feedingReviewReqQuery;
   const { refetch: refetchFeedingTodaySubs } = feedingTodaySubsQuery;
+  const { refetch: refetchRewards } = rewardsQuery;
 
   const onRefresh = useCallback(() => {
     void refetchProgram();
@@ -620,7 +636,8 @@ export default function HomeScreen() {
     void refetchFeedingReviewReqs();
     void refetchFeedingTodaySubs();
     void refetchObjectives();
-  }, [refetchProgram, refetchLogs, refetchAllLogs, refetchSubmissions, refetchReviewReqs, refetchTodaySubs, refetchFeedingSkills, refetchFeedingReviewReqs, refetchFeedingTodaySubs, refetchObjectives]);
+    void refetchRewards();
+  }, [refetchProgram, refetchLogs, refetchAllLogs, refetchSubmissions, refetchReviewReqs, refetchTodaySubs, refetchFeedingSkills, refetchFeedingReviewReqs, refetchFeedingTodaySubs, refetchObjectives, refetchRewards]);
 
   if (programQuery.isLoading) {
     return (
@@ -761,7 +778,7 @@ export default function HomeScreen() {
                 <View style={styles.starSummaryItem}>
                   <Star size={20} color="#FFB800" fill="#FFB800" />
                   <ScaledText size={22} weight="bold" color="#B8860B">
-                    {starInfo.totalStars}
+                    {rewardsQuery.data?.stars_total ?? starInfo.totalStars}
                   </ScaledText>
                   <ScaledText size={11} color={Colors.textSecondary}>
                     {t('totalStars')}

@@ -52,7 +52,7 @@ interface PatientFlower {
   id: string;
   patient_id: string;
   flower_type_id: string;
-  slot_index: number;
+  grid_position: number;
   is_stolen: boolean;
   stolen_at: string | null;
   obtained_at: string;
@@ -85,7 +85,7 @@ function getFlowerPosition(gridPosition: number, gardenWidth: number, gardenHeig
 function FlowerItem({ flowerType, slotIndex, gardenWidth, gardenHeight, onPress }: {
   flower: PatientFlower;
   flowerType: FlowerType | undefined;
-  slotIndex: number;
+  slotIndex: number; // mapped from grid_position
   gardenWidth: number;
   gardenHeight: number;
   onPress: () => void;
@@ -216,7 +216,7 @@ export default function FlowerYieldScreen() {
         .select('*, flower_types(*)')
         .eq('patient_id', patientId!)
         .eq('is_stolen', false)
-        .order('slot_index');
+        .order('grid_position');
       if (error) {
         log('[FlowerYield] Flowers fetch error:', error);
         throw error;
@@ -412,7 +412,7 @@ export default function FlowerYieldScreen() {
                     key={flower.id}
                     flower={flower}
                     flowerType={ft}
-                    slotIndex={flower.slot_index}
+                    slotIndex={flower.grid_position}
                     gardenWidth={gardenSize.width}
                     gardenHeight={gardenSize.height}
                     onPress={() => setSelectedFlower(flower)}

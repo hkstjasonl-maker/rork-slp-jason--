@@ -318,18 +318,6 @@ export default function ProgressScreen() {
                   </View>
                 </View>
 
-                <TouchableOpacity
-                  style={[styles.drawFlowersBtn, { alignSelf: 'center', marginTop: 12 }]}
-                  activeOpacity={0.7}
-                  testID="draw-flowers-btn"
-                  onPress={() => router.push('/flower-yield')}
-                >
-                  <Flower2 size={14} color="#E91E63" />
-                  <ScaledText size={11} weight="700" color="#E91E63">
-                    {t('drawFlowers')}
-                  </ScaledText>
-                </TouchableOpacity>
-
                 <View style={styles.streakSection}>
                   <View style={styles.streakRow}>
                     <Flame size={18} color="#FF6B35" />
@@ -355,13 +343,38 @@ export default function ProgressScreen() {
                   </View>
                 </View>
 
-                {starSummary.todayStars > 0 && (
-                  <View style={styles.todayStarsBadge}>
-                    <ScaledText size={13} weight="600" color="#B8860B">
-                      {t('today')}: +{starSummary.todayStars} ⭐
+                <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 14, gap: 8 }}>
+                  {starSummary.todayStars > 0 ? (
+                    <View style={styles.todayStarsBadge}>
+                      <ScaledText size={13} weight="600" color="#B8860B">
+                        {t('today')}: +{starSummary.todayStars} ⭐
+                      </ScaledText>
+                    </View>
+                  ) : (
+                    <View />
+                  )}
+                  <TouchableOpacity
+                    style={{
+                      flexDirection: 'row',
+                      alignItems: 'center',
+                      gap: 5,
+                      backgroundColor: '#FCE4EC',
+                      paddingVertical: 8,
+                      paddingHorizontal: 14,
+                      borderRadius: 14,
+                      borderWidth: 1,
+                      borderColor: '#F48FB1',
+                    }}
+                    activeOpacity={0.7}
+                    onPress={() => router.push('/flower-yield')}
+                    testID="draw-flowers-btn"
+                  >
+                    <Flower2 size={14} color="#E91E63" />
+                    <ScaledText size={12} weight="700" color="#E91E63">
+                      {language === 'zh_hant' ? '用星星變出美麗花田 · 我的寶箱' : language === 'zh_hans' ? '用星星变出美丽花田 · 我的宝箱' : 'Grow Flowers · Treasure Chest'}
                     </ScaledText>
-                  </View>
-                )}
+                  </TouchableOpacity>
+                </View>
 
                 {starSummary.totalStars === 0 && !rewards?.stars_total && (
                   <ScaledText size={13} color={Colors.textSecondary} style={styles.noStarsText}>
@@ -763,7 +776,6 @@ const styles = StyleSheet.create({
     gap: 1,
   },
   todayStarsBadge: {
-    marginTop: 14,
     backgroundColor: '#FFF8E1',
     borderRadius: 10,
     paddingVertical: 8,

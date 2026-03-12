@@ -335,11 +335,30 @@ export default function FlowerYieldScreen() {
             <TouchableOpacity style={styles.drawBtn} onPress={() => router.push('/gacha-draw')} activeOpacity={0.75} testID="lucky-draw-btn">
               <Sparkles size={14} color="#FFF" />
               <ScaledText size={11} weight="700" color="#FFF">
-                {language === 'zh_hant' ? '用星星變出美麗花田' : language === 'zh_hans' ? '用星星变出美丽花田' : 'Grow Flowers'}
+                {language === 'zh_hant' ? '抽出幸運花朵' : language === 'zh_hans' ? '抽出幸运花朵' : 'Lucky Flower Draw'}
               </ScaledText>
             </TouchableOpacity>
-            <TouchableOpacity style={styles.chestBtn} onPress={() => router.push('/treasure-chest')} activeOpacity={0.75} testID="treasure-chest-btn">
+            <TouchableOpacity
+              style={{
+                flexDirection: 'row',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: 4,
+                backgroundColor: '#FFE0B2',
+                paddingVertical: 10,
+                paddingHorizontal: 12,
+                borderRadius: 12,
+                borderWidth: 1.5,
+                borderColor: '#FFCC80',
+              }}
+              onPress={() => router.push('/treasure-chest')}
+              activeOpacity={0.75}
+              testID="treasure-chest-btn"
+            >
               <Gift size={14} color="#8B4513" />
+              <ScaledText size={11} weight="700" color="#8B4513">
+                {language === 'zh_hant' ? '我的寶箱' : language === 'zh_hans' ? '我的宝箱' : 'Treasure'}
+              </ScaledText>
             </TouchableOpacity>
           </View>
 

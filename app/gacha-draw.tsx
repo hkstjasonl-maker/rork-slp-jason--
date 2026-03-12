@@ -87,6 +87,8 @@ function weightedRandomPick(flowers: FlowerType[]): FlowerType {
   return flowers[flowers.length - 1];
 }
 
+const GACHA_MACHINE_URL = 'https://pfgtnrlgetomfmrzbxgb.supabase.co/storage/v1/object/public/flowers/gacha-machine.png';
+
 function CapsuleMachine({ shakeAnim }: { shakeAnim: Animated.Value }) {
   const machineShake = shakeAnim.interpolate({
     inputRange: [-1, 0, 1],
@@ -95,25 +97,12 @@ function CapsuleMachine({ shakeAnim }: { shakeAnim: Animated.Value }) {
 
   return (
     <Animated.View style={[styles.machineContainer, { transform: [{ rotate: machineShake }] }]}>
-      <View style={styles.machineGlobe}>
-        <View style={styles.machineGlobeInner}>
-          <View style={styles.capsulePreview1} />
-          <View style={styles.capsulePreview2} />
-          <View style={styles.capsulePreview3} />
-          <View style={styles.capsulePreview4} />
-          <View style={styles.capsulePreview5} />
-        </View>
-        <View style={styles.machineGlobeShine} />
-      </View>
-      <View style={styles.machineBody}>
-        <View style={styles.machineSlot} />
-        <View style={styles.machineKnob}>
-          <View style={styles.machineKnobInner} />
-        </View>
-      </View>
-      <View style={styles.machineBase}>
-        <View style={styles.machineDispenser} />
-      </View>
+      <Image
+        source={{ uri: GACHA_MACHINE_URL }}
+        style={{ width: '100%', height: undefined, aspectRatio: 0.67 }}
+        resizeMode="contain"
+        onError={() => log('[GachaDraw] Failed to load gacha machine image')}
+      />
     </Animated.View>
   );
 }
@@ -781,119 +770,7 @@ const styles = StyleSheet.create({
     width: SCREEN_WIDTH * 0.55,
     maxWidth: 240,
   },
-  machineGlobe: {
-    width: '100%',
-    aspectRatio: 1,
-    borderRadius: 999,
-    backgroundColor: '#E8F5E9',
-    borderWidth: 4,
-    borderColor: '#C62828',
-    overflow: 'hidden',
-    position: 'relative',
-  },
-  machineGlobeInner: {
-    flex: 1,
-    padding: 16,
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    justifyContent: 'center',
-    alignItems: 'center',
-    gap: 8,
-  },
-  capsulePreview1: {
-    width: 28,
-    height: 28,
-    borderRadius: 14,
-    backgroundColor: '#F48FB1',
-  },
-  capsulePreview2: {
-    width: 24,
-    height: 24,
-    borderRadius: 12,
-    backgroundColor: '#64B5F6',
-  },
-  capsulePreview3: {
-    width: 26,
-    height: 26,
-    borderRadius: 13,
-    backgroundColor: '#FFD54F',
-  },
-  capsulePreview4: {
-    width: 22,
-    height: 22,
-    borderRadius: 11,
-    backgroundColor: '#CE93D8',
-  },
-  capsulePreview5: {
-    width: 20,
-    height: 20,
-    borderRadius: 10,
-    backgroundColor: '#A5D6A7',
-  },
-  machineGlobeShine: {
-    position: 'absolute',
-    top: 8,
-    left: 12,
-    width: '30%',
-    height: '30%',
-    borderRadius: 999,
-    backgroundColor: 'rgba(255,255,255,0.35)',
-  },
-  machineBody: {
-    width: '70%',
-    height: 50,
-    backgroundColor: '#C62828',
-    alignItems: 'center',
-    justifyContent: 'center',
-    position: 'relative',
-  },
-  machineSlot: {
-    position: 'absolute',
-    top: 0,
-    width: '60%',
-    height: 6,
-    backgroundColor: '#8E0000',
-    borderRadius: 3,
-  },
-  machineKnob: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    backgroundColor: '#FFD54F',
-    justifyContent: 'center',
-    alignItems: 'center',
-    borderWidth: 3,
-    borderColor: '#F9A825',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.2,
-    shadowRadius: 3,
-    elevation: 3,
-  },
-  machineKnobInner: {
-    width: 12,
-    height: 12,
-    borderRadius: 6,
-    backgroundColor: '#F57F17',
-  },
-  machineBase: {
-    width: '80%',
-    height: 36,
-    backgroundColor: '#B71C1C',
-    borderBottomLeftRadius: 12,
-    borderBottomRightRadius: 12,
-    alignItems: 'center',
-    justifyContent: 'flex-end',
-    paddingBottom: 4,
-  },
-  machineDispenser: {
-    width: 50,
-    height: 18,
-    backgroundColor: '#8E0000',
-    borderRadius: 6,
-    borderWidth: 2,
-    borderColor: '#5D0000',
-  },
+
   capsuleBallContainer: {
     position: 'absolute',
     flexDirection: 'row',

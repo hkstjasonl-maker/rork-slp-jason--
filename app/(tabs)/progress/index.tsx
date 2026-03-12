@@ -306,31 +306,6 @@ export default function ProgressScreen() {
                       </ScaledText>
                     </View>
                   </View>
-
-                  <View style={styles.rewardItem}>
-                    <View style={[styles.rewardCircle, { borderColor: '#81C784', backgroundColor: '#E8F5E9' }]}>
-                      <ScaledText size={28} weight="bold" color="#2E7D32">
-                        {rewards?.stars_available ?? 0}
-                      </ScaledText>
-                      <ScaledText size={10} weight="600" color="#2E7D32">
-                        {t('availableStars')}
-                      </ScaledText>
-                    </View>
-                    <TouchableOpacity
-                      style={styles.drawFlowersBtn}
-                      activeOpacity={0.7}
-                      testID="draw-flowers-btn"
-                      onPress={() => router.push('/flower-yield')}
-                    >
-                      <Flower2 size={14} color="#E91E63" />
-                      <ScaledText size={11} weight="700" color="#E91E63">
-                        {t('drawFlowers')}
-                      </ScaledText>
-                    </TouchableOpacity>
-                  </View>
-                </View>
-
-                <View style={styles.rewardsGrid}>
                   <View style={styles.rewardItem}>
                     <View style={[styles.rewardCircle, { borderColor: '#FFCC80', backgroundColor: '#FFF3E0' }]}>
                       <ScaledText size={28} weight="bold" color="#E65100">
@@ -341,18 +316,19 @@ export default function ProgressScreen() {
                       </ScaledText>
                     </View>
                   </View>
-
-                  <View style={styles.rewardItem}>
-                    <View style={[styles.rewardCircle, { borderColor: '#FFB74D', backgroundColor: '#FFF8E1' }]}>
-                      <ScaledText size={28} weight="bold" color="#F57F17">
-                        {rewards?.fires_available ?? 0}
-                      </ScaledText>
-                      <ScaledText size={10} weight="600" color="#F57F17">
-                        {t('availableFires')}
-                      </ScaledText>
-                    </View>
-                  </View>
                 </View>
+
+                <TouchableOpacity
+                  style={[styles.drawFlowersBtn, { alignSelf: 'center', marginTop: 12 }]}
+                  activeOpacity={0.7}
+                  testID="draw-flowers-btn"
+                  onPress={() => router.push('/flower-yield')}
+                >
+                  <Flower2 size={14} color="#E91E63" />
+                  <ScaledText size={11} weight="700" color="#E91E63">
+                    {t('drawFlowers')}
+                  </ScaledText>
+                </TouchableOpacity>
 
                 <View style={styles.streakSection}>
                   <View style={styles.streakRow}>

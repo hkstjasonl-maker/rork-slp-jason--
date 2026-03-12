@@ -9,6 +9,7 @@ import {
   Animated,
   Dimensions,
   Platform,
+  ActivityIndicator,
 } from 'react-native';
 import * as Haptics from 'expo-haptics';
 import { Eye } from 'lucide-react-native';
@@ -38,7 +39,7 @@ interface MiniMahjongGameProps {
   practiceMode?: boolean;
 }
 
-type Phase = 'rules' | 'game' | 'reveal';
+type Phase = 'rules' | 'loading' | 'game' | 'reveal';
 
 interface ScatteredTile {
   x: number;
@@ -193,13 +194,18 @@ export default function MiniMahjongGame({ visible, level, onClose, patientId, pr
   const handleStart = useCallback(() => {
     const data = generateHand(level);
     setGameData(data);
-    setPhase('game');
-    log('[MiniMahjongGame] Game started, level:', level);
+    setPhase('loading');
+    log('[MiniMahjongGame] Game loading, level:', level);
 
     if (Platform.OS !== 'web') {
       data.hand.forEach(t => Image.prefetch(getTileImageUrl(t)).catch(() => {}));
       data.choices.forEach(t => Image.prefetch(getTileImageUrl(t)).catch(() => {}));
     }
+
+    setTimeout(() => {
+      setPhase('game');
+      log('[MiniMahjongGame] Game started');
+    }, 1500);
   }, [level]);
 
   const flipTile = useCallback((index: number): Promise<void> => {
@@ -368,6 +374,18 @@ export default function MiniMahjongGame({ visible, level, onClose, patientId, pr
 
   const showTipsButton = (level === 'basic' || level === 'moderate') && phase === 'game' && !tipsUsed && !tapsDisabled;
 
+  const renderLoadingPhase = () => (
+    <View style={styles.loadingContainer}>
+      <ScatteredTilesLayer tiles={bgScatteredTiles} />
+      <View style={styles.loadingContent}>
+        <ActivityIndicator size="large" color="#FFD700" />
+        <Text style={styles.loadingText}>
+          {getBilingualText('Shuffling tiles...', '洗牌中...', '洗牌中...')}
+        </Text>
+      </View>
+    </View>
+  );
+
   const renderRulesPhase = () => (
     <View style={styles.rulesContainer}>
       <Text style={styles.mahjongEmoji}>🀄</Text>
@@ -425,7 +443,7 @@ export default function MiniMahjongGame({ visible, level, onClose, patientId, pr
       <View key={index} style={styles.choiceTileWrapper}>
         <Animated.View
           style={[
-            isRevealed && isRevealPhase ? styles.choiceTileRevealed : styles.choiceTile,
+            isRevealed ? styles.choiceTileRevealed : styles.choiceTile,
             { transform: [{ rotateY }] },
             showGoldenGlow && styles.goldenGlow,
             showGreenGlow && styles.greenGlow,
@@ -443,7 +461,7 @@ export default function MiniMahjongGame({ visible, level, onClose, patientId, pr
           >
             <Image
               source={isRevealed ? { uri: getTileImageUrl(tileId) } : backImageSource}
-              style={isRevealed && isRevealPhase ? styles.choiceTileImageRevealed : styles.choiceTileImage}
+              style={isRevealed ? styles.choiceTileImageRevealed : styles.choiceTileImage}
               resizeMode="contain"
             />
           </TouchableOpacity>
@@ -660,6 +678,7 @@ export default function MiniMahjongGame({ visible, level, onClose, patientId, pr
     >
       <View style={styles.container}>
         {phase === 'rules' && renderRulesPhase()}
+        {phase === 'loading' && renderLoadingPhase()}
         {(phase === 'game' || phase === 'reveal') && renderGamePhase()}
       </View>
     </Modal>
@@ -968,6 +987,24 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
     fontSize: 16,
     fontWeight: '700' as const,
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  loadingContent: {
+    alignItems: 'center',
+    zIndex: 2,
+  },
+  loadingText: {
+    color: '#FFD700',
+    fontSize: 18,
+    fontWeight: '700' as const,
+    marginTop: 16,
+    textShadowColor: 'rgba(0,0,0,0.5)',
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 4,
   },
   practiceBadge: {
     position: 'absolute' as const,

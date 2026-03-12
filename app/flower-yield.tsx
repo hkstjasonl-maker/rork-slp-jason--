@@ -31,7 +31,7 @@ if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental
 }
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
-const GARDEN_HEIGHT = 420;
+const GARDEN_HEIGHT = 520;
 const TOTAL_SLOTS = 20;
 const GRID_COLS = 4;
 const GRID_ROWS = 5;
@@ -140,7 +140,7 @@ for (let i = 0; i < TOTAL_SLOTS; i++) {
 }
 
 const Mountains = React.memo(function Mountains() {
-  const mountainTop = GARDEN_HEIGHT * 0.42;
+  const mountainTop = GARDEN_HEIGHT * 0.35;
   return (
     <>
       {MOUNTAIN_DATA.map((m, i) => {
@@ -192,22 +192,22 @@ const RollingHills = React.memo(function RollingHills() {
   return (
     <>
       <View style={{
-        position: 'absolute' as const, bottom: GARDEN_HEIGHT * 0.48, left: -30, right: -30,
+        position: 'absolute' as const, bottom: GARDEN_HEIGHT * 0.52, left: -30, right: -30,
         height: 60, borderTopLeftRadius: 300, borderTopRightRadius: 200,
         backgroundColor: 'rgba(165,214,167,0.35)', zIndex: 3,
       }} />
       <View style={{
-        position: 'absolute' as const, bottom: GARDEN_HEIGHT * 0.44, left: SCREEN_WIDTH * 0.2, right: -40,
+        position: 'absolute' as const, bottom: GARDEN_HEIGHT * 0.48, left: SCREEN_WIDTH * 0.2, right: -40,
         height: 50, borderTopLeftRadius: 250, borderTopRightRadius: 350,
         backgroundColor: 'rgba(129,199,132,0.3)', zIndex: 3,
       }} />
       <View style={{
-        position: 'absolute' as const, bottom: GARDEN_HEIGHT * 0.40, left: -50, right: SCREEN_WIDTH * 0.15,
+        position: 'absolute' as const, bottom: GARDEN_HEIGHT * 0.44, left: -50, right: SCREEN_WIDTH * 0.15,
         height: 45, borderTopLeftRadius: 350, borderTopRightRadius: 180,
         backgroundColor: 'rgba(102,187,106,0.25)', zIndex: 3,
       }} />
       <View style={{
-        position: 'absolute' as const, bottom: GARDEN_HEIGHT * 0.36, left: -20, right: -20,
+        position: 'absolute' as const, bottom: GARDEN_HEIGHT * 0.40, left: -20, right: -20,
         height: 40, borderTopLeftRadius: 200, borderTopRightRadius: 280,
         backgroundColor: 'rgba(85,139,47,0.2)', zIndex: 3,
       }} />
@@ -818,13 +818,13 @@ const MemoGardenScene = React.memo(function GardenScene({ flowers, flowerTypeMap
   return (
     <View style={gardenStyles.container}>
       <View style={[StyleSheet.absoluteFill, { backgroundColor: '#3E6B2E' }]} />
-      <View style={{ position: 'absolute' as const, top: 0, left: 0, right: 0, height: '64%', backgroundColor: '#5A8B48' }} />
-      <View style={{ position: 'absolute' as const, top: 0, left: 0, right: 0, height: '43%', backgroundColor: '#8BBD78' }} />
-      <View style={{ position: 'absolute' as const, top: 0, left: 0, right: 0, height: '30%', backgroundColor: '#B0D6A2' }} />
-      <View style={{ position: 'absolute' as const, top: 0, left: 0, right: 0, height: '19%', backgroundColor: '#CFDEC4' }} />
-      <View style={{ position: 'absolute' as const, top: 0, left: 0, right: 0, height: '11%', backgroundColor: '#CBDADB' }} />
-      <View style={{ position: 'absolute' as const, top: 0, left: 0, right: 0, height: '5%', backgroundColor: '#ACC6E4' }} />
-      <View style={{ position: 'absolute' as const, top: 0, left: 0, right: 0, height: '1%', backgroundColor: '#94B6E4' }} />
+      <View style={{ position: 'absolute' as const, top: 0, left: 0, right: 0, height: '58%', backgroundColor: '#5A8B48' }} />
+      <View style={{ position: 'absolute' as const, top: 0, left: 0, right: 0, height: '38%', backgroundColor: '#8BBD78' }} />
+      <View style={{ position: 'absolute' as const, top: 0, left: 0, right: 0, height: '26%', backgroundColor: '#B0D6A2' }} />
+      <View style={{ position: 'absolute' as const, top: 0, left: 0, right: 0, height: '18%', backgroundColor: '#CFDEC4' }} />
+      <View style={{ position: 'absolute' as const, top: 0, left: 0, right: 0, height: '13%', backgroundColor: '#CBDADB' }} />
+      <View style={{ position: 'absolute' as const, top: 0, left: 0, right: 0, height: '8%', backgroundColor: '#ACC6E4' }} />
+      <View style={{ position: 'absolute' as const, top: 0, left: 0, right: 0, height: '3%', backgroundColor: '#94B6E4' }} />
 
       <View style={gardenStyles.grassTexture1} />
       <View style={gardenStyles.grassTexture2} />

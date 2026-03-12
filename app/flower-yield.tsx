@@ -69,16 +69,23 @@ function getFlowerPosition(gridPosition: number, gardenWidth: number, gardenHeig
   const col = gridPosition % GRID_COLS;
   const row = Math.floor(gridPosition / GRID_COLS);
 
-  const paddingX = gardenWidth * 0.08;
-  const paddingY = gardenHeight * 0.08;
-  const cellWidth = (gardenWidth - paddingX * 2) / GRID_COLS;
-  const cellHeight = (gardenHeight - paddingY * 2) / GRID_ROWS;
+  const centerX = gardenWidth / 2;
+  const centerY = gardenHeight / 2;
+
+  const cellW = gardenWidth * 0.135;
+  const cellH = gardenHeight * 0.085;
+
+  const offsetCol = col - 1.5;
+  const offsetRow = row - 2;
+
+  const isoX = centerX + (offsetCol - offsetRow) * cellW;
+  const isoY = centerY + (offsetCol + offsetRow) * cellH - gardenHeight * 0.05;
 
   return {
-    left: paddingX + col * cellWidth + cellWidth * 0.15,
-    top: paddingY + row * cellHeight + cellHeight * 0.05,
-    cellWidth,
-    cellHeight,
+    left: isoX - cellW * 0.45,
+    top: isoY - cellH * 0.5,
+    cellWidth: cellW * 1.8,
+    cellHeight: cellH * 2.8,
   };
 }
 
@@ -145,8 +152,8 @@ function FlowerItem({ flowerType, slotIndex, gardenWidth, gardenHeight, onPress 
         {
           left: pos.left,
           top: pos.top,
-          width: pos.cellWidth * 0.7,
-          height: pos.cellHeight * 0.85,
+          width: pos.cellWidth * 0.9,
+          height: pos.cellHeight * 1.0,
         },
       ]}
       testID={`flower-slot-${slotIndex}`}
@@ -154,8 +161,8 @@ function FlowerItem({ flowerType, slotIndex, gardenWidth, gardenHeight, onPress 
       <Animated.Image
         source={{ uri: flowerType.image_url }}
         style={{
-          width: '80%',
-          height: '80%',
+          width: '95%',
+          height: '95%',
           resizeMode: 'contain' as const,
           transform: [{ rotate }],
         }}
@@ -328,8 +335,8 @@ export default function FlowerYieldScreen() {
               onPress={() => router.push('/gacha-draw')}
             >
               <Sparkles size={18} color="#FFF" />
-              <ScaledText size={14} weight="700" color="#FFF">
-                {isZh ? '抽花 Lucky Draw' : 'Lucky Draw 抽花'}
+              <ScaledText size={13} weight="700" color="#FFF">
+                {language === 'zh_hant' ? '用星星變出美麗花田' : language === 'zh_hans' ? '用星星变出美丽花田' : 'Grow Beautiful Flowers'}
               </ScaledText>
             </TouchableOpacity>
 
@@ -340,8 +347,8 @@ export default function FlowerYieldScreen() {
               onPress={() => router.push('/treasure-chest')}
             >
               <Gift size={18} color="#8B4513" />
-              <ScaledText size={14} weight="700" color="#8B4513">
-                {isZh ? '寶箱 Treasure' : 'Treasure 寶箱'}
+              <ScaledText size={13} weight="700" color="#8B4513">
+                {language === 'zh_hant' ? '我的寶箱' : language === 'zh_hans' ? '我的宝箱' : 'My Treasure Chest'}
               </ScaledText>
             </TouchableOpacity>
           </View>
@@ -360,50 +367,11 @@ export default function FlowerYieldScreen() {
                 }
               }}
             >
-              <View style={styles.gardenDefaultBg}>
-                  {Array.from({ length: TOTAL_SLOTS }).map((_, i) => {
-                    const col = i % GRID_COLS;
-                    const row = Math.floor(i / GRID_COLS);
-                    const isEven = (col + row) % 2 === 0;
-                    const cellW = gardenSize.width / GRID_COLS;
-                    const cellH = gardenSize.height / GRID_ROWS;
-                    return (
-                      <View
-                        key={`grass-${i}`}
-                        style={[
-                          styles.grassCell,
-                          {
-                            left: col * cellW,
-                            top: row * cellH,
-                            width: cellW,
-                            height: cellH,
-                            backgroundColor: isEven ? '#A8D5A2' : '#96C990',
-                          },
-                        ]}
-                      />
-                    );
-                  })}
-
-                  {Array.from({ length: TOTAL_SLOTS }).map((_, i) => {
-                    const col = i % GRID_COLS;
-                    const row = Math.floor(i / GRID_COLS);
-                    const cellW = gardenSize.width / GRID_COLS;
-                    const cellH = gardenSize.height / GRID_ROWS;
-                    return (
-                      <View
-                        key={`iso-${i}`}
-                        style={[
-                          styles.isoOverlay,
-                          {
-                            left: col * cellW + 2,
-                            top: row * cellH + cellH - 8,
-                            width: cellW - 4,
-                          },
-                        ]}
-                      />
-                    );
-                  })}
-              </View>
+              <Image
+                source={{ uri: 'https://pfgtnrlgetomfmrzbxgb.supabase.co/storage/v1/object/public/flowers/garden-bg.png' }}
+                style={styles.gardenBackground}
+                resizeMode="contain"
+              />
 
               {flowers.map((flower) => {
                 const ft = flower.flower_types || flowerTypeMap[flower.flower_type_id];
@@ -576,7 +544,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     marginHorizontal: 20,
     marginTop: 8,
-    marginBottom: 12,
+    marginBottom: 8,
     backgroundColor: Colors.card,
     borderRadius: 14,
     paddingVertical: 12,
@@ -602,7 +570,7 @@ const styles = StyleSheet.create({
   actionRow: {
     flexDirection: 'row',
     marginHorizontal: 20,
-    marginBottom: 16,
+    marginBottom: 10,
     gap: 10,
   },
   luckyDrawBtn: {
@@ -638,11 +606,10 @@ const styles = StyleSheet.create({
   },
   gardenContainer: {
     marginHorizontal: 20,
-    aspectRatio: GRID_COLS / GRID_ROWS,
-    borderRadius: 20,
+    aspectRatio: 1,
+    borderRadius: 0,
     overflow: 'hidden',
-    borderWidth: 2,
-    borderColor: '#8BC34A',
+    backgroundColor: 'transparent',
     position: 'relative',
   },
   gardenBackground: {

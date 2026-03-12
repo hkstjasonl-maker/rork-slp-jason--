@@ -502,7 +502,7 @@ function PlantedFlower({ flower, flowerType, row }: {
 
   const rowFrac = row / (GRID_ROWS - 1);
   const imgSize = 52 + rowFrac * 18;
-  const stemHeight = 42 + rowFrac * 30;
+  const stemHeight = 168 + rowFrac * 120;
   const stemWidth = 2.5 + rowFrac * 0.8;
   const shadowWidth = imgSize * 0.7;
   const shadowOpacity = 0.15 + rowFrac * 0.12;

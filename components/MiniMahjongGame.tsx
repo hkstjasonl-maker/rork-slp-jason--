@@ -783,7 +783,12 @@ const styles = StyleSheet.create({
     height: CHOICE_TILE_H,
     borderRadius: 6,
     overflow: 'visible',
-    backgroundColor: 'transparent',
+    backgroundColor: '#FFFFFF',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.4,
+    shadowRadius: 6,
+    elevation: 5,
   },
   choicePulse: {
     position: 'absolute',
@@ -803,6 +808,7 @@ const styles = StyleSheet.create({
   choiceTileImageRevealed: {
     width: CHOICE_TILE_W,
     height: CHOICE_TILE_H,
+    borderRadius: 4,
   },
   choiceLabel: {
     color: 'rgba(255,255,255,0.7)',

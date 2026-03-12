@@ -443,13 +443,13 @@ export function sortHand(hand: TileId[]): TileId[] {
 }
 
 export function getTileImageUrl(tileId: TileId): string {
-  return `${BASE_URL}${tileId}.svg`;
+  return `${BASE_URL}${tileId}.png`;
 }
 
 export function getBackImageUrl(): string {
-  return `${BASE_URL}Back.svg`;
+  return `${BASE_URL}Back.png`;
 }
 
 export function getTableBgUrl(): string {
-  return `${BASE_URL}table_bg.svg`;
+  return `${BASE_URL}table_bg.png`;
 }

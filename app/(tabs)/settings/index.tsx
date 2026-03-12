@@ -32,6 +32,7 @@ import {
   Accessibility,
   Shield,
   Trash2,
+  Dices,
 } from 'lucide-react-native';
 import { AppTutorial } from '@/components/AppTutorial';
 
@@ -61,6 +62,10 @@ export default function SettingsScreen() {
     managingOrgLogoUrl,
     liveSubtitlesEnabled,
     setLiveSubtitlesEnabled,
+    mahjongGameEnabled,
+    mahjongGameLevel,
+    setMahjongGameEnabled,
+    setMahjongGameLevel,
     acknowledgements,
   } = useApp();
 
@@ -240,6 +245,61 @@ export default function SettingsScreen() {
               </View>
               <ChevronRight size={18} color={Colors.disabled} />
             </TouchableOpacity>
+          </View>
+
+          <View style={styles.section}>
+            <View style={styles.sectionHeader}>
+              <Dices size={18} color={Colors.primary} />
+              <ScaledText size={16} weight="600" color={Colors.textPrimary}>
+                {t('miniMahjong')}
+              </ScaledText>
+            </View>
+            <View style={styles.card}>
+              <View style={[styles.optionRow, mahjongGameEnabled ? styles.optionBorder : undefined]}>
+                <View style={{ flex: 1, gap: 2 }}>
+                  <ScaledText size={15} color={Colors.textPrimary}>
+                    {t('enableMahjong')}
+                  </ScaledText>
+                </View>
+                <Switch
+                  value={mahjongGameEnabled}
+                  onValueChange={(val) => void setMahjongGameEnabled(val)}
+                  trackColor={{ false: Colors.border, true: Colors.primary }}
+                  thumbColor="#fff"
+                />
+              </View>
+              {mahjongGameEnabled && (
+                <View style={styles.mahjongLevelSection}>
+                  <ScaledText size={13} weight="600" color={Colors.textSecondary} style={{ marginBottom: 10 }}>
+                    {t('mahjongLevel')}
+                  </ScaledText>
+                  <View style={styles.segmentedRow}>
+                    {(['basic', 'moderate', 'difficult'] as const).map((lvl) => (
+                      <TouchableOpacity
+                        key={lvl}
+                        style={[
+                          styles.segmentButton,
+                          mahjongGameLevel === lvl && styles.segmentButtonActive,
+                        ]}
+                        onPress={() => void setMahjongGameLevel(lvl)}
+                        activeOpacity={0.7}
+                      >
+                        <ScaledText
+                          size={13}
+                          weight={mahjongGameLevel === lvl ? 'bold' : 'normal'}
+                          color={mahjongGameLevel === lvl ? '#fff' : Colors.textPrimary}
+                        >
+                          {t(lvl === 'basic' ? 'mahjongBasic' : lvl === 'moderate' ? 'mahjongModerate' : 'mahjongDifficult')}
+                        </ScaledText>
+                      </TouchableOpacity>
+                    ))}
+                  </View>
+                  <ScaledText size={12} color={Colors.textSecondary} style={{ marginTop: 8 }}>
+                    {t(mahjongGameLevel === 'basic' ? 'mahjongBasicDesc' : mahjongGameLevel === 'moderate' ? 'mahjongModerateDesc' : 'mahjongDifficultDesc')}
+                  </ScaledText>
+                </View>
+              )}
+            </View>
           </View>
 
           <View style={styles.section}>
@@ -560,5 +620,26 @@ const styles = StyleSheet.create({
     paddingHorizontal: 18,
     gap: 2,
   },
-
+  mahjongLevelSection: {
+    paddingHorizontal: 18,
+    paddingBottom: 16,
+  },
+  segmentedRow: {
+    flexDirection: 'row' as const,
+    gap: 8,
+  },
+  segmentButton: {
+    flex: 1,
+    paddingVertical: 10,
+    borderRadius: 10,
+    backgroundColor: Colors.background,
+    alignItems: 'center' as const,
+    justifyContent: 'center' as const,
+    borderWidth: 1,
+    borderColor: Colors.border,
+  },
+  segmentButtonActive: {
+    backgroundColor: Colors.primary,
+    borderColor: Colors.primary,
+  },
 });

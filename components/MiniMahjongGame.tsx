@@ -5,7 +5,6 @@ import {
   StyleSheet,
   Modal,
   TouchableOpacity,
-  ScrollView,
   Image,
   Animated,
   Dimensions,
@@ -47,12 +46,12 @@ interface ScatteredTile {
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
-const HAND_TILE_W = 48;
-const HAND_TILE_H = 66;
+const HAND_TILE_W = 42;
+const HAND_TILE_H = 58;
 const CHOICE_TILE_W = 65;
 const CHOICE_TILE_H = 90;
-const SCATTER_TILE_W = 36;
-const SCATTER_TILE_H = 50;
+const SCATTER_TILE_W = 32;
+const SCATTER_TILE_H = 44;
 
 const RULES_TEXT: Record<GameLevel, { en: string; zh_hant: string; zh_hans: string }> = {
   basic: {
@@ -78,16 +77,14 @@ const LEVEL_LABELS: Record<GameLevel, { en: string; zh_hant: string; zh_hans: st
   difficult: { en: 'Difficult', zh_hant: '困難', zh_hans: '困难' },
 };
 
-function generateScatteredTiles(count: number): ScatteredTile[] {
+function generateScatteredTiles(count: number, areaW: number, areaH: number): ScatteredTile[] {
   const tiles: ScatteredTile[] = [];
-  const areaW = SCREEN_WIDTH - 40;
-  const areaH = 140;
   for (let i = 0; i < count; i++) {
     tiles.push({
       x: Math.random() * areaW,
       y: Math.random() * areaH,
-      rotation: (Math.random() - 0.5) * 30,
-      scale: 0.7 + Math.random() * 0.3,
+      rotation: (Math.random() - 0.5) * 40,
+      scale: 0.5 + Math.random() * 0.4,
     });
   }
   return tiles;
@@ -105,7 +102,7 @@ export default function MiniMahjongGame({ visible, level, onClose, patientId, pr
   const [showResult, setShowResult] = useState<boolean>(false);
   const [tapsDisabled, setTapsDisabled] = useState<boolean>(false);
 
-  const scatteredTiles = useMemo(() => generateScatteredTiles(16), []);
+  const bgScatteredTiles = useMemo(() => generateScatteredTiles(25, SCREEN_WIDTH, Dimensions.get('window').height), []);
 
   const flipAnimsRef = useRef<Animated.Value[]>([
     new Animated.Value(0),
@@ -415,13 +412,13 @@ export default function MiniMahjongGame({ visible, level, onClose, patientId, pr
           </View>
         )}
 
-        <View style={styles.scatterArea}>
-          {scatteredTiles.map((st, i) => (
+        <View style={styles.bgScatterLayer} pointerEvents="none">
+          {bgScatteredTiles.map((st, i) => (
             <Image
-              key={i}
+              key={`bg-${i}`}
               source={{ uri: getBackImageUrl() }}
               style={[
-                styles.scatteredTile,
+                styles.bgScatteredTile,
                 {
                   left: st.x,
                   top: st.y,
@@ -450,30 +447,48 @@ export default function MiniMahjongGame({ visible, level, onClose, patientId, pr
           <Text style={styles.handLabel}>
             {getBilingualText('Your Hand', '你的手牌', '你的手牌')}
           </Text>
-          <ScrollView
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            contentContainerStyle={styles.handScroll}
-          >
-            {gameData.hand.map((tileId, i) => {
-              const highlighted = isMatchingTile(tileId);
-              return (
-                <View
-                  key={`${tileId}-${i}`}
-                  style={[
-                    styles.handTileWrapper,
-                    highlighted && styles.handTileHighlight,
-                  ]}
-                >
-                  <Image
-                    source={{ uri: getTileImageUrl(tileId) }}
-                    style={styles.handTileImage}
-                    resizeMode="contain"
-                  />
-                </View>
-              );
-            })}
-          </ScrollView>
+          <View style={styles.handGrid}>
+            <View style={styles.handRow}>
+              {gameData.hand.slice(0, 7).map((tileId, i) => {
+                const highlighted = isMatchingTile(tileId);
+                return (
+                  <View
+                    key={`${tileId}-${i}`}
+                    style={[
+                      styles.handTileWrapper,
+                      highlighted && styles.handTileHighlight,
+                    ]}
+                  >
+                    <Image
+                      source={{ uri: getTileImageUrl(tileId) }}
+                      style={styles.handTileImage}
+                      resizeMode="contain"
+                    />
+                  </View>
+                );
+              })}
+            </View>
+            <View style={styles.handRow}>
+              {gameData.hand.slice(7).map((tileId, i) => {
+                const highlighted = isMatchingTile(tileId);
+                return (
+                  <View
+                    key={`${tileId}-${i + 7}`}
+                    style={[
+                      styles.handTileWrapper,
+                      highlighted && styles.handTileHighlight,
+                    ]}
+                  >
+                    <Image
+                      source={{ uri: getTileImageUrl(tileId) }}
+                      style={styles.handTileImage}
+                      resizeMode="contain"
+                    />
+                  </View>
+                );
+              })}
+            </View>
+          </View>
         </View>
       </View>
     );
@@ -646,6 +661,7 @@ const styles = StyleSheet.create({
   gameContainer: {
     flex: 1,
     paddingTop: 50,
+    zIndex: 1,
   },
   levelBadgeSmall: {
     position: 'absolute',
@@ -664,17 +680,16 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: '700' as const,
   },
-  scatterArea: {
-    height: 140,
-    marginHorizontal: 20,
-    position: 'relative',
+  bgScatterLayer: {
+    ...StyleSheet.absoluteFillObject,
+    zIndex: 0,
     overflow: 'hidden',
   },
-  scatteredTile: {
+  bgScatteredTile: {
     position: 'absolute',
     width: SCATTER_TILE_W,
     height: SCATTER_TILE_H,
-    opacity: 0.4,
+    opacity: 0.15,
   },
   pickText: {
     color: '#FFD700',
@@ -757,11 +772,12 @@ const styles = StyleSheet.create({
     bottom: 0,
     left: 0,
     right: 0,
-    paddingBottom: 40,
-    paddingTop: 12,
-    backgroundColor: 'rgba(0,0,0,0.25)',
+    paddingBottom: 32,
+    paddingTop: 10,
+    backgroundColor: 'rgba(0,0,0,0.3)',
     borderTopLeftRadius: 20,
     borderTopRightRadius: 20,
+    zIndex: 5,
   },
   handLabel: {
     color: 'rgba(255,255,255,0.6)',
@@ -771,9 +787,14 @@ const styles = StyleSheet.create({
     marginBottom: 8,
     letterSpacing: 0.5,
   },
-  handScroll: {
-    paddingHorizontal: 12,
+  handGrid: {
+    paddingHorizontal: 8,
     gap: 4,
+  },
+  handRow: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    gap: 3,
   },
   handTileWrapper: {
     borderRadius: 4,

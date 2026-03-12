@@ -502,7 +502,7 @@ function PlantedFlower({ flower, flowerType, row }: {
 
   const rowFrac = row / (GRID_ROWS - 1);
   const imgSize = 52 + rowFrac * 18;
-  const stemHeight = 14 + rowFrac * 10;
+  const stemHeight = 42 + rowFrac * 30;
   const stemWidth = 2.5 + rowFrac * 0.8;
   const shadowWidth = imgSize * 0.7;
   const shadowOpacity = 0.15 + rowFrac * 0.12;
@@ -510,7 +510,7 @@ function PlantedFlower({ flower, flowerType, row }: {
   const rarityInfo = RARITY_COLORS[rarity] || RARITY_COLORS.common;
   const glowSize = imgSize * 1.3;
 
-  const totalHeight = imgSize + stemHeight + 16;
+  const totalHeight = imgSize + stemHeight + 24;
 
   return (
     <View style={{ alignItems: 'center' as const, width: imgSize + 14, height: totalHeight }}>

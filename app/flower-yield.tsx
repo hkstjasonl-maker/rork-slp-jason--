@@ -11,6 +11,7 @@ import {
   Pressable,
   Image,
   Dimensions,
+  PanResponder,
 } from 'react-native';
 import { Stack, useRouter } from 'expo-router';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
@@ -207,6 +208,42 @@ export default function FlowerYieldScreen() {
   const queryClient = useQueryClient();
   const scrollY = useRef(new Animated.Value(0)).current;
 
+  const panX = useRef(new Animated.Value(0)).current;
+  const panY = useRef(new Animated.Value(0)).current;
+  const lastPan = useRef({ x: 0, y: 0 });
+
+  const gardenPanResponder = useRef(
+    PanResponder.create({
+      onStartShouldSetPanResponder: () => true,
+      onMoveShouldSetPanResponder: (_, g) => Math.abs(g.dx) > 5 || Math.abs(g.dy) > 5,
+      onPanResponderGrant: () => {
+        panX.setOffset(lastPan.current.x);
+        panY.setOffset(lastPan.current.y);
+        panX.setValue(0);
+        panY.setValue(0);
+      },
+      onPanResponderMove: (_, g) => {
+        const clampedDx = Math.max(-40, Math.min(40, g.dx));
+        const clampedDy = Math.max(-40, Math.min(40, g.dy));
+        panX.setValue(clampedDx);
+        panY.setValue(clampedDy);
+      },
+      onPanResponderRelease: (_, g) => {
+        const finalX = Math.max(-40, Math.min(40, lastPan.current.x + g.dx));
+        const finalY = Math.max(-40, Math.min(40, lastPan.current.y + g.dy));
+        lastPan.current = { x: finalX, y: finalY };
+        panX.flattenOffset();
+        panY.flattenOffset();
+        Animated.parallel([
+          Animated.spring(panX, { toValue: 0, friction: 7, tension: 40, useNativeDriver: true }),
+          Animated.spring(panY, { toValue: 0, friction: 7, tension: 40, useNativeDriver: true }),
+        ]).start(() => {
+          lastPan.current = { x: 0, y: 0 };
+        });
+      },
+    })
+  ).current;
+
   const [selectedFlower, setSelectedFlower] = useState<PatientFlower | null>(null);
   const [theftModalVisible, setTheftModalVisible] = useState<boolean>(false);
 
@@ -364,14 +401,16 @@ export default function FlowerYieldScreen() {
 
           <CollectionProgress count={flowers.length} total={TOTAL_SLOTS} isZh={isZh} />
 
-          <View style={styles.gardenHeroContainer}>
-            <Animated.Image
-              source={{ uri: SUPABASE_STORAGE + 'garden-bg.png' }}
-              style={[styles.gardenHeroImage, {
-                transform: [{ translateY: gardenTranslateY }, { scale: gardenScale }],
-              }]}
-              resizeMode="contain"
-            />
+          <View style={styles.gardenHeroContainer} {...gardenPanResponder.panHandlers}>
+            <Animated.View style={{ transform: [{ translateY: gardenTranslateY }, { scale: gardenScale }] }}>
+              <Animated.Image
+                source={{ uri: SUPABASE_STORAGE + 'garden-bg.png' }}
+                style={[styles.gardenHeroImage, {
+                  transform: [{ translateX: panX }, { translateY: panY }],
+                }]}
+                resizeMode="contain"
+              />
+            </Animated.View>
             <SparkleParticles />
             {flowers.length === 0 && (
               <View style={styles.emptyGardenHint}>
@@ -600,14 +639,16 @@ const styles = StyleSheet.create({
     marginLeft: -8,
   },
   gardenHeroContainer: {
-    marginHorizontal: 8,
-    height: SCREEN_WIDTH - 16,
+    marginHorizontal: -20,
+    height: SCREEN_WIDTH * 1.15,
     position: 'relative',
     overflow: 'hidden',
   },
   gardenHeroImage: {
-    width: '100%',
-    height: '100%',
+    width: SCREEN_WIDTH * 1.3,
+    height: SCREEN_WIDTH * 1.3,
+    alignSelf: 'center',
+    marginLeft: -SCREEN_WIDTH * 0.15,
   },
   emptyGardenHint: {
     position: 'absolute',

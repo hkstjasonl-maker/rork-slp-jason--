@@ -39,8 +39,7 @@ export const [AppProvider, useApp] = createContextHook(() => {
   const [managingOrgLogoUrl, setManagingOrgLogoUrl] = useState<string | null>(null);
   const [acknowledgements, setAcknowledgements] = useState<Acknowledgement[]>([]);
   const [liveSubtitlesEnabled, setLiveSubtitlesEnabledState] = useState<boolean>(false);
-  const [mahjongGameEnabled, setMahjongGameEnabledState] = useState<boolean>(true);
-  const [mahjongGameLevel, setMahjongGameLevelState] = useState<string>('basic');
+
   const [flowersJustStolen, setFlowersJustStolen] = useState<number>(0);
   const [drawQueue, setDrawQueue] = useState<QueuedCampaign[]>([]);
   const [currentDraw, setCurrentDraw] = useState<QueuedCampaign | null>(null);
@@ -263,7 +262,7 @@ export const [AppProvider, useApp] = createContextHook(() => {
 
         const { data: patientData, error: patientError } = await supabase
           .from('patients')
-          .select('reinforcement_audio_youtube_id, reinforcement_audio_youtube_id_zh_hant, reinforcement_audio_youtube_id_zh_hans, reinforcement_audio_url_en, reinforcement_audio_url_zh_hant, reinforcement_audio_url_zh_hans, therapist_photo_url, therapist_cartoon_url, therapist_name_en, therapist_name_zh, managing_org_name_en, managing_org_name_zh, managing_org_logo_url, live_subtitles_enabled, mahjong_game_enabled, mahjong_game_level')
+          .select('reinforcement_audio_youtube_id, reinforcement_audio_youtube_id_zh_hant, reinforcement_audio_youtube_id_zh_hans, reinforcement_audio_url_en, reinforcement_audio_url_zh_hant, reinforcement_audio_url_zh_hans, therapist_photo_url, therapist_cartoon_url, therapist_name_en, therapist_name_zh, managing_org_name_en, managing_org_name_zh, managing_org_logo_url, live_subtitles_enabled')
           .eq('id', patientId)
           .single();
 
@@ -283,8 +282,6 @@ export const [AppProvider, useApp] = createContextHook(() => {
           setManagingOrgNameZh(patientData.managing_org_name_zh || null);
           setManagingOrgLogoUrl(patientData.managing_org_logo_url || null);
           setLiveSubtitlesEnabledState(patientData.live_subtitles_enabled === true);
-          setMahjongGameEnabledState(patientData.mahjong_game_enabled !== false);
-          setMahjongGameLevelState(patientData.mahjong_game_level || 'basic');
 
           if (lang === 'zh_hant') {
             audioUrl = patientData.reinforcement_audio_url_zh_hant || patientData.reinforcement_audio_url_en || null;
@@ -344,29 +341,6 @@ export const [AppProvider, useApp] = createContextHook(() => {
     }
   }, [patientId]);
 
-  const setMahjongGameEnabled = useCallback(async (value: boolean) => {
-    setMahjongGameEnabledState(value);
-    if (patientId) {
-      try {
-        log('[AppContext] Updating mahjong_game_enabled to', value, 'for patient:', patientId);
-        await supabase.from('patients').update({ mahjong_game_enabled: value }).eq('id', patientId);
-      } catch (e) {
-        log('[AppContext] Failed to update mahjong_game_enabled:', e);
-      }
-    }
-  }, [patientId]);
-
-  const setMahjongGameLevel = useCallback(async (level: string) => {
-    setMahjongGameLevelState(level);
-    if (patientId) {
-      try {
-        log('[AppContext] Updating mahjong_game_level to', level, 'for patient:', patientId);
-        await supabase.from('patients').update({ mahjong_game_level: level }).eq('id', patientId);
-      } catch (e) {
-        log('[AppContext] Failed to update mahjong_game_level:', e);
-      }
-    }
-  }, [patientId]);
 
   const clearFlowersStolen = useCallback(() => setFlowersJustStolen(0), []);
 
@@ -395,8 +369,6 @@ export const [AppProvider, useApp] = createContextHook(() => {
         setManagingOrgNameZh(data.managing_org_name_zh || null);
         setManagingOrgLogoUrl(data.managing_org_logo_url || null);
         setLiveSubtitlesEnabledState(data.live_subtitles_enabled === true);
-        setMahjongGameEnabledState(data.mahjong_game_enabled !== false);
-        setMahjongGameLevelState(data.mahjong_game_level || 'basic');
         log('[AppContext] Patient data refreshed successfully');
       }
     } catch (e) {
@@ -487,8 +459,6 @@ export const [AppProvider, useApp] = createContextHook(() => {
     managingOrgNameZh,
     managingOrgLogoUrl,
     liveSubtitlesEnabled,
-    mahjongGameEnabled,
-    mahjongGameLevel,
     acknowledgements,
     flowersJustStolen,
     clearFlowersStolen,
@@ -503,8 +473,6 @@ export const [AppProvider, useApp] = createContextHook(() => {
     clearPatient,
     setFontSizeLevel,
     setLiveSubtitlesEnabled,
-    setMahjongGameEnabled,
-    setMahjongGameLevel,
     setTutorialCompleted,
     resetTutorial,
     t,
@@ -515,7 +483,6 @@ export const [AppProvider, useApp] = createContextHook(() => {
     therapistPhotoUrl, therapistCartoonUrl, therapistNameEn, therapistNameZh,
     managingOrgNameEn, managingOrgNameZh, managingOrgLogoUrl,
     liveSubtitlesEnabled,
-    mahjongGameEnabled, mahjongGameLevel,
     acknowledgements,
     flowersJustStolen,
     clearFlowersStolen,
@@ -524,7 +491,6 @@ export const [AppProvider, useApp] = createContextHook(() => {
     setLanguage,
     setTermsAccepted, setPatient, clearPatient, setFontSizeLevel,
     setLiveSubtitlesEnabled,
-    setMahjongGameEnabled, setMahjongGameLevel,
     setTutorialCompleted, resetTutorial, t,
   ]);
 });

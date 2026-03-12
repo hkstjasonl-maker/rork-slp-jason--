@@ -511,8 +511,8 @@ function PlantedFlower({ flower, flowerType, row }: {
   const glowSize = imgSize * 1.3;
 
   const totalHeight = imgSize + stemHeight + 24;
-  const counterTilt = -42;
-  const liftOffset = -(imgSize * 0.55 + stemHeight * 0.3);
+  const flowerTilt = -42;
+  const liftOffset = -(imgSize * 0.35 + stemHeight * 0.15);
 
   return (
     <View style={{
@@ -520,8 +520,6 @@ function PlantedFlower({ flower, flowerType, row }: {
       width: imgSize + 14,
       height: totalHeight,
       transform: [
-        { perspective: 400 },
-        { rotateX: `${counterTilt}deg` },
         { translateY: liftOffset },
       ],
     }}>
@@ -538,7 +536,14 @@ function PlantedFlower({ flower, flowerType, row }: {
         position: 'absolute' as const,
         bottom: stemHeight,
         alignItems: 'center' as const,
-        transform: [{ rotate }, { translateY }, { translateX }, { scale: popAnim }],
+        transform: [
+          { perspective: 400 },
+          { rotateX: `${flowerTilt}deg` },
+          { rotate },
+          { translateY },
+          { translateX },
+          { scale: popAnim },
+        ],
         zIndex: 10,
       }}>
         <Image

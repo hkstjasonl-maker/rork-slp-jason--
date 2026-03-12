@@ -20,6 +20,7 @@ import * as MediaLibrary from 'expo-media-library';
 
 
 import { useApp } from '@/contexts/AppContext';
+import MiniMahjongGame from '@/components/MiniMahjongGame';
 import { ScaledText } from '@/components/ScaledText';
 import { YouTubePlayer } from '@/components/YouTubePlayer';
 import { VimeoPlayer } from '@/components/VimeoPlayer';
@@ -536,7 +537,7 @@ export default function ExerciseScreen() {
   }>();
   const router = useRouter();
   const queryClient = useQueryClient();
-  const { t, patientId, patientName, language, reinforcementAudioId, reinforcementAudioUrl, liveSubtitlesEnabled, refreshPatient: refreshPatientCtx, addToDrawQueue, currentDraw, dismissCurrentDraw } = useApp();
+  const { t, patientId, patientName, language, reinforcementAudioId, reinforcementAudioUrl, liveSubtitlesEnabled, mahjongGameEnabled, mahjongGameLevel, refreshPatient: refreshPatientCtx, addToDrawQueue, currentDraw, dismissCurrentDraw } = useApp();
 
   const allIds: string[] = useMemo(() => {
     if (params.allExerciseIds) {
@@ -581,6 +582,7 @@ export default function ExerciseScreen() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [lastRecordedUri, setLastRecordedUri] = useState<string | null>(null);
   const [submissionSuccess, setSubmissionSuccess] = useState(false);
+  const [showMahjongGame, setShowMahjongGame] = useState(false);
 
   const countdownFade = useRef(new Animated.Value(0)).current;
   const countdownScale = useRef(new Animated.Value(0.5)).current;
@@ -952,6 +954,22 @@ export default function ExerciseScreen() {
     setShowRestPrompt(false);
     setShowRestTimer(true);
   }, []);
+
+  const handleRestPromptMahjong = useCallback(() => {
+    setShowRestPrompt(false);
+    setShowMahjongGame(true);
+  }, []);
+
+  const handleMahjongClose = useCallback((starsEarned: number) => {
+    setShowMahjongGame(false);
+    if (starsEarned > 0) {
+      setToastType('success');
+      setToastMessage('🀄 +3 ⭐');
+    }
+    if (hasNext) {
+      setCurrentIdx((prev) => prev + 1);
+    }
+  }, [hasNext]);
 
   const handleRestPromptSkip = useCallback(() => {
     setShowRestPrompt(false);
@@ -1920,35 +1938,86 @@ export default function ExerciseScreen() {
                 <View style={styles.restPromptIcon}>
                   <Coffee size={28} color={Colors.primary} />
                 </View>
-                <ScaledText size={18} weight="700" color={Colors.textPrimary} style={styles.restPromptTitle}>
-                  {t('restBeforeNext')}
-                </ScaledText>
-                <View style={styles.restPromptActions}>
-                  <TouchableOpacity
-                    style={styles.restPromptRestBtn}
-                    onPress={handleRestPromptRest}
-                    activeOpacity={0.8}
-                    testID="rest-prompt-rest"
-                  >
-                    <ScaledText size={16} weight="700" color={Colors.white}>
-                      {t('rest')}
+                {mahjongGameEnabled ? (
+                  <>
+                    <ScaledText size={18} weight="700" color={Colors.textPrimary} style={styles.restPromptTitle}>
+                      {t('restOrPlay')}
                     </ScaledText>
-                  </TouchableOpacity>
-                  <TouchableOpacity
-                    style={styles.restPromptSkipBtn}
-                    onPress={handleRestPromptSkip}
-                    activeOpacity={0.7}
-                    testID="rest-prompt-skip"
-                  >
-                    <ScaledText size={15} weight="600" color={Colors.textSecondary}>
-                      {t('skip')}
+                    <View style={styles.restPromptActions}>
+                      <View style={styles.restPromptRow}>
+                        <TouchableOpacity
+                          style={styles.restPromptRestBtnHalf}
+                          onPress={handleRestPromptRest}
+                          activeOpacity={0.8}
+                          testID="rest-prompt-rest"
+                        >
+                          <ScaledText size={16} weight="700" color={Colors.white}>
+                            {`😴 ${t('restBtn')}`}
+                          </ScaledText>
+                        </TouchableOpacity>
+                        <TouchableOpacity
+                          style={styles.restPromptMahjongBtn}
+                          onPress={handleRestPromptMahjong}
+                          activeOpacity={0.8}
+                          testID="rest-prompt-mahjong"
+                        >
+                          <ScaledText size={16} weight="700" color={Colors.white}>
+                            {`🀄 ${t('miniMahjongBtn')}`}
+                          </ScaledText>
+                        </TouchableOpacity>
+                      </View>
+                      <TouchableOpacity
+                        style={styles.restPromptSkipBtn}
+                        onPress={handleRestPromptSkip}
+                        activeOpacity={0.7}
+                        testID="rest-prompt-skip"
+                      >
+                        <ScaledText size={15} weight="600" color={Colors.textSecondary}>
+                          {t('skip')}
+                        </ScaledText>
+                      </TouchableOpacity>
+                    </View>
+                  </>
+                ) : (
+                  <>
+                    <ScaledText size={18} weight="700" color={Colors.textPrimary} style={styles.restPromptTitle}>
+                      {t('restBeforeNext')}
                     </ScaledText>
-                  </TouchableOpacity>
-                </View>
+                    <View style={styles.restPromptActions}>
+                      <TouchableOpacity
+                        style={styles.restPromptRestBtn}
+                        onPress={handleRestPromptRest}
+                        activeOpacity={0.8}
+                        testID="rest-prompt-rest"
+                      >
+                        <ScaledText size={16} weight="700" color={Colors.white}>
+                          {t('rest')}
+                        </ScaledText>
+                      </TouchableOpacity>
+                      <TouchableOpacity
+                        style={styles.restPromptSkipBtn}
+                        onPress={handleRestPromptSkip}
+                        activeOpacity={0.7}
+                        testID="rest-prompt-skip"
+                      >
+                        <ScaledText size={15} weight="600" color={Colors.textSecondary}>
+                          {t('skip')}
+                        </ScaledText>
+                      </TouchableOpacity>
+                    </View>
+                  </>
+                )}
               </View>
             </View>
           </Modal>
         )}
+
+        <MiniMahjongGame
+          visible={showMahjongGame}
+          level={(mahjongGameLevel as 'basic' | 'moderate' | 'difficult') || 'basic'}
+          onClose={handleMahjongClose}
+          patientId={patientId || ''}
+        />
 
         {currentDraw && (
           <MarketingDrawModal
@@ -2395,6 +2464,24 @@ const styles = StyleSheet.create({
     paddingVertical: 14,
     borderRadius: 14,
     alignItems: 'center',
+  },
+  restPromptRow: {
+    flexDirection: 'row' as const,
+    gap: 10,
+  },
+  restPromptRestBtnHalf: {
+    flex: 1,
+    backgroundColor: Colors.primary,
+    paddingVertical: 14,
+    borderRadius: 14,
+    alignItems: 'center' as const,
+  },
+  restPromptMahjongBtn: {
+    flex: 1,
+    backgroundColor: '#2B6B35',
+    paddingVertical: 14,
+    borderRadius: 14,
+    alignItems: 'center' as const,
   },
   restPromptSkipBtn: {
     paddingVertical: 12,

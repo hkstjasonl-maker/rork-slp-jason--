@@ -33,6 +33,7 @@ interface MiniMahjongGameProps {
   level: GameLevel;
   onClose: (starsEarned: number) => void;
   patientId: string;
+  practiceMode?: boolean;
 }
 
 type Phase = 'rules' | 'game' | 'reveal';
@@ -92,7 +93,7 @@ function generateScatteredTiles(count: number): ScatteredTile[] {
   return tiles;
 }
 
-export default function MiniMahjongGame({ visible, level, onClose, patientId }: MiniMahjongGameProps) {
+export default function MiniMahjongGame({ visible, level, onClose, patientId, practiceMode = false }: MiniMahjongGameProps) {
   const { language } = useApp();
   const lang = language || 'en';
 
@@ -219,7 +220,7 @@ export default function MiniMahjongGame({ visible, level, onClose, patientId }: 
   }, [tapsDisabled, gameData, level, flipTile, resultBounceAnim, starsFloatAnim, starsOpacityAnim]);
 
   const handleClose = useCallback(async () => {
-    const starsEarned = result?.won ? 3 : 0;
+    const starsEarned = practiceMode ? 0 : (result?.won ? 3 : 0);
 
     try {
       await supabase.from('mahjong_game_log').insert({
@@ -233,7 +234,7 @@ export default function MiniMahjongGame({ visible, level, onClose, patientId }: 
       });
       log('[MiniMahjongGame] Game log saved');
 
-      if (result?.won) {
+      if (result?.won && !practiceMode) {
         await supabase.rpc('increment_stars', {
           p_patient_id: patientId,
           p_amount: 3,
@@ -262,7 +263,7 @@ export default function MiniMahjongGame({ visible, level, onClose, patientId }: 
     }
 
     onClose(starsEarned);
-  }, [result, gameData, pickedIndex, patientId, level, onClose]);
+  }, [result, gameData, pickedIndex, patientId, level, onClose, practiceMode]);
 
   const getLocalizedText = useCallback((texts: { en: string; zh_hant: string; zh_hans: string }) => {
     if (lang === 'zh_hant') return texts.zh_hant;
@@ -406,6 +407,13 @@ export default function MiniMahjongGame({ visible, level, onClose, patientId }: 
             {getLocalizedText(LEVEL_LABELS[level])}
           </Text>
         </View>
+        {practiceMode && (
+          <View style={styles.practiceBadge}>
+            <Text style={styles.practiceBadgeText}>
+              {getBilingualText('Practice', '練習', '练习')}
+            </Text>
+          </View>
+        )}
 
         <View style={styles.scatterArea}>
           {scatteredTiles.map((st, i) => (
@@ -484,6 +492,10 @@ export default function MiniMahjongGame({ visible, level, onClose, patientId }: 
       outputRange: [0, -60],
     });
 
+    const closeButtonLabel = practiceMode
+      ? getBilingualText('Back to Settings', '返回設定', '返回设置')
+      : getBilingualText('Back to Exercise', '返回練習', '返回练习');
+
     if (result.won) {
       return (
         <View style={styles.resultOverlay}>
@@ -495,17 +507,23 @@ export default function MiniMahjongGame({ visible, level, onClose, patientId }: 
           >
             {result.patternDisplay ? getLocalizedText(result.patternDisplay) : 'Win!'}
           </Animated.Text>
-          <Animated.Text
-            style={[
-              styles.starsText,
-              {
-                opacity: starsOpacityAnim,
-                transform: [{ translateY: floatY }],
-              },
-            ]}
-          >
-            +3 ⭐
-          </Animated.Text>
+          {practiceMode ? (
+            <Text style={styles.starsText}>
+              {getBilingualText('Great job!', '做得好！', '做得好！')}
+            </Text>
+          ) : (
+            <Animated.Text
+              style={[
+                styles.starsText,
+                {
+                  opacity: starsOpacityAnim,
+                  transform: [{ translateY: floatY }],
+                },
+              ]}
+            >
+              +3 ⭐
+            </Animated.Text>
+          )}
           <TouchableOpacity
             style={styles.closeButton}
             onPress={handleClose}
@@ -513,7 +531,7 @@ export default function MiniMahjongGame({ visible, level, onClose, patientId }: 
             testID="mahjong-close-button"
           >
             <Text style={styles.closeButtonText}>
-              {getBilingualText('Back to Exercise', '返回練習', '返回练习')}
+              {closeButtonLabel}
             </Text>
           </TouchableOpacity>
         </View>
@@ -536,7 +554,7 @@ export default function MiniMahjongGame({ visible, level, onClose, patientId }: 
           testID="mahjong-close-button"
         >
           <Text style={styles.closeButtonText}>
-            {getBilingualText('Back to Exercise', '返回練習', '返回练习')}
+            {closeButtonLabel}
           </Text>
         </TouchableOpacity>
       </View>
@@ -819,6 +837,23 @@ const styles = StyleSheet.create({
   closeButtonText: {
     color: '#FFFFFF',
     fontSize: 16,
+    fontWeight: '700' as const,
+  },
+  practiceBadge: {
+    position: 'absolute' as const,
+    top: 52,
+    right: 16,
+    backgroundColor: 'rgba(158,158,158,0.4)',
+    borderWidth: 1,
+    borderColor: 'rgba(200,200,200,0.5)',
+    borderRadius: 12,
+    paddingHorizontal: 12,
+    paddingVertical: 4,
+    zIndex: 10,
+  },
+  practiceBadgeText: {
+    color: '#E0E0E0',
+    fontSize: 12,
     fontWeight: '700' as const,
   },
 });

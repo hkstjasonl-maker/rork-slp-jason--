@@ -35,6 +35,8 @@ import {
   Dices,
 } from 'lucide-react-native';
 import { AppTutorial } from '@/components/AppTutorial';
+import MiniMahjongGame from '@/components/MiniMahjongGame';
+import { GameLevel } from '@/utils/mahjongGame';
 
 const FONT_SIZE_OPTIONS: { key: FontSizeLevel; labelKey: string }[] = [
   { key: 'small', labelKey: 'fontSmall' },
@@ -67,9 +69,11 @@ export default function SettingsScreen() {
     setMahjongGameEnabled,
     setMahjongGameLevel,
     acknowledgements,
+    patientId,
   } = useApp();
 
   const [showTutorial, setShowTutorial] = useState(false);
+  const [showMahjongGame, setShowMahjongGame] = useState(false);
   const router = useRouter();
 
   const handleSwitchProfile = useCallback(() => {
@@ -297,6 +301,19 @@ export default function SettingsScreen() {
                   <ScaledText size={12} color={Colors.textSecondary} style={{ marginTop: 8 }}>
                     {t(mahjongGameLevel === 'basic' ? 'mahjongBasicDesc' : mahjongGameLevel === 'moderate' ? 'mahjongModerateDesc' : 'mahjongDifficultDesc')}
                   </ScaledText>
+                  <TouchableOpacity
+                    style={styles.playNowButton}
+                    onPress={() => setShowMahjongGame(true)}
+                    activeOpacity={0.8}
+                    testID="mahjong-play-now"
+                  >
+                    <ScaledText size={16} weight="700" color="#FFFFFF">
+                      {'🀄 ' + t('playNow')}
+                    </ScaledText>
+                  </TouchableOpacity>
+                  <ScaledText size={11} color={Colors.textSecondary} style={{ marginTop: 6, textAlign: 'center' as const }}>
+                    {t('practiceModeDesc')}
+                  </ScaledText>
                 </View>
               )}
             </View>
@@ -487,6 +504,13 @@ export default function SettingsScreen() {
         visible={showTutorial}
         onComplete={() => setShowTutorial(false)}
       />
+      <MiniMahjongGame
+        visible={showMahjongGame}
+        level={(mahjongGameLevel || 'basic') as GameLevel}
+        onClose={() => setShowMahjongGame(false)}
+        patientId={patientId || ''}
+        practiceMode
+      />
     </View>
   );
 }
@@ -641,5 +665,13 @@ const styles = StyleSheet.create({
   segmentButtonActive: {
     backgroundColor: Colors.primary,
     borderColor: Colors.primary,
+  },
+  playNowButton: {
+    marginTop: 14,
+    backgroundColor: '#2B6B35',
+    borderRadius: 14,
+    paddingVertical: 14,
+    alignItems: 'center' as const,
+    justifyContent: 'center' as const,
   },
 });

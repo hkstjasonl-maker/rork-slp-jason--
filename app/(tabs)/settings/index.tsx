@@ -32,6 +32,7 @@ import {
   Accessibility,
   Shield,
   Trash2,
+  Gamepad2,
 } from 'lucide-react-native';
 import { AppTutorial } from '@/components/AppTutorial';
 
@@ -61,8 +62,18 @@ export default function SettingsScreen() {
     managingOrgLogoUrl,
     liveSubtitlesEnabled,
     setLiveSubtitlesEnabled,
+    mahjongGameEnabled,
+    mahjongGameLevel,
+    setMahjongGameEnabled,
+    setMahjongGameLevel,
     acknowledgements,
   } = useApp();
+
+  const MAHJONG_LEVELS = [
+    { key: 'basic', labelKey: 'mahjongBasic', descKey: 'mahjongBasicDesc' },
+    { key: 'moderate', labelKey: 'mahjongModerate', descKey: 'mahjongModerateDesc' },
+    { key: 'difficult', labelKey: 'mahjongDifficult', descKey: 'mahjongDifficultDesc' },
+  ] as const;
   const [showTutorial, setShowTutorial] = useState(false);
   const router = useRouter();
 
@@ -223,6 +234,70 @@ export default function SettingsScreen() {
               </View>
               <ChevronRight size={18} color={Colors.disabled} />
             </TouchableOpacity>
+          </View>
+
+          <View style={styles.section}>
+            <View style={styles.sectionHeader}>
+              <Gamepad2 size={18} color={Colors.primary} />
+              <ScaledText size={16} weight="600" color={Colors.textPrimary}>
+                {t('miniMahjong')}
+              </ScaledText>
+            </View>
+            <View style={styles.card}>
+              <View style={[styles.optionRow, mahjongGameEnabled && styles.optionBorder]}>
+                <View style={{ flex: 1, gap: 2 }}>
+                  <ScaledText size={15} color={Colors.textPrimary}>
+                    {t('enableMahjong')}
+                  </ScaledText>
+                </View>
+                <Switch
+                  value={mahjongGameEnabled}
+                  onValueChange={(val) => void setMahjongGameEnabled(val)}
+                  trackColor={{ false: Colors.border, true: Colors.primary }}
+                  thumbColor="#fff"
+                />
+              </View>
+              {mahjongGameEnabled && (
+                <View style={styles.mahjongLevelSection}>
+                  <ScaledText size={13} weight="600" color={Colors.textSecondary} style={{ paddingHorizontal: 18, paddingTop: 12, paddingBottom: 8 }}>
+                    {t('mahjongLevel')}
+                  </ScaledText>
+                  <View style={styles.segmentedControl}>
+                    {MAHJONG_LEVELS.map((level) => (
+                      <TouchableOpacity
+                        key={level.key}
+                        style={[
+                          styles.segmentButton,
+                          mahjongGameLevel === level.key && styles.segmentButtonActive,
+                        ]}
+                        onPress={() => void setMahjongGameLevel(level.key)}
+                        activeOpacity={0.7}
+                      >
+                        <ScaledText
+                          size={13}
+                          weight={mahjongGameLevel === level.key ? 'bold' : '500'}
+                          color={mahjongGameLevel === level.key ? '#fff' : Colors.textPrimary}
+                        >
+                          {t(level.labelKey)}
+                        </ScaledText>
+                      </TouchableOpacity>
+                    ))}
+                  </View>
+                  {MAHJONG_LEVELS.map((level) =>
+                    mahjongGameLevel === level.key ? (
+                      <ScaledText
+                        key={level.key}
+                        size={12}
+                        color={Colors.textSecondary}
+                        style={{ paddingHorizontal: 18, paddingTop: 8, paddingBottom: 14 }}
+                      >
+                        {t(level.descKey)}
+                      </ScaledText>
+                    ) : null
+                  )}
+                </View>
+              )}
+            </View>
           </View>
 
           <View style={styles.section}>
@@ -558,5 +633,25 @@ const styles = StyleSheet.create({
     paddingVertical: 13,
     paddingHorizontal: 18,
     gap: 2,
+  },
+  mahjongLevelSection: {
+    borderTopWidth: 0,
+  },
+  segmentedControl: {
+    flexDirection: 'row' as const,
+    marginHorizontal: 18,
+    borderRadius: 10,
+    backgroundColor: Colors.border,
+    padding: 3,
+    gap: 2,
+  },
+  segmentButton: {
+    flex: 1,
+    paddingVertical: 8,
+    alignItems: 'center' as const,
+    borderRadius: 8,
+  },
+  segmentButtonActive: {
+    backgroundColor: Colors.primary,
   },
 });

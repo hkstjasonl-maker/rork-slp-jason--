@@ -219,12 +219,16 @@ function AtmosphericHaze() {
   return (
     <>
       <View style={{
-        position: 'absolute' as const, top: GARDEN_HEIGHT * 0.18, left: 0, right: 0,
-        height: GARDEN_HEIGHT * 0.12, backgroundColor: 'rgba(200,230,200,0.15)', zIndex: 2,
+        position: 'absolute' as const, top: GARDEN_HEIGHT * 0.10, left: 0, right: 0,
+        height: GARDEN_HEIGHT * 0.18, backgroundColor: 'rgba(190,225,195,0.35)', zIndex: 2,
       }} />
       <View style={{
-        position: 'absolute' as const, top: GARDEN_HEIGHT * 0.25, left: 0, right: 0,
-        height: GARDEN_HEIGHT * 0.08, backgroundColor: 'rgba(220,237,200,0.1)', zIndex: 2,
+        position: 'absolute' as const, top: GARDEN_HEIGHT * 0.16, left: 0, right: 0,
+        height: GARDEN_HEIGHT * 0.14, backgroundColor: 'rgba(200,230,200,0.28)', zIndex: 2,
+      }} />
+      <View style={{
+        position: 'absolute' as const, top: GARDEN_HEIGHT * 0.22, left: 0, right: 0,
+        height: GARDEN_HEIGHT * 0.10, backgroundColor: 'rgba(215,235,205,0.22)', zIndex: 2,
       }} />
       <View style={{
         position: 'absolute' as const, bottom: 0, left: 0, right: 0,
@@ -269,40 +273,45 @@ function SunWithFace() {
   const rays = [0, 30, 60, 90, 120, 150];
 
   return (
-    <View style={{ position: 'absolute' as const, top: 10, right: 30, width: 44, height: 44, zIndex: 4, opacity: 0.7 }}>
+    <View style={{ position: 'absolute' as const, top: 8, right: 28, width: 52, height: 52, zIndex: 4 }}>
       <Animated.View style={{
-        position: 'absolute' as const, top: -58, left: -58, width: 160, height: 160,
+        position: 'absolute' as const, top: -74, left: -74, width: 200, height: 200,
         alignItems: 'center' as const, justifyContent: 'center' as const,
         transform: [{ rotate: rayRotate }],
       }}>
         {rays.map((angle) => (
           <View key={angle} style={{
-            position: 'absolute' as const, width: 2.5, height: 130, borderRadius: 1.25,
-            backgroundColor: 'rgba(255,245,200,0.1)', transform: [{ rotate: `${angle}deg` }],
+            position: 'absolute' as const, width: 3, height: 160, borderRadius: 1.5,
+            backgroundColor: 'rgba(255,240,180,0.18)', transform: [{ rotate: `${angle}deg` }],
           }} />
         ))}
       </Animated.View>
       <Animated.View style={{
-        position: 'absolute' as const, top: -18, left: -18, width: 80, height: 80, borderRadius: 40,
-        backgroundColor: 'rgba(255,248,225,0.18)', transform: [{ scale: glowScale }],
+        position: 'absolute' as const, top: -34, left: -34, width: 120, height: 120, borderRadius: 60,
+        backgroundColor: 'rgba(255,248,200,0.25)', transform: [{ scale: glowScale }],
+      }} />
+      <Animated.View style={{
+        position: 'absolute' as const, top: -14, left: -14, width: 80, height: 80, borderRadius: 40,
+        backgroundColor: 'rgba(255,245,180,0.15)', transform: [{ scale: glowScale }],
       }} />
       <View style={{
-        width: 36, height: 36, borderRadius: 18, backgroundColor: '#FFF9C4',
+        width: 44, height: 44, borderRadius: 22, backgroundColor: '#FFEE58',
         position: 'absolute' as const, top: 4, left: 4,
         alignItems: 'center' as const, justifyContent: 'center' as const,
-        shadowColor: '#FFE082', shadowOffset: { width: 0, height: 0 }, shadowOpacity: 0.6, shadowRadius: 8,
+        shadowColor: '#FFD54F', shadowOffset: { width: 0, height: 0 }, shadowOpacity: 0.9, shadowRadius: 14,
+        borderWidth: 2, borderColor: '#FFF176',
       }}>
-        <View style={{ flexDirection: 'row' as const, gap: 7, marginTop: -3 }}>
-          <Animated.View style={{ width: 3.5, height: 3.5, borderRadius: 1.75, backgroundColor: '#A1887F', transform: [{ scaleY: blinkAnim }] }} />
-          <Animated.View style={{ width: 3.5, height: 3.5, borderRadius: 1.75, backgroundColor: '#A1887F', transform: [{ scaleY: blinkAnim }] }} />
+        <View style={{ flexDirection: 'row' as const, gap: 9, marginTop: -3 }}>
+          <Animated.View style={{ width: 4, height: 4, borderRadius: 2, backgroundColor: '#795548', transform: [{ scaleY: blinkAnim }] }} />
+          <Animated.View style={{ width: 4, height: 4, borderRadius: 2, backgroundColor: '#795548', transform: [{ scaleY: blinkAnim }] }} />
         </View>
-        <View style={{ flexDirection: 'row' as const, gap: 12, marginTop: 1 }}>
-          <View style={{ width: 6, height: 3.5, borderRadius: 2, backgroundColor: 'rgba(255,171,145,0.25)' }} />
-          <View style={{ width: 6, height: 3.5, borderRadius: 2, backgroundColor: 'rgba(255,171,145,0.25)' }} />
+        <View style={{ flexDirection: 'row' as const, gap: 14, marginTop: 2 }}>
+          <View style={{ width: 7, height: 4, borderRadius: 2, backgroundColor: 'rgba(255,138,101,0.4)' }} />
+          <View style={{ width: 7, height: 4, borderRadius: 2, backgroundColor: 'rgba(255,138,101,0.4)' }} />
         </View>
         <View style={{
-          width: 10, height: 5, borderBottomLeftRadius: 5, borderBottomRightRadius: 5,
-          borderWidth: 1.2, borderTopWidth: 0, borderColor: '#A1887F', backgroundColor: 'transparent', marginTop: 0.5,
+          width: 12, height: 6, borderBottomLeftRadius: 6, borderBottomRightRadius: 6,
+          borderWidth: 1.5, borderTopWidth: 0, borderColor: '#795548', backgroundColor: 'transparent', marginTop: 1,
         }} />
       </View>
     </View>
@@ -492,29 +501,31 @@ function PlantedFlower({ flower, flowerType, row }: {
   const translateX = swayAnim.interpolate({ inputRange: [-1, 0, 1], outputRange: [-1.5, 0, 1.5] });
 
   const rowFrac = row / (GRID_ROWS - 1);
-  const imgSize = 44 + rowFrac * 16;
-  const stemHeight = 8 + rowFrac * 6;
-  const stemWidth = 2 + rowFrac * 0.5;
-  const shadowWidth = imgSize * 0.8;
-  const shadowOpacity = 0.18 + rowFrac * 0.12;
+  const imgSize = 52 + rowFrac * 18;
+  const stemHeight = 14 + rowFrac * 10;
+  const stemWidth = 2.5 + rowFrac * 0.8;
+  const shadowWidth = imgSize * 0.7;
+  const shadowOpacity = 0.15 + rowFrac * 0.12;
   const rarity = flowerType.rarity || 'common';
   const rarityInfo = RARITY_COLORS[rarity] || RARITY_COLORS.common;
   const glowSize = imgSize * 1.3;
 
+  const totalHeight = imgSize + stemHeight + 16;
+
   return (
-    <View style={{ alignItems: 'center' as const, width: imgSize + 10, height: imgSize + stemHeight + 10 }}>
+    <View style={{ alignItems: 'center' as const, width: imgSize + 14, height: totalHeight }}>
       <View style={{
         position: 'absolute' as const,
-        bottom: stemHeight + 2,
+        bottom: stemHeight + 6,
         width: glowSize,
-        height: glowSize,
+        height: glowSize * 0.6,
         borderRadius: glowSize / 2,
-        backgroundColor: rarityInfo.glow + '15',
+        backgroundColor: rarityInfo.glow + '18',
         alignSelf: 'center' as const,
       }} />
       <Animated.View style={{
         position: 'absolute' as const,
-        bottom: stemHeight - 2,
+        bottom: stemHeight,
         alignItems: 'center' as const,
         transform: [{ rotate }, { translateY }, { translateX }, { scale: popAnim }],
         zIndex: 10,
@@ -525,16 +536,16 @@ function PlantedFlower({ flower, flowerType, row }: {
             width: imgSize,
             height: imgSize,
             shadowColor: '#000',
-            shadowOffset: { width: 0, height: 3 },
-            shadowOpacity: 0.2,
-            shadowRadius: 4,
+            shadowOffset: { width: 0, height: 4 },
+            shadowOpacity: 0.25,
+            shadowRadius: 5,
           }}
           resizeMode="contain"
         />
       </Animated.View>
       <View style={{
         position: 'absolute' as const,
-        bottom: 0,
+        bottom: 2,
         width: stemWidth,
         height: stemHeight,
         backgroundColor: '#5D8A3C',
@@ -547,13 +558,24 @@ function PlantedFlower({ flower, flowerType, row }: {
       }} />
       <View style={{
         position: 'absolute' as const,
-        bottom: stemHeight * 0.4,
-        left: (imgSize + 10) / 2 + stemWidth / 2 - 1,
-        width: 5 + rowFrac * 2,
-        height: 3 + rowFrac,
+        bottom: 2 + stemHeight * 0.45,
+        left: (imgSize + 14) / 2 + stemWidth / 2 - 1,
+        width: 6 + rowFrac * 2,
+        height: 3.5 + rowFrac,
         borderRadius: 3,
         backgroundColor: '#6B9E4A',
         transform: [{ rotate: '30deg' }, { scaleY: 0.7 }],
+        zIndex: 9,
+      }} />
+      <View style={{
+        position: 'absolute' as const,
+        bottom: 0,
+        left: (imgSize + 14) / 2 - stemWidth,
+        width: 6 + rowFrac * 1.5,
+        height: 3 + rowFrac * 0.8,
+        borderRadius: 3,
+        backgroundColor: '#5A9240',
+        transform: [{ rotate: '-35deg' }, { scaleY: 0.7 }],
         zIndex: 9,
       }} />
       <View style={{
@@ -563,7 +585,7 @@ function PlantedFlower({ flower, flowerType, row }: {
         height: 5,
         borderRadius: shadowWidth / 2,
         backgroundColor: `rgba(40,25,10,${shadowOpacity})`,
-        transform: [{ scaleX: 1.3 }, { scaleY: 0.6 }],
+        transform: [{ scaleX: 1.4 }, { scaleY: 0.5 }],
         zIndex: 8,
       }} />
     </View>
@@ -780,25 +802,29 @@ function GardenScene({ flowers, flowerTypeMap, onFlowerPress }: {
   return (
     <View style={gardenStyles.container}>
       <View style={[StyleSheet.absoluteFill, { backgroundColor: '#3E6B2E' }]} />
-      <View style={{ position: 'absolute' as const, top: 0, left: 0, right: 0, height: '68%', backgroundColor: '#4A7A38' }} />
-      <View style={{ position: 'absolute' as const, top: 0, left: 0, right: 0, height: '58%', backgroundColor: '#5A8B48' }} />
-      <View style={{ position: 'absolute' as const, top: 0, left: 0, right: 0, height: '50%', backgroundColor: '#6B9C58' }} />
-      <View style={{ position: 'absolute' as const, top: 0, left: 0, right: 0, height: '43%', backgroundColor: '#7DAD6A' }} />
-      <View style={{ position: 'absolute' as const, top: 0, left: 0, right: 0, height: '37%', backgroundColor: '#8FBE7C' }} />
-      <View style={{ position: 'absolute' as const, top: 0, left: 0, right: 0, height: '32%', backgroundColor: '#9ECA8C' }} />
-      <View style={{ position: 'absolute' as const, top: 0, left: 0, right: 0, height: '28%', backgroundColor: '#ACD59C' }} />
-      <View style={{ position: 'absolute' as const, top: 0, left: 0, right: 0, height: '24%', backgroundColor: '#B8DCAA' }} />
-      <View style={{ position: 'absolute' as const, top: 0, left: 0, right: 0, height: '21%', backgroundColor: '#C2E0B6' }} />
-      <View style={{ position: 'absolute' as const, top: 0, left: 0, right: 0, height: '18%', backgroundColor: '#CAE2C0' }} />
-      <View style={{ position: 'absolute' as const, top: 0, left: 0, right: 0, height: '15.5%', backgroundColor: '#CFDFC8' }} />
-      <View style={{ position: 'absolute' as const, top: 0, left: 0, right: 0, height: '13%', backgroundColor: '#D2DCD0' }} />
-      <View style={{ position: 'absolute' as const, top: 0, left: 0, right: 0, height: '11%', backgroundColor: '#D0DAD6' }} />
-      <View style={{ position: 'absolute' as const, top: 0, left: 0, right: 0, height: '9%', backgroundColor: '#CBDADC' }} />
-      <View style={{ position: 'absolute' as const, top: 0, left: 0, right: 0, height: '7.5%', backgroundColor: '#C2D6E0' }} />
-      <View style={{ position: 'absolute' as const, top: 0, left: 0, right: 0, height: '6%', backgroundColor: '#B8D0E2' }} />
-      <View style={{ position: 'absolute' as const, top: 0, left: 0, right: 0, height: '4.5%', backgroundColor: '#AECAE4' }} />
-      <View style={{ position: 'absolute' as const, top: 0, left: 0, right: 0, height: '3%', backgroundColor: '#A4C4E4' }} />
-      <View style={{ position: 'absolute' as const, top: 0, left: 0, right: 0, height: '1.5%', backgroundColor: '#9ABFE4' }} />
+      <View style={{ position: 'absolute' as const, top: 0, left: 0, right: 0, height: '72%', backgroundColor: '#4A7A38' }} />
+      <View style={{ position: 'absolute' as const, top: 0, left: 0, right: 0, height: '64%', backgroundColor: '#5A8B48' }} />
+      <View style={{ position: 'absolute' as const, top: 0, left: 0, right: 0, height: '56%', backgroundColor: '#6B9C58' }} />
+      <View style={{ position: 'absolute' as const, top: 0, left: 0, right: 0, height: '49%', backgroundColor: '#7DAD6A' }} />
+      <View style={{ position: 'absolute' as const, top: 0, left: 0, right: 0, height: '43%', backgroundColor: '#8BBD78' }} />
+      <View style={{ position: 'absolute' as const, top: 0, left: 0, right: 0, height: '38%', backgroundColor: '#9AC888' }} />
+      <View style={{ position: 'absolute' as const, top: 0, left: 0, right: 0, height: '34%', backgroundColor: '#A6D096' }} />
+      <View style={{ position: 'absolute' as const, top: 0, left: 0, right: 0, height: '30%', backgroundColor: '#B0D6A2' }} />
+      <View style={{ position: 'absolute' as const, top: 0, left: 0, right: 0, height: '27%', backgroundColor: '#BADCAE' }} />
+      <View style={{ position: 'absolute' as const, top: 0, left: 0, right: 0, height: '24%', backgroundColor: '#C2DEB6' }} />
+      <View style={{ position: 'absolute' as const, top: 0, left: 0, right: 0, height: '21.5%', backgroundColor: '#CADEBE' }} />
+      <View style={{ position: 'absolute' as const, top: 0, left: 0, right: 0, height: '19%', backgroundColor: '#CFDEC4' }} />
+      <View style={{ position: 'absolute' as const, top: 0, left: 0, right: 0, height: '17%', backgroundColor: '#D2DCCA' }} />
+      <View style={{ position: 'absolute' as const, top: 0, left: 0, right: 0, height: '15%', backgroundColor: '#D2DCD0' }} />
+      <View style={{ position: 'absolute' as const, top: 0, left: 0, right: 0, height: '13%', backgroundColor: '#CFDCD4' }} />
+      <View style={{ position: 'absolute' as const, top: 0, left: 0, right: 0, height: '11%', backgroundColor: '#CBDADB' }} />
+      <View style={{ position: 'absolute' as const, top: 0, left: 0, right: 0, height: '9.5%', backgroundColor: '#C4D6DE' }} />
+      <View style={{ position: 'absolute' as const, top: 0, left: 0, right: 0, height: '8%', backgroundColor: '#BCD2E2' }} />
+      <View style={{ position: 'absolute' as const, top: 0, left: 0, right: 0, height: '6.5%', backgroundColor: '#B4CCE4' }} />
+      <View style={{ position: 'absolute' as const, top: 0, left: 0, right: 0, height: '5%', backgroundColor: '#ACC6E4' }} />
+      <View style={{ position: 'absolute' as const, top: 0, left: 0, right: 0, height: '3.5%', backgroundColor: '#A4C0E4' }} />
+      <View style={{ position: 'absolute' as const, top: 0, left: 0, right: 0, height: '2%', backgroundColor: '#9CBBE4' }} />
+      <View style={{ position: 'absolute' as const, top: 0, left: 0, right: 0, height: '1%', backgroundColor: '#94B6E4' }} />
 
       <View style={gardenStyles.grassTexture1} />
       <View style={gardenStyles.grassTexture2} />

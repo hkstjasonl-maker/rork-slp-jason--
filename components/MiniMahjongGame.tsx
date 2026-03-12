@@ -8,6 +8,7 @@ import {
   Image,
   Animated,
   Dimensions,
+  Platform,
 } from 'react-native';
 import * as Haptics from 'expo-haptics';
 import { Eye } from 'lucide-react-native';
@@ -22,6 +23,7 @@ import {
   getSuit,
   getNumber,
   isNumberTile,
+  ALL_TILES,
   GameLevel,
   TileId,
   GameResult,
@@ -91,6 +93,34 @@ function generateScatteredTiles(count: number, areaW: number, areaH: number): Sc
   return tiles;
 }
 
+const BACK_IMAGE_URI = getBackImageUrl();
+const backImageSource = { uri: BACK_IMAGE_URI };
+
+const ScatteredTilesLayer = React.memo(function ScatteredTilesLayer({ tiles }: { tiles: ScatteredTile[] }) {
+  return (
+    <View style={styles.bgScatterLayer} pointerEvents="none">
+      {tiles.map((st, i) => (
+        <Image
+          key={`bg-${i}`}
+          source={backImageSource}
+          style={[
+            styles.bgScatteredTile,
+            {
+              left: st.x,
+              top: st.y,
+              transform: [
+                { rotate: `${st.rotation}deg` },
+                { scale: st.scale },
+              ],
+            },
+          ]}
+          resizeMode="contain"
+        />
+      ))}
+    </View>
+  );
+});
+
 export default function MiniMahjongGame({ visible, level, onClose, patientId, practiceMode = false }: MiniMahjongGameProps) {
   const { language } = useApp();
   const lang = language || 'en';
@@ -136,6 +166,14 @@ export default function MiniMahjongGame({ visible, level, onClose, patientId, pr
       resultBounceAnimRef.current.setValue(0);
       starsFloatAnimRef.current.setValue(0);
       starsOpacityAnimRef.current.setValue(0);
+
+      const backUrl = getBackImageUrl();
+      if (Platform.OS !== 'web') {
+        Image.prefetch(backUrl).catch(() => {});
+        ALL_TILES.slice(0, 15).forEach(t => {
+          Image.prefetch(getTileImageUrl(t)).catch(() => {});
+        });
+      }
     }
   }, [visible]);
 
@@ -157,6 +195,11 @@ export default function MiniMahjongGame({ visible, level, onClose, patientId, pr
     setGameData(data);
     setPhase('game');
     log('[MiniMahjongGame] Game started, level:', level);
+
+    if (Platform.OS !== 'web') {
+      data.hand.forEach(t => Image.prefetch(getTileImageUrl(t)).catch(() => {}));
+      data.choices.forEach(t => Image.prefetch(getTileImageUrl(t)).catch(() => {}));
+    }
   }, [level]);
 
   const flipTile = useCallback((index: number): Promise<void> => {
@@ -399,7 +442,7 @@ export default function MiniMahjongGame({ visible, level, onClose, patientId, pr
             testID={`mahjong-choice-${index}`}
           >
             <Image
-              source={{ uri: isRevealed ? getTileImageUrl(tileId) : getBackImageUrl() }}
+              source={isRevealed ? { uri: getTileImageUrl(tileId) } : backImageSource}
               style={isRevealed && isRevealPhase ? styles.choiceTileImageRevealed : styles.choiceTileImage}
               resizeMode="contain"
             />
@@ -447,26 +490,7 @@ export default function MiniMahjongGame({ visible, level, onClose, patientId, pr
           </View>
         )}
 
-        <View style={styles.bgScatterLayer} pointerEvents="none">
-          {bgScatteredTiles.map((st, i) => (
-            <Image
-              key={`bg-${i}`}
-              source={{ uri: getBackImageUrl() }}
-              style={[
-                styles.bgScatteredTile,
-                {
-                  left: st.x,
-                  top: st.y,
-                  transform: [
-                    { rotate: `${st.rotation}deg` },
-                    { scale: st.scale },
-                  ],
-                },
-              ]}
-              resizeMode="contain"
-            />
-          ))}
-        </View>
+        <ScatteredTilesLayer tiles={bgScatteredTiles} />
 
         <View style={styles.centerArea}>
           <Text style={styles.pickText}>

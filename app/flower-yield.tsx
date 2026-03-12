@@ -139,7 +139,7 @@ for (let i = 0; i < TOTAL_SLOTS; i++) {
   CELL_GRASS.push(grasses);
 }
 
-function Mountains() {
+const Mountains = React.memo(function Mountains() {
   const mountainTop = GARDEN_HEIGHT * 0.42;
   return (
     <>
@@ -186,9 +186,9 @@ function Mountains() {
       })}
     </>
   );
-}
+});
 
-function RollingHills() {
+const RollingHills = React.memo(function RollingHills() {
   return (
     <>
       <View style={{
@@ -213,9 +213,9 @@ function RollingHills() {
       }} />
     </>
   );
-}
+});
 
-function AtmosphericHaze() {
+const AtmosphericHaze = React.memo(function AtmosphericHaze() {
   return (
     <>
       <View style={{
@@ -236,7 +236,7 @@ function AtmosphericHaze() {
       }} />
     </>
   );
-}
+});
 
 function SunWithFace() {
   const glowScale = useRef(new Animated.Value(1)).current;
@@ -443,7 +443,7 @@ function BirdsLayer() {
   return <>{BIRD_DATA.map((b, i) => <BirdGroup key={i} data={b} />)}</>;
 }
 
-function TreesAndGrassDecor() {
+const TreesAndGrassDecor = React.memo(function TreesAndGrassDecor() {
   return (
     <>
       {TREE_DATA.map((t, i) => (
@@ -458,7 +458,7 @@ function TreesAndGrassDecor() {
       ))}
     </>
   );
-}
+});
 
 function PlantedFlower({ flower, flowerType, row }: {
   flower: PatientFlower;
@@ -782,7 +782,7 @@ function GoldenSparkles() {
   );
 }
 
-function FenceRow() {
+const FenceRow = React.memo(function FenceRow() {
   const postCount = 18;
   const spacing = SCREEN_WIDTH / (postCount + 1);
   return (
@@ -808,9 +808,9 @@ function FenceRow() {
       })}
     </View>
   );
-}
+});
 
-function GardenScene({ flowers, flowerTypeMap, onFlowerPress }: {
+const MemoGardenScene = React.memo(function GardenScene({ flowers, flowerTypeMap, onFlowerPress }: {
   flowers: PatientFlower[];
   flowerTypeMap: Record<string, FlowerType>;
   onFlowerPress: (f: PatientFlower) => void;
@@ -818,28 +818,12 @@ function GardenScene({ flowers, flowerTypeMap, onFlowerPress }: {
   return (
     <View style={gardenStyles.container}>
       <View style={[StyleSheet.absoluteFill, { backgroundColor: '#3E6B2E' }]} />
-      <View style={{ position: 'absolute' as const, top: 0, left: 0, right: 0, height: '72%', backgroundColor: '#4A7A38' }} />
       <View style={{ position: 'absolute' as const, top: 0, left: 0, right: 0, height: '64%', backgroundColor: '#5A8B48' }} />
-      <View style={{ position: 'absolute' as const, top: 0, left: 0, right: 0, height: '56%', backgroundColor: '#6B9C58' }} />
-      <View style={{ position: 'absolute' as const, top: 0, left: 0, right: 0, height: '49%', backgroundColor: '#7DAD6A' }} />
       <View style={{ position: 'absolute' as const, top: 0, left: 0, right: 0, height: '43%', backgroundColor: '#8BBD78' }} />
-      <View style={{ position: 'absolute' as const, top: 0, left: 0, right: 0, height: '38%', backgroundColor: '#9AC888' }} />
-      <View style={{ position: 'absolute' as const, top: 0, left: 0, right: 0, height: '34%', backgroundColor: '#A6D096' }} />
       <View style={{ position: 'absolute' as const, top: 0, left: 0, right: 0, height: '30%', backgroundColor: '#B0D6A2' }} />
-      <View style={{ position: 'absolute' as const, top: 0, left: 0, right: 0, height: '27%', backgroundColor: '#BADCAE' }} />
-      <View style={{ position: 'absolute' as const, top: 0, left: 0, right: 0, height: '24%', backgroundColor: '#C2DEB6' }} />
-      <View style={{ position: 'absolute' as const, top: 0, left: 0, right: 0, height: '21.5%', backgroundColor: '#CADEBE' }} />
       <View style={{ position: 'absolute' as const, top: 0, left: 0, right: 0, height: '19%', backgroundColor: '#CFDEC4' }} />
-      <View style={{ position: 'absolute' as const, top: 0, left: 0, right: 0, height: '17%', backgroundColor: '#D2DCCA' }} />
-      <View style={{ position: 'absolute' as const, top: 0, left: 0, right: 0, height: '15%', backgroundColor: '#D2DCD0' }} />
-      <View style={{ position: 'absolute' as const, top: 0, left: 0, right: 0, height: '13%', backgroundColor: '#CFDCD4' }} />
       <View style={{ position: 'absolute' as const, top: 0, left: 0, right: 0, height: '11%', backgroundColor: '#CBDADB' }} />
-      <View style={{ position: 'absolute' as const, top: 0, left: 0, right: 0, height: '9.5%', backgroundColor: '#C4D6DE' }} />
-      <View style={{ position: 'absolute' as const, top: 0, left: 0, right: 0, height: '8%', backgroundColor: '#BCD2E2' }} />
-      <View style={{ position: 'absolute' as const, top: 0, left: 0, right: 0, height: '6.5%', backgroundColor: '#B4CCE4' }} />
       <View style={{ position: 'absolute' as const, top: 0, left: 0, right: 0, height: '5%', backgroundColor: '#ACC6E4' }} />
-      <View style={{ position: 'absolute' as const, top: 0, left: 0, right: 0, height: '3.5%', backgroundColor: '#A4C0E4' }} />
-      <View style={{ position: 'absolute' as const, top: 0, left: 0, right: 0, height: '2%', backgroundColor: '#9CBBE4' }} />
       <View style={{ position: 'absolute' as const, top: 0, left: 0, right: 0, height: '1%', backgroundColor: '#94B6E4' }} />
 
       <View style={gardenStyles.grassTexture1} />
@@ -859,7 +843,7 @@ function GardenScene({ flowers, flowerTypeMap, onFlowerPress }: {
       <FenceRow />
     </View>
   );
-}
+});
 
 function CollectionCard({ group, index, isZh, expanded, onToggleExpand }: {
   group: GroupedFlower;
@@ -975,7 +959,7 @@ export default function FlowerYieldScreen() {
       return data || { consecutive_inactive_days: 0, stars_available: 0, fires_available: 0 };
     },
     enabled: !!patientId,
-    staleTime: 5 * 1000,
+    staleTime: 30 * 1000,
   });
 
   const flowersQuery = useQuery({
@@ -992,7 +976,7 @@ export default function FlowerYieldScreen() {
       return (data || []) as PatientFlower[];
     },
     enabled: !!patientId,
-    staleTime: 5 * 1000,
+    staleTime: 30 * 1000,
   });
 
   const flowerTypesQuery = useQuery({
@@ -1005,6 +989,17 @@ export default function FlowerYieldScreen() {
     },
     staleTime: 10 * 60 * 1000,
   });
+
+  useEffect(() => {
+    if (Platform.OS !== 'web' && flowersQuery.data) {
+      const urls = new Set<string>();
+      flowersQuery.data.forEach(f => {
+        const ft = f.flower_types;
+        if (ft?.image_url) urls.add(ft.image_url);
+      });
+      urls.forEach(url => Image.prefetch(url).catch(() => {}));
+    }
+  }, [flowersQuery.data]);
 
   const flowerTypeMap = useMemo(() => {
     const map: Record<string, FlowerType> = {};
@@ -1093,7 +1088,7 @@ export default function FlowerYieldScreen() {
             </View>
           ) : (
             <>
-              <GardenScene flowers={flowers} flowerTypeMap={flowerTypeMap} onFlowerPress={handleFlowerPress} />
+              <MemoGardenScene flowers={flowers} flowerTypeMap={flowerTypeMap} onFlowerPress={handleFlowerPress} />
 
               {flowers.length === 0 && (
                 <View style={styles.emptyHint}>

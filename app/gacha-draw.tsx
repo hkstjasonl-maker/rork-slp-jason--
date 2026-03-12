@@ -97,8 +97,14 @@ function weightedRandomPick(flowers: FlowerType[]): FlowerType {
 }
 
 const GACHA_MACHINE_URL = 'https://pfgtnrlgetomfmrzbxgb.supabase.co/storage/v1/object/public/flowers/gacha-machine.png';
+const gachaMachineSource = { uri: GACHA_MACHINE_URL };
 
-function CapsuleMachine({ shakeAnim }: { shakeAnim: Animated.Value }) {
+const capsuleSources: Record<string, { uri: string }> = {};
+for (const key of Object.keys(RARITY_CAPSULE_IMAGES)) {
+  capsuleSources[key] = { uri: RARITY_CAPSULE_IMAGES[key] };
+}
+
+const CapsuleMachine = React.memo(function CapsuleMachine({ shakeAnim }: { shakeAnim: Animated.Value }) {
   const machineShake = shakeAnim.interpolate({
     inputRange: [-1, 0, 1],
     outputRange: ['-2deg', '0deg', '2deg'],
@@ -107,14 +113,16 @@ function CapsuleMachine({ shakeAnim }: { shakeAnim: Animated.Value }) {
   return (
     <Animated.View style={[styles.machineContainer, { transform: [{ rotate: machineShake }] }]}>
       <Image
-        source={{ uri: GACHA_MACHINE_URL }}
-        style={{ width: '100%', height: undefined, aspectRatio: 0.65 }}
+        source={gachaMachineSource}
+        style={machineImageStyle}
         resizeMode="contain"
         onError={() => log('[GachaDraw] Failed to load gacha machine image')}
       />
     </Animated.View>
   );
-}
+});
+
+const machineImageStyle = { width: '100%' as const, height: undefined, aspectRatio: 0.65 };
 
 function CapsuleBall({
   rarity,
@@ -129,7 +137,7 @@ function CapsuleBall({
 }) {
   if (!visible) return null;
 
-  const imageUrl = RARITY_CAPSULE_IMAGES[rarity] || RARITY_CAPSULE_IMAGES.common;
+  const imageSource = capsuleSources[rarity] || capsuleSources.common;
 
   const translateY = dropAnim.interpolate({
     inputRange: [0, 1],
@@ -154,7 +162,7 @@ function CapsuleBall({
       ]}
     >
       <Animated.Image
-        source={{ uri: imageUrl }}
+        source={imageSource}
         style={{
           width: 56,
           height: 56,
@@ -518,6 +526,15 @@ export default function GachaDrawScreen() {
 
   const isZh = language === 'zh_hant' || language === 'zh_hans';
 
+  useEffect(() => {
+    if (Platform.OS !== 'web') {
+      Image.prefetch(GACHA_MACHINE_URL).catch(() => {});
+      Object.values(RARITY_CAPSULE_IMAGES).forEach(url => {
+        Image.prefetch(url).catch(() => {});
+      });
+    }
+  }, []);
+
   const [drawPhase, setDrawPhase] = useState<DrawPhase>('idle');
   const [currentFlower, setCurrentFlower] = useState<FlowerType | null>(null);
   const [drawResults, setDrawResults] = useState<DrawResult[]>([]);
@@ -547,7 +564,7 @@ export default function GachaDrawScreen() {
       return data as { stars_available: number; fires_available: number };
     },
     enabled: !!patientId,
-    staleTime: 10 * 1000,
+    staleTime: 30 * 1000,
   });
 
   const flowerTypesQuery = useQuery({

@@ -123,6 +123,22 @@ function canFormSequenceWith(hand: TileId[], tile: TileId): boolean {
   return false;
 }
 
+function countTileInAll(hand: TileId[], choices: TileId[], tile: TileId): number {
+  return countTile(hand, tile) + countTile(choices, tile);
+}
+
+function validateMaxFour(hand: TileId[], choices: TileId[]): boolean {
+  const allTiles = [...hand, ...choices];
+  const counts = new Map<string, number>();
+  for (const t of allTiles) {
+    counts.set(t, (counts.get(t) || 0) + 1);
+  }
+  for (const c of counts.values()) {
+    if (c > 4) return false;
+  }
+  return true;
+}
+
 function generateBasicHand(): GeneratedHand {
   const pairCount = 2 + Math.floor(Math.random() * 2);
   const allShuffled = shuffle(ALL_TILES);
@@ -155,9 +171,29 @@ function generateBasicHand(): GeneratedHand {
 
   const winningTile = pickRandom(pairTiles);
 
-  const loserPool = ALL_TILES.filter(t => !pairTiles.includes(t) && countTile(hand, t) === 0);
-  const shuffledLosers = shuffle(loserPool);
-  const losers = shuffledLosers.slice(0, 2);
+  const safeLoserPool = ALL_TILES.filter(t => {
+    if (t === winningTile) return false;
+    if (pairTiles.includes(t)) return false;
+    if (countTile(hand, t) >= 4) return false;
+    return true;
+  });
+  const shuffledLosers = shuffle(safeLoserPool);
+  const losers: TileId[] = [];
+  const tempChoices: TileId[] = [];
+  for (const c of shuffledLosers) {
+    if (losers.length >= 2) break;
+    tempChoices.push(c);
+    if (countTileInAll(hand, [...tempChoices, winningTile], c) <= 4) {
+      losers.push(c);
+    } else {
+      tempChoices.pop();
+    }
+  }
+  while (losers.length < 2) {
+    const fallback = shuffle(HONOUR_TILES.filter(t => t !== winningTile && countTile(hand, t) < 4));
+    if (fallback.length > 0) losers.push(fallback[0]);
+    else losers.push(shuffle(ALL_TILES.filter(t => t !== winningTile))[0]);
+  }
 
   const winningIndex = Math.floor(Math.random() * 3);
   const choices: TileId[] = [];
@@ -168,6 +204,11 @@ function generateBasicHand(): GeneratedHand {
     } else {
       choices.push(losers[loserIdx++]);
     }
+  }
+
+  if (!validateMaxFour(hand, choices)) {
+    console.log('[MahjongGame] Basic hand failed max-4 validation, regenerating...');
+    return generateBasicHand();
   }
 
   console.log('[MahjongGame] Basic hand generated, pairs:', pairTiles, 'winning:', winningTile);
@@ -236,16 +277,23 @@ function generateModerateHand(): GeneratedHand {
   const losers: TileId[] = [];
   const loserCandidates = shuffle(ALL_TILES.filter(t => {
     if (t === winningTile) return false;
+    if (countTile(hand, t) >= 4) return false;
     return !canFormSequenceWith(hand, t);
   }));
 
+  const partialChoices: TileId[] = [winningTile];
   for (const c of loserCandidates) {
     if (losers.length >= 2) break;
-    losers.push(c);
+    if (countTileInAll(hand, [...partialChoices, c], c) <= 4) {
+      losers.push(c);
+      partialChoices.push(c);
+    }
   }
 
   while (losers.length < 2) {
-    losers.push(pickRandom(HONOUR_TILES));
+    const fallback = shuffle(HONOUR_TILES.filter(t => t !== winningTile && countTile(hand, t) < 4));
+    if (fallback.length > 0) losers.push(fallback[0]);
+    else losers.push(shuffle(ALL_TILES.filter(t => t !== winningTile))[0]);
   }
 
   const winningIndex = Math.floor(Math.random() * 3);
@@ -257,6 +305,11 @@ function generateModerateHand(): GeneratedHand {
     } else {
       choices.push(losers[li++]);
     }
+  }
+
+  if (!validateMaxFour(hand, choices)) {
+    console.log('[MahjongGame] Moderate hand failed max-4 validation, regenerating...');
+    return generateModerateHand();
   }
 
   console.log('[MahjongGame] Moderate hand generated, partials:', partials, 'winning:', winningTile);
@@ -294,18 +347,24 @@ function generateDifficultHand(): GeneratedHand {
   const losers: TileId[] = [];
   const loserCandidates = shuffle(ALL_TILES.filter(t => {
     if (t === winningTile) return false;
+    if (countTile(hand13, t) >= 4) return false;
     const test14 = [...hand13, t];
     return !isWinningHand(test14);
   }));
 
+  const partialChoices: TileId[] = [winningTile];
   for (const c of loserCandidates) {
     if (losers.length >= 2) break;
-    losers.push(c);
+    if (countTileInAll(hand13, [...partialChoices, c], c) <= 4) {
+      losers.push(c);
+      partialChoices.push(c);
+    }
   }
 
   while (losers.length < 2) {
-    const fallback = shuffle(ALL_TILES.filter(t => t !== winningTile));
-    losers.push(fallback[losers.length]);
+    const fallback = shuffle(ALL_TILES.filter(t => t !== winningTile && countTile(hand13, t) < 4));
+    if (fallback.length > 0) losers.push(fallback[0]);
+    else losers.push(shuffle(ALL_TILES.filter(t => t !== winningTile))[0]);
   }
 
   const winningIndex = Math.floor(Math.random() * 3);
@@ -317,6 +376,11 @@ function generateDifficultHand(): GeneratedHand {
     } else {
       choices.push(losers[li++]);
     }
+  }
+
+  if (!validateMaxFour(hand13, choices)) {
+    console.log('[MahjongGame] Difficult hand failed max-4 validation, regenerating...');
+    return generateDifficultHand();
   }
 
   console.log('[MahjongGame] Difficult hand generated, winning:', winningTile);

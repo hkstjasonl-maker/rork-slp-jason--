@@ -10,6 +10,7 @@ import {
   Dimensions,
 } from 'react-native';
 import * as Haptics from 'expo-haptics';
+import { Eye } from 'lucide-react-native';
 import { useApp } from '@/contexts/AppContext';
 import { supabase } from '@/lib/supabase';
 import { log } from '@/lib/logger';
@@ -44,7 +45,7 @@ interface ScatteredTile {
   scale: number;
 }
 
-const { width: SCREEN_WIDTH } = Dimensions.get('window');
+const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 
 const HAND_TILE_W = 42;
 const HAND_TILE_H = 58;
@@ -101,8 +102,9 @@ export default function MiniMahjongGame({ visible, level, onClose, patientId, pr
   const [revealedIndices, setRevealedIndices] = useState<Set<number>>(new Set());
   const [showResult, setShowResult] = useState<boolean>(false);
   const [tapsDisabled, setTapsDisabled] = useState<boolean>(false);
+  const [tipsUsed, setTipsUsed] = useState<boolean>(false);
 
-  const bgScatteredTiles = useMemo(() => generateScatteredTiles(25, SCREEN_WIDTH, Dimensions.get('window').height), []);
+  const bgScatteredTiles = useMemo(() => generateScatteredTiles(25, SCREEN_WIDTH, SCREEN_HEIGHT), []);
 
   const flipAnimsRef = useRef<Animated.Value[]>([
     new Animated.Value(0),
@@ -129,6 +131,7 @@ export default function MiniMahjongGame({ visible, level, onClose, patientId, pr
       setRevealedIndices(new Set());
       setShowResult(false);
       setTapsDisabled(false);
+      setTipsUsed(false);
       flipAnimsRef.current.forEach(a => a.setValue(0));
       resultBounceAnimRef.current.setValue(0);
       starsFloatAnimRef.current.setValue(0);
@@ -137,7 +140,7 @@ export default function MiniMahjongGame({ visible, level, onClose, patientId, pr
   }, [visible]);
 
   useEffect(() => {
-    if (phase === 'game') {
+    if (phase === 'game' && !tipsUsed) {
       const pulse = Animated.loop(
         Animated.sequence([
           Animated.timing(choicePulseAnim, { toValue: 1, duration: 1000, useNativeDriver: false }),
@@ -147,7 +150,7 @@ export default function MiniMahjongGame({ visible, level, onClose, patientId, pr
       pulse.start();
       return () => pulse.stop();
     }
-  }, [phase, choicePulseAnim]);
+  }, [phase, choicePulseAnim, tipsUsed]);
 
   const handleStart = useCallback(() => {
     const data = generateHand(level);
@@ -173,6 +176,21 @@ export default function MiniMahjongGame({ visible, level, onClose, patientId, pr
     });
   }, [flipAnims]);
 
+  const handleTips = useCallback(() => {
+    if (tapsDisabled || !gameData || tipsUsed) return;
+    setTipsUsed(true);
+    log('[MiniMahjongGame] Tips used - revealing all choices');
+
+    const flipAll = async () => {
+      await flipTile(0);
+      await new Promise<void>(resolve => setTimeout(resolve, 100));
+      await flipTile(1);
+      await new Promise<void>(resolve => setTimeout(resolve, 100));
+      await flipTile(2);
+    };
+    void flipAll();
+  }, [tapsDisabled, gameData, tipsUsed, flipTile]);
+
   const handlePickTile = useCallback(async (index: number) => {
     if (tapsDisabled || !gameData) return;
     setTapsDisabled(true);
@@ -181,13 +199,15 @@ export default function MiniMahjongGame({ visible, level, onClose, patientId, pr
 
     log('[MiniMahjongGame] Picked tile index:', index, 'tile:', gameData.choices[index]);
 
-    await flipTile(index);
+    if (!tipsUsed) {
+      await flipTile(index);
 
-    const otherIndices = [0, 1, 2].filter(i => i !== index);
-    await new Promise<void>(resolve => setTimeout(resolve, 200));
-    await flipTile(otherIndices[0]);
-    await new Promise<void>(resolve => setTimeout(resolve, 200));
-    await flipTile(otherIndices[1]);
+      const otherIndices = [0, 1, 2].filter(i => i !== index);
+      await new Promise<void>(resolve => setTimeout(resolve, 200));
+      await flipTile(otherIndices[0]);
+      await new Promise<void>(resolve => setTimeout(resolve, 200));
+      await flipTile(otherIndices[1]);
+    }
 
     const gameResult = checkResult(gameData.hand, gameData.choices[index], level);
     setResult(gameResult);
@@ -214,7 +234,7 @@ export default function MiniMahjongGame({ visible, level, onClose, patientId, pr
     } else {
       void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     }
-  }, [tapsDisabled, gameData, level, flipTile, resultBounceAnim, starsFloatAnim, starsOpacityAnim]);
+  }, [tapsDisabled, gameData, level, flipTile, resultBounceAnim, starsFloatAnim, starsOpacityAnim, tipsUsed]);
 
   const handleClose = useCallback(async () => {
     const starsEarned = practiceMode ? 0 : (result?.won ? 3 : 0);
@@ -303,6 +323,8 @@ export default function MiniMahjongGame({ visible, level, onClose, patientId, pr
     return false;
   }, [gameData, pickedIndex, result, level]);
 
+  const showTipsButton = (level === 'basic' || level === 'moderate') && phase === 'game' && !tipsUsed && !tapsDisabled;
+
   const renderRulesPhase = () => (
     <View style={styles.rulesContainer}>
       <Text style={styles.mahjongEmoji}>🀄</Text>
@@ -354,19 +376,20 @@ export default function MiniMahjongGame({ visible, level, onClose, patientId, pr
     const showGoldenGlow = showResult && result?.won && isWinner;
     const showGreenGlow = showResult && !result?.won && isWinner;
     const showRedTint = showResult && !result?.won && isPicked;
+    const isRevealPhase = phase === 'reveal';
 
     return (
       <View key={index} style={styles.choiceTileWrapper}>
         <Animated.View
           style={[
-            styles.choiceTile,
+            isRevealed && isRevealPhase ? styles.choiceTileRevealed : styles.choiceTile,
             { transform: [{ rotateY }] },
             showGoldenGlow && styles.goldenGlow,
             showGreenGlow && styles.greenGlow,
             showRedTint && styles.redTint,
           ]}
         >
-          {!tapsDisabled && !isRevealed && (
+          {!tapsDisabled && !isRevealed && !tipsUsed && (
             <Animated.View style={[styles.choicePulse, { opacity: glowOpacity }]} />
           )}
           <TouchableOpacity
@@ -377,14 +400,26 @@ export default function MiniMahjongGame({ visible, level, onClose, patientId, pr
           >
             <Image
               source={{ uri: isRevealed ? getTileImageUrl(tileId) : getBackImageUrl() }}
-              style={styles.choiceTileImage}
+              style={isRevealed && isRevealPhase ? styles.choiceTileImageRevealed : styles.choiceTileImage}
               resizeMode="contain"
             />
           </TouchableOpacity>
         </Animated.View>
-        <Text style={styles.choiceLabel}>
-          {['①', '②', '③'][index]}
-        </Text>
+        {!isRevealPhase && (
+          <Text style={styles.choiceLabel}>
+            {['①', '②', '③'][index]}
+          </Text>
+        )}
+        {isRevealed && !isRevealPhase && (
+          <Text style={styles.choiceLabel}>
+            {['①', '②', '③'][index]}
+          </Text>
+        )}
+        {isRevealPhase && (
+          <Text style={styles.choiceLabel}>
+            {['①', '②', '③'][index]}
+          </Text>
+        )}
         {showGreenGlow && (
           <Text style={styles.winnerArrow}>
             {getBilingualText('This one!', '這張才是！', '这张才是！')} ↑
@@ -433,15 +468,31 @@ export default function MiniMahjongGame({ visible, level, onClose, patientId, pr
           ))}
         </View>
 
-        <Text style={styles.pickText}>
-          {getBilingualText('Pick one!', '選一張！', '选一张！')}
-        </Text>
+        <View style={styles.centerArea}>
+          <Text style={styles.pickText}>
+            {getBilingualText('Pick one!', '選一張！', '选一张！')}
+          </Text>
 
-        <View style={styles.choicesRow}>
-          {[0, 1, 2].map(i => renderChoiceTile(i))}
+          <View style={styles.choicesRow}>
+            {[0, 1, 2].map(i => renderChoiceTile(i))}
+          </View>
+
+          {showTipsButton && (
+            <TouchableOpacity
+              style={styles.tipsButton}
+              onPress={handleTips}
+              activeOpacity={0.7}
+              testID="mahjong-tips-button"
+            >
+              <Eye size={18} color="#FFD700" />
+              <Text style={styles.tipsButtonText}>
+                {getBilingualText('Tips', '提示', '提示')}
+              </Text>
+            </TouchableOpacity>
+          )}
+
+          {showResult && renderResultOverlay()}
         </View>
-
-        {showResult && renderResultOverlay()}
 
         <View style={styles.handArea}>
           <Text style={styles.handLabel}>
@@ -691,13 +742,18 @@ const styles = StyleSheet.create({
     height: SCATTER_TILE_H,
     opacity: 0.15,
   },
+  centerArea: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    zIndex: 2,
+  },
   pickText: {
     color: '#FFD700',
     fontSize: 20,
     fontWeight: '700' as const,
     textAlign: 'center',
-    marginTop: 8,
-    marginBottom: 12,
+    marginBottom: 16,
     textShadowColor: 'rgba(0,0,0,0.5)',
     textShadowOffset: { width: 0, height: 1 },
     textShadowRadius: 4,
@@ -706,8 +762,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'center',
     alignItems: 'flex-start',
-    gap: 20,
-    paddingHorizontal: 16,
+    gap: 24,
   },
   choiceTileWrapper: {
     alignItems: 'center',
@@ -723,6 +778,13 @@ const styles = StyleSheet.create({
     shadowRadius: 6,
     elevation: 5,
   },
+  choiceTileRevealed: {
+    width: CHOICE_TILE_W,
+    height: CHOICE_TILE_H,
+    borderRadius: 6,
+    overflow: 'visible',
+    backgroundColor: 'transparent',
+  },
   choicePulse: {
     position: 'absolute',
     top: -4,
@@ -737,6 +799,10 @@ const styles = StyleSheet.create({
     width: CHOICE_TILE_W,
     height: CHOICE_TILE_H,
     borderRadius: 4,
+  },
+  choiceTileImageRevealed: {
+    width: CHOICE_TILE_W,
+    height: CHOICE_TILE_H,
   },
   choiceLabel: {
     color: 'rgba(255,255,255,0.7)',
@@ -767,11 +833,24 @@ const styles = StyleSheet.create({
     marginTop: 4,
     textAlign: 'center',
   },
+  tipsButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    marginTop: 20,
+    backgroundColor: 'rgba(255,215,0,0.15)',
+    borderWidth: 1,
+    borderColor: 'rgba(255,215,0,0.4)',
+    borderRadius: 20,
+    paddingHorizontal: 20,
+    paddingVertical: 10,
+  },
+  tipsButtonText: {
+    color: '#FFD700',
+    fontSize: 15,
+    fontWeight: '700' as const,
+  },
   handArea: {
-    position: 'absolute',
-    bottom: 0,
-    left: 0,
-    right: 0,
     paddingBottom: 32,
     paddingTop: 10,
     backgroundColor: 'rgba(0,0,0,0.3)',

@@ -5,6 +5,7 @@ import {
   SafeAreaView,
   TouchableOpacity,
   Animated,
+  Easing,
   Modal,
   Image,
   Dimensions,
@@ -232,6 +233,284 @@ function FlowerReveal({
   );
 }
 
+function FullScreenReveal({
+  visible,
+  flower,
+  isZh,
+  onContinue,
+  hasNextDraw,
+}: {
+  visible: boolean;
+  flower: FlowerType | null;
+  isZh: boolean;
+  onContinue: () => void;
+  hasNextDraw: boolean;
+}) {
+  const overlayOpacity = useRef(new Animated.Value(0)).current;
+  const flowerScale = useRef(new Animated.Value(0)).current;
+  const flowerRotate = useRef(new Animated.Value(0)).current;
+  const glowScale = useRef(new Animated.Value(0)).current;
+  const glowOpacity = useRef(new Animated.Value(0)).current;
+  const bannerTranslateY = useRef(new Animated.Value(60)).current;
+  const bannerOpacity = useRef(new Animated.Value(0)).current;
+  const nameOpacity = useRef(new Animated.Value(0)).current;
+  const congratsOpacity = useRef(new Animated.Value(0)).current;
+  const buttonOpacity = useRef(new Animated.Value(0)).current;
+  const [displayedName, setDisplayedName] = useState<string>('');
+  const [showParticles, setShowParticles] = useState<boolean>(false);
+  const typeTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const timeoutsRef = useRef<ReturnType<typeof setTimeout>[]>([]);
+
+  const particles = useRef(
+    Array.from({ length: 20 }, () => ({
+      x: new Animated.Value(0),
+      y: new Animated.Value(0),
+      opacity: new Animated.Value(0),
+      scale: new Animated.Value(1),
+    }))
+  ).current;
+
+  useEffect(() => {
+    if (!visible || !flower) return;
+
+    overlayOpacity.setValue(0);
+    flowerScale.setValue(0);
+    flowerRotate.setValue(-5);
+    glowScale.setValue(0);
+    glowOpacity.setValue(0);
+    bannerTranslateY.setValue(60);
+    bannerOpacity.setValue(0);
+    nameOpacity.setValue(0);
+    congratsOpacity.setValue(0);
+    buttonOpacity.setValue(0);
+    setDisplayedName('');
+    setShowParticles(false);
+    particles.forEach((p) => {
+      p.x.setValue(0);
+      p.y.setValue(0);
+      p.opacity.setValue(0);
+      p.scale.setValue(1);
+    });
+
+    const name = isZh ? (flower.name_zh || flower.name_en) : flower.name_en;
+    const timers: ReturnType<typeof setTimeout>[] = [];
+
+    Animated.timing(overlayOpacity, { toValue: 1, duration: 300, useNativeDriver: true }).start();
+
+    timers.push(setTimeout(() => {
+      setShowParticles(true);
+      if (Platform.OS !== 'web') Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => {});
+
+      particles.forEach((p) => {
+        const angle = Math.random() * Math.PI * 2;
+        const distance = 80 + Math.random() * 120;
+        p.x.setValue(0);
+        p.y.setValue(0);
+        p.opacity.setValue(1);
+        p.scale.setValue(0.5 + Math.random() * 1);
+
+        Animated.parallel([
+          Animated.timing(p.x, { toValue: Math.cos(angle) * distance, duration: 800, useNativeDriver: true }),
+          Animated.timing(p.y, { toValue: Math.sin(angle) * distance, duration: 800, useNativeDriver: true }),
+          Animated.timing(p.opacity, { toValue: 0, duration: 800, delay: 200, useNativeDriver: true }),
+        ]).start();
+      });
+    }, 300));
+
+    timers.push(setTimeout(() => {
+      if (Platform.OS !== 'web') Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
+
+      Animated.parallel([
+        Animated.spring(flowerScale, { toValue: 1, friction: 4, tension: 40, useNativeDriver: true }),
+        Animated.sequence([
+          Animated.timing(flowerRotate, { toValue: 5, duration: 200, useNativeDriver: true }),
+          Animated.timing(flowerRotate, { toValue: -3, duration: 200, useNativeDriver: true }),
+          Animated.timing(flowerRotate, { toValue: 0, duration: 300, easing: Easing.out(Easing.quad), useNativeDriver: true }),
+        ]),
+        Animated.timing(glowScale, { toValue: 1.5, duration: 600, useNativeDriver: true }),
+        Animated.sequence([
+          Animated.timing(glowOpacity, { toValue: 0.8, duration: 300, useNativeDriver: true }),
+          Animated.timing(glowOpacity, { toValue: 0.3, duration: 300, useNativeDriver: true }),
+        ]),
+      ]).start();
+    }, 600));
+
+    timers.push(setTimeout(() => {
+      Animated.parallel([
+        Animated.spring(bannerTranslateY, { toValue: 0, friction: 6, tension: 50, useNativeDriver: true }),
+        Animated.timing(bannerOpacity, { toValue: 1, duration: 300, useNativeDriver: true }),
+      ]).start();
+    }, 1000));
+
+    timers.push(setTimeout(() => {
+      nameOpacity.setValue(1);
+      let i = 0;
+      const timer = setInterval(() => {
+        i++;
+        setDisplayedName(name.substring(0, i));
+        if (i % 3 === 0 && Platform.OS !== 'web') {
+          Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
+        }
+        if (i >= name.length) clearInterval(timer);
+      }, 80);
+      typeTimerRef.current = timer;
+    }, 1200));
+
+    timers.push(setTimeout(() => {
+      Animated.timing(congratsOpacity, { toValue: 1, duration: 400, useNativeDriver: true }).start();
+    }, 1800));
+
+    timers.push(setTimeout(() => {
+      Animated.timing(buttonOpacity, { toValue: 1, duration: 400, useNativeDriver: true }).start();
+    }, 2500));
+
+    timeoutsRef.current = timers;
+
+    return () => {
+      timers.forEach(clearTimeout);
+      if (typeTimerRef.current) clearInterval(typeTimerRef.current);
+    };
+  }, [visible, flower, isZh, overlayOpacity, flowerScale, flowerRotate, glowScale, glowOpacity, bannerTranslateY, bannerOpacity, nameOpacity, congratsOpacity, buttonOpacity, particles]);
+
+  if (!visible || !flower) return null;
+
+  const rarity = flower.rarity || 'common';
+  const REVEAL_BG: Record<string, string> = {
+    common: '#F48FB1',
+    uncommon: '#64B5F6',
+    rare: '#CE93D8',
+    epic: '#FFB74D',
+    legendary: '#FFD54F',
+  };
+  const REVEAL_STARS: Record<string, string> = {
+    common: '★',
+    uncommon: '★★',
+    rare: '★★★',
+    epic: '★★★★',
+    legendary: '★★★★★',
+  };
+  const REVEAL_LABEL: Record<string, { en: string; zh: string }> = {
+    common: { en: 'Common', zh: '普通' },
+    uncommon: { en: 'Uncommon', zh: '不常見' },
+    rare: { en: 'Rare', zh: '稀有' },
+    epic: { en: 'Epic', zh: '史詩' },
+    legendary: { en: 'Legendary', zh: '傳說' },
+  };
+  const bgColor = REVEAL_BG[rarity] || '#F48FB1';
+  const stars = REVEAL_STARS[rarity] || '★';
+  const label = REVEAL_LABEL[rarity] || REVEAL_LABEL.common;
+  const flowerRotateStr = flowerRotate.interpolate({
+    inputRange: [-5, 0, 5],
+    outputRange: ['-5deg', '0deg', '5deg'],
+  });
+
+  return (
+    <Modal visible={visible} transparent animationType="none">
+      <Animated.View style={[revealStyles.overlay, { opacity: overlayOpacity }]}>
+        {showParticles && particles.map((p, i) => (
+          <Animated.View
+            key={i}
+            style={{
+              position: 'absolute',
+              width: 8 + (i % 3) * 4,
+              height: 8 + (i % 3) * 4,
+              borderRadius: 10,
+              backgroundColor: bgColor,
+              opacity: p.opacity,
+              transform: [{ translateX: p.x }, { translateY: p.y }, { scale: p.scale }],
+            }}
+          />
+        ))}
+
+        <Animated.View style={{ opacity: congratsOpacity, marginBottom: 20 }}>
+          <ScaledText size={28} weight="bold" color="#FFF">
+            🎉 {isZh ? '恭喜！' : 'Congratulations!'}
+          </ScaledText>
+        </Animated.View>
+
+        <Animated.View style={[
+          revealStyles.glowRing,
+          { backgroundColor: bgColor, opacity: glowOpacity, transform: [{ scale: glowScale }] },
+        ]} />
+
+        <Animated.Image
+          source={{ uri: flower.image_url }}
+          style={{
+            width: 140,
+            height: 140,
+            transform: [{ scale: flowerScale }, { rotate: flowerRotateStr }],
+          }}
+          resizeMode="contain"
+        />
+
+        <Animated.View style={[
+          revealStyles.rarityBanner,
+          { backgroundColor: bgColor, opacity: bannerOpacity, transform: [{ translateY: bannerTranslateY }] },
+        ]}>
+          <ScaledText size={16} weight="bold" color="#FFF">
+            {stars} {isZh ? label.zh : label.en}
+          </ScaledText>
+        </Animated.View>
+
+        <Animated.View style={{ marginTop: 16, opacity: nameOpacity }}>
+          <ScaledText size={24} weight="bold" color="#FFF" style={{ textAlign: 'center' as const }}>
+            {displayedName}
+          </ScaledText>
+        </Animated.View>
+
+        <Animated.View style={{ marginTop: 40, opacity: buttonOpacity }}>
+          {hasNextDraw ? (
+            <ScaledText size={14} weight="600" color="rgba(255,255,255,0.7)">
+              {isZh ? '準備下一次抽花...' : 'Preparing next draw...'}
+            </ScaledText>
+          ) : (
+            <TouchableOpacity
+              style={[revealStyles.continueBtn, { shadowColor: bgColor }]}
+              onPress={onContinue}
+              activeOpacity={0.8}
+            >
+              <ScaledText size={16} weight="bold" color={bgColor}>
+                {isZh ? '太棒了！' : 'Amazing!'}
+              </ScaledText>
+            </TouchableOpacity>
+          )}
+        </Animated.View>
+      </Animated.View>
+    </Modal>
+  );
+}
+
+const revealStyles = StyleSheet.create({
+  overlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.88)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  glowRing: {
+    position: 'absolute',
+    width: 200,
+    height: 200,
+    borderRadius: 100,
+  },
+  rarityBanner: {
+    marginTop: 20,
+    paddingHorizontal: 24,
+    paddingVertical: 10,
+    borderRadius: 20,
+  },
+  continueBtn: {
+    backgroundColor: '#FFF',
+    paddingVertical: 14,
+    paddingHorizontal: 40,
+    borderRadius: 16,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 5,
+  },
+});
+
 export default function GachaDrawScreen() {
   const { patientId, language, refreshPatient: refreshPatientCtx } = useApp();
   const router = useRouter();
@@ -245,6 +524,7 @@ export default function GachaDrawScreen() {
   const [pendingDraws, setPendingDraws] = useState<number>(0);
   const [showResultModal, setShowResultModal] = useState<boolean>(false);
   const [isStartingDraw, setIsStartingDraw] = useState<boolean>(false);
+  const [showFullReveal, setShowFullReveal] = useState<boolean>(false);
 
   const secondFlowerRef = useRef<FlowerType | null>(null);
 
@@ -477,8 +757,18 @@ export default function GachaDrawScreen() {
   }, [flowerTypesQuery.data, patientId, isZh, resetAnimations, runDrawAnimation, refreshAfterDraw, refreshPatientCtx]);
 
   useEffect(() => {
-    if (drawPhase === 'done' && pendingDraws > 0) {
+    if (drawPhase === 'done') {
       const timeout = setTimeout(() => {
+        setShowFullReveal(true);
+      }, 800);
+      return () => clearTimeout(timeout);
+    }
+  }, [drawPhase]);
+
+  useEffect(() => {
+    if (showFullReveal && pendingDraws > 0) {
+      const timeout = setTimeout(() => {
+        setShowFullReveal(false);
         const secondFlower = secondFlowerRef.current;
         if (!secondFlower) return;
 
@@ -486,20 +776,14 @@ export default function GachaDrawScreen() {
         setPendingDraws(0);
         secondFlowerRef.current = null;
 
-        runDrawAnimation(secondFlower, true);
-      }, 2000);
+        setTimeout(() => {
+          runDrawAnimation(secondFlower, true);
+        }, 300);
+      }, 2500);
 
       return () => clearTimeout(timeout);
     }
-
-    if (drawPhase === 'done' && pendingDraws === 0) {
-      const timeout = setTimeout(() => {
-        setDrawPhase('complete');
-        setShowResultModal(true);
-      }, 1500);
-      return () => clearTimeout(timeout);
-    }
-  }, [drawPhase, pendingDraws, resetAnimations, runDrawAnimation]);
+  }, [showFullReveal, pendingDraws, resetAnimations, runDrawAnimation]);
 
   const starsAvailable = patientDataQuery.data?.stars_available ?? 0;
   const firesAvailable = patientDataQuery.data?.fires_available ?? 0;
@@ -628,6 +912,18 @@ export default function GachaDrawScreen() {
           </TouchableOpacity>
         </View>
       </SafeAreaView>
+
+      <FullScreenReveal
+        visible={showFullReveal}
+        flower={currentFlower}
+        isZh={isZh}
+        hasNextDraw={pendingDraws > 0}
+        onContinue={() => {
+          setShowFullReveal(false);
+          setDrawPhase('complete');
+          setShowResultModal(true);
+        }}
+      />
 
       <Modal
         visible={showResultModal}

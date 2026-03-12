@@ -5,12 +5,11 @@ import {
   StyleSheet,
   Modal,
   TouchableOpacity,
-  Image,
   Animated,
   Dimensions,
-  Platform,
   ActivityIndicator,
 } from 'react-native';
+import { Image } from 'expo-image';
 import * as Haptics from 'expo-haptics';
 import { Eye } from 'lucide-react-native';
 import { useApp } from '@/contexts/AppContext';
@@ -97,6 +96,8 @@ function generateScatteredTiles(count: number, areaW: number, areaH: number): Sc
 const BACK_IMAGE_URI = getBackImageUrl();
 const backImageSource = { uri: BACK_IMAGE_URI };
 
+const BLURHASH_TILE = 'L5H2EC=PM+yV0g-mq.wG9c010J}I';
+
 const ScatteredTilesLayer = React.memo(function ScatteredTilesLayer({ tiles }: { tiles: ScatteredTile[] }) {
   return (
     <View style={styles.bgScatterLayer} pointerEvents="none">
@@ -115,7 +116,9 @@ const ScatteredTilesLayer = React.memo(function ScatteredTilesLayer({ tiles }: {
               ],
             },
           ]}
-          resizeMode="contain"
+          contentFit="contain"
+          cachePolicy="memory-disk"
+          recyclingKey={`scatter-${i}`}
         />
       ))}
     </View>
@@ -135,7 +138,7 @@ export default function MiniMahjongGame({ visible, level, onClose, patientId, pr
   const [tapsDisabled, setTapsDisabled] = useState<boolean>(false);
   const [tipsUsed, setTipsUsed] = useState<boolean>(false);
 
-  const bgScatteredTiles = useMemo(() => generateScatteredTiles(25, SCREEN_WIDTH, SCREEN_HEIGHT), []);
+  const bgScatteredTiles = useMemo(() => generateScatteredTiles(12, SCREEN_WIDTH, SCREEN_HEIGHT), []);
 
   const flipAnimsRef = useRef<Animated.Value[]>([
     new Animated.Value(0),
@@ -168,13 +171,7 @@ export default function MiniMahjongGame({ visible, level, onClose, patientId, pr
       starsFloatAnimRef.current.setValue(0);
       starsOpacityAnimRef.current.setValue(0);
 
-      const backUrl = getBackImageUrl();
-      if (Platform.OS !== 'web') {
-        Image.prefetch(backUrl).catch(() => {});
-        ALL_TILES.slice(0, 15).forEach(t => {
-          Image.prefetch(getTileImageUrl(t)).catch(() => {});
-        });
-      }
+      Image.prefetch([getBackImageUrl(), ...ALL_TILES.map(t => getTileImageUrl(t))]).catch(() => {});
     }
   }, [visible]);
 
@@ -197,15 +194,19 @@ export default function MiniMahjongGame({ visible, level, onClose, patientId, pr
     setPhase('loading');
     log('[MiniMahjongGame] Game loading, level:', level);
 
-    if (Platform.OS !== 'web') {
-      data.hand.forEach(t => Image.prefetch(getTileImageUrl(t)).catch(() => {}));
-      data.choices.forEach(t => Image.prefetch(getTileImageUrl(t)).catch(() => {}));
-    }
+    const allUrls = [
+      ...data.hand.map(t => getTileImageUrl(t)),
+      ...data.choices.map(t => getTileImageUrl(t)),
+    ];
+    const uniqueUrls = [...new Set(allUrls)];
 
-    setTimeout(() => {
+    const prefetchPromise = Image.prefetch(uniqueUrls).catch(() => {});
+    const minDelay = new Promise<void>(resolve => setTimeout(resolve, 800));
+
+    void Promise.all([prefetchPromise, minDelay]).then(() => {
       setPhase('game');
-      log('[MiniMahjongGame] Game started');
-    }, 1500);
+      log('[MiniMahjongGame] Game started, all images prefetched');
+    });
   }, [level]);
 
   const flipTile = useCallback((index: number): Promise<void> => {
@@ -462,7 +463,11 @@ export default function MiniMahjongGame({ visible, level, onClose, patientId, pr
             <Image
               source={isRevealed ? { uri: getTileImageUrl(tileId) } : backImageSource}
               style={isRevealed ? styles.choiceTileImageRevealed : styles.choiceTileImage}
-              resizeMode="contain"
+              contentFit="contain"
+              cachePolicy="memory-disk"
+              placeholder={{ blurhash: BLURHASH_TILE }}
+              transition={150}
+              recyclingKey={`choice-${index}-${isRevealed ? tileId : 'back'}`}
             />
           </TouchableOpacity>
         </Animated.View>
@@ -555,7 +560,9 @@ export default function MiniMahjongGame({ visible, level, onClose, patientId, pr
                     <Image
                       source={{ uri: getTileImageUrl(tileId) }}
                       style={styles.handTileImage}
-                      resizeMode="contain"
+                      contentFit="contain"
+                      cachePolicy="memory-disk"
+                      recyclingKey={`hand-${i}-${tileId}`}
                     />
                   </View>
                 );
@@ -575,7 +582,9 @@ export default function MiniMahjongGame({ visible, level, onClose, patientId, pr
                     <Image
                       source={{ uri: getTileImageUrl(tileId) }}
                       style={styles.handTileImage}
-                      resizeMode="contain"
+                      contentFit="contain"
+                      cachePolicy="memory-disk"
+                      recyclingKey={`hand-${i + 7}-${tileId}`}
                     />
                   </View>
                 );

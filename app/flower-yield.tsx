@@ -188,6 +188,52 @@ function Mountains() {
   );
 }
 
+function RollingHills() {
+  return (
+    <>
+      <View style={{
+        position: 'absolute' as const, bottom: GARDEN_HEIGHT * 0.48, left: -30, right: -30,
+        height: 60, borderTopLeftRadius: 300, borderTopRightRadius: 200,
+        backgroundColor: 'rgba(165,214,167,0.35)', zIndex: 3,
+      }} />
+      <View style={{
+        position: 'absolute' as const, bottom: GARDEN_HEIGHT * 0.44, left: SCREEN_WIDTH * 0.2, right: -40,
+        height: 50, borderTopLeftRadius: 250, borderTopRightRadius: 350,
+        backgroundColor: 'rgba(129,199,132,0.3)', zIndex: 3,
+      }} />
+      <View style={{
+        position: 'absolute' as const, bottom: GARDEN_HEIGHT * 0.40, left: -50, right: SCREEN_WIDTH * 0.15,
+        height: 45, borderTopLeftRadius: 350, borderTopRightRadius: 180,
+        backgroundColor: 'rgba(102,187,106,0.25)', zIndex: 3,
+      }} />
+      <View style={{
+        position: 'absolute' as const, bottom: GARDEN_HEIGHT * 0.36, left: -20, right: -20,
+        height: 40, borderTopLeftRadius: 200, borderTopRightRadius: 280,
+        backgroundColor: 'rgba(85,139,47,0.2)', zIndex: 3,
+      }} />
+    </>
+  );
+}
+
+function AtmosphericHaze() {
+  return (
+    <>
+      <View style={{
+        position: 'absolute' as const, top: GARDEN_HEIGHT * 0.18, left: 0, right: 0,
+        height: GARDEN_HEIGHT * 0.12, backgroundColor: 'rgba(200,230,200,0.15)', zIndex: 2,
+      }} />
+      <View style={{
+        position: 'absolute' as const, top: GARDEN_HEIGHT * 0.25, left: 0, right: 0,
+        height: GARDEN_HEIGHT * 0.08, backgroundColor: 'rgba(220,237,200,0.1)', zIndex: 2,
+      }} />
+      <View style={{
+        position: 'absolute' as const, bottom: 0, left: 0, right: 0,
+        height: 30, backgroundColor: 'rgba(30,60,20,0.08)', zIndex: 7,
+      }} />
+    </>
+  );
+}
+
 function SunWithFace() {
   const glowScale = useRef(new Animated.Value(1)).current;
   const rayRotation = useRef(new Animated.Value(0)).current;
@@ -400,36 +446,64 @@ function PlantedFlower({ flower, flowerType, row }: {
 }) {
   const swayAnim = useRef(new Animated.Value(0)).current;
   const popAnim = useRef(new Animated.Value(0)).current;
+  const bobAnim = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
     Animated.spring(popAnim, { toValue: 1, friction: 5, tension: 50, useNativeDriver: true }).start();
-    const duration = 2200 + seededRand(flower.grid_position * 17) * 800;
-    const delay = seededRand(flower.grid_position * 23) * 600;
+
+    const swayDuration = 1800 + seededRand(flower.grid_position * 17) * 1200;
+    const bobDuration = 2400 + seededRand(flower.grid_position * 19) * 1000;
+    const delay = seededRand(flower.grid_position * 23) * 800;
+
     const timer = setTimeout(() => {
       Animated.loop(
         Animated.sequence([
-          Animated.timing(swayAnim, { toValue: 1, duration, easing: Easing.inOut(Easing.sin), useNativeDriver: true }),
-          Animated.timing(swayAnim, { toValue: -1, duration, easing: Easing.inOut(Easing.sin), useNativeDriver: true }),
-          Animated.timing(swayAnim, { toValue: 0, duration, easing: Easing.inOut(Easing.sin), useNativeDriver: true }),
+          Animated.timing(swayAnim, { toValue: 1, duration: swayDuration, easing: Easing.inOut(Easing.sin), useNativeDriver: true }),
+          Animated.timing(swayAnim, { toValue: -1, duration: swayDuration * 1.1, easing: Easing.inOut(Easing.sin), useNativeDriver: true }),
+          Animated.timing(swayAnim, { toValue: 0, duration: swayDuration * 0.9, easing: Easing.inOut(Easing.sin), useNativeDriver: true }),
+        ])
+      ).start();
+
+      Animated.loop(
+        Animated.sequence([
+          Animated.timing(bobAnim, { toValue: 1, duration: bobDuration, easing: Easing.inOut(Easing.sin), useNativeDriver: true }),
+          Animated.timing(bobAnim, { toValue: 0, duration: bobDuration, easing: Easing.inOut(Easing.sin), useNativeDriver: true }),
         ])
       ).start();
     }, delay);
     return () => clearTimeout(timer);
-  }, [swayAnim, popAnim, flower.grid_position]);
+  }, [swayAnim, popAnim, bobAnim, flower.grid_position]);
 
-  const rotate = swayAnim.interpolate({ inputRange: [-1, 0, 1], outputRange: ['-2deg', '0deg', '2deg'] });
-  const imgSize = 32 + (row / (GRID_ROWS - 1)) * 10;
+  const swayAmplitude = 2.5 + (row / (GRID_ROWS - 1)) * 1.5;
+  const rotate = swayAnim.interpolate({ inputRange: [-1, 0, 1], outputRange: [`-${swayAmplitude}deg`, '0deg', `${swayAmplitude}deg`] });
+  const translateY = bobAnim.interpolate({ inputRange: [0, 1], outputRange: [0, -2.5] });
+  const translateX = swayAnim.interpolate({ inputRange: [-1, 0, 1], outputRange: [-1, 0, 1] });
+
+  const imgSize = 34 + (row / (GRID_ROWS - 1)) * 12;
+  const shadowWidth = imgSize * 0.7;
+  const shadowOpacity = 0.15 + (row / (GRID_ROWS - 1)) * 0.1;
 
   return (
-    <Animated.Image
-      source={{ uri: flowerType.image_url }}
-      style={{
-        width: imgSize,
-        height: imgSize,
-        transform: [{ rotate }, { scale: popAnim }],
-      }}
-      resizeMode="contain"
-    />
+    <View style={{ alignItems: 'center' as const }}>
+      <Animated.Image
+        source={{ uri: flowerType.image_url }}
+        style={{
+          width: imgSize,
+          height: imgSize,
+          transform: [{ rotate }, { translateY }, { translateX }, { scale: popAnim }],
+          zIndex: 10,
+        }}
+        resizeMode="contain"
+      />
+      <View style={{
+        width: shadowWidth,
+        height: 4,
+        borderRadius: shadowWidth / 2,
+        backgroundColor: `rgba(60,40,20,${shadowOpacity})`,
+        marginTop: -3,
+        transform: [{ scaleX: 1.2 }],
+      }} />
+    </View>
   );
 }
 
@@ -642,18 +716,26 @@ function GardenScene({ flowers, flowerTypeMap, onFlowerPress }: {
 }) {
   return (
     <View style={gardenStyles.container}>
-      <View style={[StyleSheet.absoluteFill, { backgroundColor: '#4E7A3E' }]} />
-      <View style={{ position: 'absolute' as const, top: 0, left: 0, right: 0, height: '55%', backgroundColor: '#7CB342' }} />
-      <View style={{ position: 'absolute' as const, top: 0, left: 0, right: 0, height: '35%', backgroundColor: '#AED581' }} />
-      <View style={{ position: 'absolute' as const, top: 0, left: 0, right: 0, height: '27%', backgroundColor: '#C5E1A5' }} />
-      <View style={{ position: 'absolute' as const, top: 0, left: 0, right: 0, height: '21%', backgroundColor: '#B8D4E8' }} />
-      <View style={{ position: 'absolute' as const, top: 0, left: 0, right: 0, height: '13%', backgroundColor: '#9ECAE1' }} />
+      <View style={[StyleSheet.absoluteFill, { backgroundColor: '#3E6B2E' }]} />
+      <View style={{ position: 'absolute' as const, top: 0, left: 0, right: 0, height: '62%', backgroundColor: '#4A7A38' }} />
+      <View style={{ position: 'absolute' as const, top: 0, left: 0, right: 0, height: '52%', backgroundColor: '#5E8E4A' }} />
+      <View style={{ position: 'absolute' as const, top: 0, left: 0, right: 0, height: '44%', backgroundColor: '#78A85E' }} />
+      <View style={{ position: 'absolute' as const, top: 0, left: 0, right: 0, height: '37%', backgroundColor: '#8FBE74' }} />
+      <View style={{ position: 'absolute' as const, top: 0, left: 0, right: 0, height: '31%', backgroundColor: '#A8D08D' }} />
+      <View style={{ position: 'absolute' as const, top: 0, left: 0, right: 0, height: '26%', backgroundColor: '#C0DCA8' }} />
+      <View style={{ position: 'absolute' as const, top: 0, left: 0, right: 0, height: '21%', backgroundColor: '#D0E8C0' }} />
+      <View style={{ position: 'absolute' as const, top: 0, left: 0, right: 0, height: '17%', backgroundColor: '#C8DFCE' }} />
+      <View style={{ position: 'absolute' as const, top: 0, left: 0, right: 0, height: '13%', backgroundColor: '#B8D8D8' }} />
+      <View style={{ position: 'absolute' as const, top: 0, left: 0, right: 0, height: '9%', backgroundColor: '#A8CCE0' }} />
+      <View style={{ position: 'absolute' as const, top: 0, left: 0, right: 0, height: '5%', backgroundColor: '#96C0D8' }} />
 
       <View style={gardenStyles.grassTexture1} />
       <View style={gardenStyles.grassTexture2} />
       <View style={gardenStyles.grassTexture3} />
 
       <Mountains />
+      <RollingHills />
+      <AtmosphericHaze />
       <SunWithFace />
       <CloudsLayer />
       <BirdsLayer />
@@ -1038,23 +1120,23 @@ const gardenStyles = StyleSheet.create({
   },
   grassTexture1: {
     position: 'absolute',
-    top: '38%',
-    left: -10,
-    right: -10,
-    height: 35,
-    backgroundColor: 'rgba(139,195,74,0.06)',
-    borderRadius: 18,
-    transform: [{ rotate: '-2deg' }],
+    top: '36%',
+    left: -20,
+    right: -20,
+    height: 40,
+    backgroundColor: 'rgba(120,180,60,0.06)',
+    borderRadius: 22,
+    transform: [{ rotate: '-1.5deg' }],
   },
   grassTexture2: {
     position: 'absolute',
-    top: '52%',
-    left: -10,
-    right: -10,
-    height: 28,
-    backgroundColor: 'rgba(104,159,56,0.05)',
-    borderRadius: 14,
-    transform: [{ rotate: '1.5deg' }],
+    top: '48%',
+    left: -15,
+    right: -15,
+    height: 32,
+    backgroundColor: 'rgba(90,150,45,0.05)',
+    borderRadius: 16,
+    transform: [{ rotate: '1deg' }],
   },
   grassTexture3: {
     position: 'absolute',
@@ -1077,8 +1159,8 @@ const gardenStyles = StyleSheet.create({
     backgroundColor: '#6D4C41',
   },
   soilCellEmpty: {
-    backgroundColor: '#9E8E7E',
-    opacity: 0.65,
+    backgroundColor: '#6D4C41',
+    opacity: 0.8,
   },
   soilHighlight: {
     position: 'absolute',

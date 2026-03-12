@@ -31,11 +31,14 @@ if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental
 }
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
-
+const GARDEN_HEIGHT = 420;
 const TOTAL_SLOTS = 20;
 const GRID_COLS = 4;
 const GRID_ROWS = 5;
-const PATH_HEIGHT = 320;
+const CELL_W = 72;
+const CELL_H = 46;
+const GRID_W = GRID_COLS * CELL_W;
+const GRID_H = GRID_ROWS * CELL_H;
 
 const RARITY_COLORS: Record<string, { bg: string; dot: string; label: string; glow: string }> = {
   common: { bg: '#E8F5E9', dot: '#4CAF50', label: '★', glow: '#A5D6A7' },
@@ -72,104 +75,350 @@ interface GroupedFlower {
   flowers: PatientFlower[];
 }
 
-function getStonePositions(width: number, height: number) {
-  const positions: { x: number; y: number; index: number }[] = [];
-  const marginX = width * 0.08;
-  const marginY = height * 0.06;
-  const usableW = width - marginX * 2;
-  const usableH = height - marginY * 2;
-  const rowH = usableH / (GRID_ROWS - 1);
-
-  for (let row = 0; row < GRID_ROWS; row++) {
-    const isEvenRow = row % 2 === 0;
-    for (let col = 0; col < GRID_COLS; col++) {
-      const colW = usableW / (GRID_COLS - 1);
-      let x = marginX + col * colW;
-      if (!isEvenRow) {
-        x = marginX + (GRID_COLS - 1 - col) * colW;
-      }
-      const offsetX = Math.sin(row * 3 + col * 7) * 6;
-      const offsetY = Math.cos(row * 5 + col * 3) * 4;
-      positions.push({
-        x: x + offsetX,
-        y: marginY + row * rowH + offsetY,
-        index: row * GRID_COLS + col,
-      });
-    }
-  }
-  return positions;
+function seededRand(seed: number): number {
+  const x = Math.sin(seed * 9301 + 49297) * 233280;
+  return x - Math.floor(x);
 }
 
-function PathDots({ positions }: { positions: { x: number; y: number }[] }) {
-  const dots: { x: number; y: number }[] = [];
-  for (let i = 0; i < positions.length - 1; i++) {
-    const from = positions[i];
-    const to = positions[i + 1];
-    const dist = Math.sqrt((to.x - from.x) ** 2 + (to.y - from.y) ** 2);
-    const numDots = Math.max(2, Math.floor(dist / 12));
-    for (let d = 1; d < numDots; d++) {
-      const t = d / numDots;
-      dots.push({
-        x: from.x + (to.x - from.x) * t,
-        y: from.y + (to.y - from.y) * t,
-      });
-    }
+const MOUNTAIN_DATA = [
+  { type: 'dome' as const, left: -20, w: 180, h: 55, color: 'rgba(130,155,170,0.07)' },
+  { type: 'peak' as const, left: 40, bL: 45, bR: 45, bB: 95, color: 'rgba(110,140,155,0.08)' },
+  { type: 'dome' as const, left: 100, w: 150, h: 70, color: 'rgba(120,145,160,0.06)' },
+  { type: 'peak' as const, left: 180, bL: 55, bR: 55, bB: 85, color: 'rgba(125,150,165,0.09)' },
+  { type: 'dome' as const, left: 230, w: 130, h: 65, color: 'rgba(115,140,155,0.07)' },
+  { type: 'peak' as const, left: 300, bL: 40, bR: 40, bB: 100, color: 'rgba(130,155,170,0.08)' },
+  { type: 'dome' as const, left: 340, w: 160, h: 50, color: 'rgba(120,145,160,0.06)' },
+  { type: 'peak' as const, left: 380, bL: 30, bR: 30, bB: 75, color: 'rgba(110,135,150,0.09)' },
+];
+
+const CLOUD_DATA = [
+  { y: 12, w: 72, h: 22, duration: 42000, startFrac: 0.15 },
+  { y: 38, w: 56, h: 18, duration: 52000, startFrac: 0.55 },
+  { y: 6, w: 88, h: 26, duration: 48000, startFrac: 0.35 },
+  { y: 52, w: 62, h: 20, duration: 58000, startFrac: 0.75 },
+  { y: 24, w: 66, h: 19, duration: 46000, startFrac: 0.05 },
+];
+
+const BIRD_DATA = [
+  { y: 20, size: 12, speed: 26000, startFrac: 0.1, dir: 1, flapSpeed: 800, count: 2 },
+  { y: 40, size: 18, speed: 34000, startFrac: 0.7, dir: -1, flapSpeed: 0, count: 1 },
+  { y: 14, size: 8, speed: 22000, startFrac: 0.4, dir: 1, flapSpeed: 600, count: 3 },
+];
+
+const TREE_DATA = [
+  { emoji: '🌳', left: 18, top: 125, size: 34, opacity: 0.22 },
+  { emoji: '🌲', left: SCREEN_WIDTH - 55, top: 135, size: 30, opacity: 0.18 },
+  { emoji: '🌳', left: 80, top: 150, size: 22, opacity: 0.15 },
+  { emoji: '🌴', left: SCREEN_WIDTH - 110, top: 145, size: 24, opacity: 0.15 },
+];
+
+const GRASS_SPRITES: { emoji: string; left: number; top: number; size: number }[] = [];
+const grassEmojis = ['🌱', '🌿', '☘️', '🍀'];
+for (let i = 0; i < 14; i++) {
+  const isLeft = i < 7;
+  GRASS_SPRITES.push({
+    emoji: grassEmojis[i % 4],
+    left: isLeft ? seededRand(i * 7 + 1) * 30 + 4 : SCREEN_WIDTH - 36 + seededRand(i * 7 + 2) * 26,
+    top: 155 + seededRand(i * 7 + 3) * 220,
+    size: 7 + Math.floor(seededRand(i * 7 + 4) * 5),
+  });
+}
+
+const CELL_GRASS: { emoji: string; dx: number; dy: number; size: number }[][] = [];
+for (let i = 0; i < TOTAL_SLOTS; i++) {
+  const grasses: { emoji: string; dx: number; dy: number; size: number }[] = [];
+  const count = 2 + (i % 2);
+  for (let g = 0; g < count; g++) {
+    grasses.push({
+      emoji: grassEmojis[Math.floor(seededRand(i * 13 + g * 7) * 4)],
+      dx: seededRand(i * 13 + g * 7 + 1) * (CELL_W - 14) + 4,
+      dy: seededRand(i * 13 + g * 7 + 2) * (CELL_H - 12) + 2,
+      size: 7 + Math.floor(seededRand(i * 13 + g * 7 + 3) * 4),
+    });
   }
+  CELL_GRASS.push(grasses);
+}
+
+function Mountains() {
+  const mountainTop = GARDEN_HEIGHT * 0.42;
   return (
     <>
-      {dots.map((dot, i) => (
-        <View
-          key={`dot-${i}`}
-          style={{
-            position: 'absolute' as const,
-            left: dot.x - 2,
-            top: dot.y - 2,
-            width: 4,
-            height: 4,
-            borderRadius: 2,
-            backgroundColor: '#A5D6A7',
-            opacity: 0.5,
-          }}
-        />
+      {MOUNTAIN_DATA.map((m, i) => {
+        if (m.type === 'dome') {
+          return (
+            <View
+              key={`m-${i}`}
+              style={{
+                position: 'absolute' as const,
+                bottom: GARDEN_HEIGHT - mountainTop,
+                left: m.left,
+                width: m.w,
+                height: m.h,
+                borderTopLeftRadius: (m.w ?? 100) / 2,
+                borderTopRightRadius: (m.w ?? 100) / 2,
+                backgroundColor: m.color,
+                zIndex: 3,
+              }}
+            />
+          );
+        }
+        return (
+          <View
+            key={`m-${i}`}
+            style={{
+              position: 'absolute' as const,
+              bottom: GARDEN_HEIGHT - mountainTop,
+              left: m.left,
+              width: 0,
+              height: 0,
+              backgroundColor: 'transparent',
+              borderStyle: 'solid' as const,
+              borderLeftWidth: m.bL ?? 40,
+              borderRightWidth: m.bR ?? 40,
+              borderBottomWidth: m.bB ?? 80,
+              borderLeftColor: 'transparent',
+              borderRightColor: 'transparent',
+              borderBottomColor: m.color,
+              zIndex: 3,
+            }}
+          />
+        );
+      })}
+    </>
+  );
+}
+
+function SunWithFace() {
+  const glowScale = useRef(new Animated.Value(1)).current;
+  const rayRotation = useRef(new Animated.Value(0)).current;
+  const blinkAnim = useRef(new Animated.Value(1)).current;
+
+  useEffect(() => {
+    const glowLoop = Animated.loop(
+      Animated.sequence([
+        Animated.timing(glowScale, { toValue: 1.08, duration: 2500, easing: Easing.inOut(Easing.sin), useNativeDriver: true }),
+        Animated.timing(glowScale, { toValue: 1, duration: 2500, easing: Easing.inOut(Easing.sin), useNativeDriver: true }),
+      ])
+    );
+    glowLoop.start();
+
+    const rayLoop = Animated.loop(
+      Animated.timing(rayRotation, { toValue: 1, duration: 12000, easing: Easing.linear, useNativeDriver: true })
+    );
+    rayLoop.start();
+
+    const blink = () => {
+      Animated.sequence([
+        Animated.delay(4000 + seededRand(Date.now()) * 2000),
+        Animated.timing(blinkAnim, { toValue: 0.1, duration: 80, useNativeDriver: true }),
+        Animated.timing(blinkAnim, { toValue: 1, duration: 80, useNativeDriver: true }),
+      ]).start(() => blink());
+    };
+    blink();
+
+    return () => { glowLoop.stop(); rayLoop.stop(); };
+  }, [glowScale, rayRotation, blinkAnim]);
+
+  const rayRotate = rayRotation.interpolate({ inputRange: [0, 1], outputRange: ['0deg', '360deg'] });
+  const rays = [0, 30, 60, 90, 120, 150];
+
+  return (
+    <View style={{ position: 'absolute' as const, top: 10, right: 30, width: 44, height: 44, zIndex: 4, opacity: 0.7 }}>
+      <Animated.View style={{
+        position: 'absolute' as const, top: -58, left: -58, width: 160, height: 160,
+        alignItems: 'center' as const, justifyContent: 'center' as const,
+        transform: [{ rotate: rayRotate }],
+      }}>
+        {rays.map((angle) => (
+          <View key={angle} style={{
+            position: 'absolute' as const, width: 2.5, height: 130, borderRadius: 1.25,
+            backgroundColor: 'rgba(255,245,200,0.1)', transform: [{ rotate: `${angle}deg` }],
+          }} />
+        ))}
+      </Animated.View>
+      <Animated.View style={{
+        position: 'absolute' as const, top: -18, left: -18, width: 80, height: 80, borderRadius: 40,
+        backgroundColor: 'rgba(255,248,225,0.18)', transform: [{ scale: glowScale }],
+      }} />
+      <View style={{
+        width: 36, height: 36, borderRadius: 18, backgroundColor: '#FFF9C4',
+        position: 'absolute' as const, top: 4, left: 4,
+        alignItems: 'center' as const, justifyContent: 'center' as const,
+        shadowColor: '#FFE082', shadowOffset: { width: 0, height: 0 }, shadowOpacity: 0.6, shadowRadius: 8,
+      }}>
+        <View style={{ flexDirection: 'row' as const, gap: 7, marginTop: -3 }}>
+          <Animated.View style={{ width: 3.5, height: 3.5, borderRadius: 1.75, backgroundColor: '#A1887F', transform: [{ scaleY: blinkAnim }] }} />
+          <Animated.View style={{ width: 3.5, height: 3.5, borderRadius: 1.75, backgroundColor: '#A1887F', transform: [{ scaleY: blinkAnim }] }} />
+        </View>
+        <View style={{ flexDirection: 'row' as const, gap: 12, marginTop: 1 }}>
+          <View style={{ width: 6, height: 3.5, borderRadius: 2, backgroundColor: 'rgba(255,171,145,0.25)' }} />
+          <View style={{ width: 6, height: 3.5, borderRadius: 2, backgroundColor: 'rgba(255,171,145,0.25)' }} />
+        </View>
+        <View style={{
+          width: 10, height: 5, borderBottomLeftRadius: 5, borderBottomRightRadius: 5,
+          borderWidth: 1.2, borderTopWidth: 0, borderColor: '#A1887F', backgroundColor: 'transparent', marginTop: 0.5,
+        }} />
+      </View>
+    </View>
+  );
+}
+
+function SingleCloud({ data }: { data: typeof CLOUD_DATA[0] }) {
+  const translateX = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    const startX = -data.w + (SCREEN_WIDTH + data.w) * data.startFrac;
+    const remainFrac = 1 - data.startFrac;
+    translateX.setValue(startX);
+    Animated.timing(translateX, {
+      toValue: SCREEN_WIDTH + 20,
+      duration: data.duration * remainFrac,
+      easing: Easing.linear,
+      useNativeDriver: true,
+    }).start(() => {
+      translateX.setValue(-data.w - 20);
+      Animated.loop(
+        Animated.timing(translateX, { toValue: SCREEN_WIDTH + 20, duration: data.duration, easing: Easing.linear, useNativeDriver: true })
+      ).start();
+    });
+  }, [translateX, data]);
+
+  const bumpH = data.h * 1.3;
+  return (
+    <Animated.View style={{
+      position: 'absolute' as const, top: data.y, width: data.w, height: data.h + bumpH * 0.5,
+      transform: [{ translateX }], zIndex: 4,
+    }}>
+      <View style={{
+        position: 'absolute' as const, bottom: 0, left: 0, right: 0, height: data.h,
+        borderRadius: data.h / 2, backgroundColor: 'rgba(255,255,255,0.4)',
+      }} />
+      <View style={{
+        position: 'absolute' as const, bottom: data.h * 0.35, left: data.w * 0.15,
+        width: bumpH, height: bumpH, borderRadius: bumpH / 2, backgroundColor: 'rgba(255,255,255,0.4)',
+      }} />
+      <View style={{
+        position: 'absolute' as const, bottom: data.h * 0.25, left: data.w * 0.48,
+        width: bumpH * 1.1, height: bumpH * 1.1, borderRadius: bumpH * 0.55, backgroundColor: 'rgba(255,255,255,0.4)',
+      }} />
+    </Animated.View>
+  );
+}
+
+function CloudsLayer() {
+  return <>{CLOUD_DATA.map((c, i) => <SingleCloud key={i} data={c} />)}</>;
+}
+
+function BirdShape({ size, color }: { size: number; color: string }) {
+  return (
+    <View style={{ width: size, height: size / 2 }}>
+      <View style={{
+        position: 'absolute' as const, left: 0, top: size / 4 - 1,
+        width: size / 2, height: 2, backgroundColor: color,
+        transform: [{ rotate: '-25deg' }],
+      }} />
+      <View style={{
+        position: 'absolute' as const, right: 0, top: size / 4 - 1,
+        width: size / 2, height: 2, backgroundColor: color,
+        transform: [{ rotate: '25deg' }],
+      }} />
+    </View>
+  );
+}
+
+function BirdGroup({ data }: { data: typeof BIRD_DATA[0] }) {
+  const translateX = useRef(new Animated.Value(0)).current;
+  const flapAnim = useRef(new Animated.Value(1)).current;
+
+  useEffect(() => {
+    const fromX = data.dir > 0 ? -40 : SCREEN_WIDTH + 40;
+    const toX = data.dir > 0 ? SCREEN_WIDTH + 40 : -40;
+    const startX = fromX + (toX - fromX) * data.startFrac;
+    const remainFrac = 1 - data.startFrac;
+    translateX.setValue(startX);
+    Animated.timing(translateX, {
+      toValue: toX, duration: data.speed * remainFrac, easing: Easing.linear, useNativeDriver: true,
+    }).start(() => {
+      translateX.setValue(fromX);
+      Animated.loop(
+        Animated.timing(translateX, { toValue: toX, duration: data.speed, easing: Easing.linear, useNativeDriver: true })
+      ).start();
+    });
+
+    if (data.flapSpeed > 0) {
+      Animated.loop(
+        Animated.sequence([
+          Animated.timing(flapAnim, { toValue: 0.5, duration: data.flapSpeed / 2, easing: Easing.inOut(Easing.sin), useNativeDriver: true }),
+          Animated.timing(flapAnim, { toValue: 1, duration: data.flapSpeed / 2, easing: Easing.inOut(Easing.sin), useNativeDriver: true }),
+        ])
+      ).start();
+    }
+  }, [translateX, flapAnim, data]);
+
+  const birds = Array.from({ length: data.count }, (_, i) => i);
+  const color = 'rgba(60,60,80,0.25)';
+
+  return (
+    <Animated.View style={{
+      position: 'absolute' as const, top: data.y, flexDirection: 'row' as const, gap: 8,
+      transform: [{ translateX }], zIndex: 5,
+    }}>
+      {birds.map((_, i) => (
+        <Animated.View key={i} style={{ transform: [{ scaleY: data.flapSpeed > 0 ? flapAnim : 1 }], marginLeft: i * 6, marginTop: i * 4 }}>
+          <BirdShape size={data.size} color={color} />
+        </Animated.View>
+      ))}
+    </Animated.View>
+  );
+}
+
+function BirdsLayer() {
+  return <>{BIRD_DATA.map((b, i) => <BirdGroup key={i} data={b} />)}</>;
+}
+
+function TreesAndGrassDecor() {
+  return (
+    <>
+      {TREE_DATA.map((t, i) => (
+        <View key={`tree-${i}`} style={{ position: 'absolute' as const, left: t.left, top: t.top, opacity: t.opacity, zIndex: 6 }}>
+          <ScaledText size={t.size}>{t.emoji}</ScaledText>
+        </View>
+      ))}
+      {GRASS_SPRITES.map((g, i) => (
+        <View key={`grass-${i}`} style={{ position: 'absolute' as const, left: g.left, top: g.top, zIndex: 6 }}>
+          <ScaledText size={g.size}>{g.emoji}</ScaledText>
+        </View>
       ))}
     </>
   );
 }
 
-function StoneFlower({ flower: _flower, flowerType, stoneSize }: {
+function PlantedFlower({ flower, flowerType, row }: {
   flower: PatientFlower;
-  flowerType: FlowerType | undefined;
-  stoneSize: number;
+  flowerType: FlowerType;
+  row: number;
 }) {
   const swayAnim = useRef(new Animated.Value(0)).current;
   const popAnim = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    Animated.spring(popAnim, {
-      toValue: 1,
-      friction: 5,
-      tension: 50,
-      useNativeDriver: true,
-    }).start();
+    Animated.spring(popAnim, { toValue: 1, friction: 5, tension: 50, useNativeDriver: true }).start();
+    const duration = 2200 + seededRand(flower.grid_position * 17) * 800;
+    const delay = seededRand(flower.grid_position * 23) * 600;
+    const timer = setTimeout(() => {
+      Animated.loop(
+        Animated.sequence([
+          Animated.timing(swayAnim, { toValue: 1, duration, easing: Easing.inOut(Easing.sin), useNativeDriver: true }),
+          Animated.timing(swayAnim, { toValue: -1, duration, easing: Easing.inOut(Easing.sin), useNativeDriver: true }),
+          Animated.timing(swayAnim, { toValue: 0, duration, easing: Easing.inOut(Easing.sin), useNativeDriver: true }),
+        ])
+      ).start();
+    }, delay);
+    return () => clearTimeout(timer);
+  }, [swayAnim, popAnim, flower.grid_position]);
 
-    const duration = 2200 + Math.random() * 800;
-    const loopAnim = Animated.loop(
-      Animated.sequence([
-        Animated.timing(swayAnim, { toValue: 1, duration, easing: Easing.inOut(Easing.sin), useNativeDriver: true }),
-        Animated.timing(swayAnim, { toValue: -1, duration, easing: Easing.inOut(Easing.sin), useNativeDriver: true }),
-        Animated.timing(swayAnim, { toValue: 0, duration, easing: Easing.inOut(Easing.sin), useNativeDriver: true }),
-      ])
-    );
-    const timer = setTimeout(() => loopAnim.start(), Math.random() * 600);
-    return () => { clearTimeout(timer); loopAnim.stop(); };
-  }, [popAnim, swayAnim]);
-
-  if (!flowerType) return null;
-
-  const rotate = swayAnim.interpolate({ inputRange: [-1, 0, 1], outputRange: ['-4deg', '0deg', '4deg'] });
-  const scale = popAnim;
-  const imgSize = stoneSize * 0.78;
+  const rotate = swayAnim.interpolate({ inputRange: [-1, 0, 1], outputRange: ['-2deg', '0deg', '2deg'] });
+  const imgSize = 32 + (row / (GRID_ROWS - 1)) * 10;
 
   return (
     <Animated.Image
@@ -177,132 +426,88 @@ function StoneFlower({ flower: _flower, flowerType, stoneSize }: {
       style={{
         width: imgSize,
         height: imgSize,
-        position: 'absolute' as const,
-        transform: [{ rotate }, { scale }],
+        transform: [{ rotate }, { scale: popAnim }],
       }}
       resizeMode="contain"
     />
   );
 }
 
-const MemoStoneFlower = React.memo(StoneFlower);
+const MemoPlantedFlower = React.memo(PlantedFlower);
 
-function SparkleParticles({ width: areaW, height: areaH }: { width: number; height: number }) {
-  const particles = useRef(
-    Array.from({ length: 6 }, () => ({
-      x: new Animated.Value(Math.random() * areaW),
-      y: new Animated.Value(Math.random() * areaH),
-      opacity: new Animated.Value(0),
-      scale: new Animated.Value(0.4 + Math.random() * 0.6),
-    }))
-  ).current;
-
-  useEffect(() => {
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    const anims: Animated.CompositeAnimation[] = [];
-    particles.forEach((p, i) => {
-      const animate = () => {
-        p.opacity.setValue(0);
-        p.y.setValue(Math.random() * areaH * 0.8 + areaH * 0.1);
-        p.x.setValue(Math.random() * areaW * 0.8 + areaW * 0.1);
-        const anim = Animated.sequence([
-          Animated.delay(i * 500 + Math.random() * 1500),
-          Animated.parallel([
-            Animated.timing(p.opacity, { toValue: 0.9, duration: 500, useNativeDriver: true }),
-            Animated.timing(p.y, { toValue: (p.y as any)._value - 20, duration: 1800, useNativeDriver: true }),
-          ]),
-          Animated.timing(p.opacity, { toValue: 0, duration: 500, useNativeDriver: true }),
-        ]);
-        anim.start(() => animate());
-        anims.push(anim);
-      };
-      animate();
-    });
-    return () => anims.forEach((a) => a.stop());
-  }, [particles, areaW, areaH]);
-
-  return (
-    <>
-      {particles.map((p, i) => (
-        <Animated.View
-          key={i}
-          style={{
-            position: 'absolute' as const,
-            transform: [{ translateX: p.x }, { translateY: p.y }, { scale: p.scale }],
-            opacity: p.opacity,
-            zIndex: 20,
-          }}
-        >
-          <ScaledText size={12}>✨</ScaledText>
-        </Animated.View>
-      ))}
-    </>
-  );
-}
-
-function SteppingStonePath({ flowers, flowerTypeMap, onStonePress }: {
+function SoilGrid({ flowers, flowerTypeMap, onFlowerPress }: {
   flowers: PatientFlower[];
   flowerTypeMap: Record<string, FlowerType>;
-  onStonePress: (flower: PatientFlower) => void;
+  onFlowerPress: (f: PatientFlower) => void;
 }) {
-  const pathWidth = SCREEN_WIDTH - 32;
-  const positions = useMemo(() => getStonePositions(pathWidth, PATH_HEIGHT), [pathWidth]);
-  const stoneSize = 50;
-
   const flowerBySlot = useMemo(() => {
     const map: Record<number, PatientFlower> = {};
     flowers.forEach((f) => { map[f.grid_position] = f; });
     return map;
   }, [flowers]);
 
+  const gridLeft = (SCREEN_WIDTH - GRID_W) / 2;
+
   return (
-    <View style={[styles.pathContainer, { height: PATH_HEIGHT }]}>
-      <View style={styles.pathGrassBg}>
-        <View style={styles.grassStripe1} />
-        <View style={styles.grassStripe2} />
-        <View style={styles.grassStripe3} />
-      </View>
-
-      <PathDots positions={positions} />
-
-      <SparkleParticles width={pathWidth} height={PATH_HEIGHT} />
-
-      {positions.map((pos) => {
-        const flower = flowerBySlot[pos.index];
+    <View style={{
+      position: 'absolute' as const,
+      bottom: 28,
+      left: gridLeft,
+      width: GRID_W,
+      height: GRID_H,
+      transform: [{ perspective: 500 }, { rotateX: '45deg' }],
+      zIndex: 8,
+    }}>
+      {Array.from({ length: TOTAL_SLOTS }, (_, idx) => {
+        const col = idx % GRID_COLS;
+        const row = Math.floor(idx / GRID_COLS);
+        const flower = flowerBySlot[idx];
         const ft = flower ? (flower.flower_types || flowerTypeMap[flower.flower_type_id]) : undefined;
         const hasFlower = !!flower && !!ft;
+        const isEvenRow = row % 2 === 0;
+        const offsetX = isEvenRow ? -7 : 0;
+        const cellGrass = CELL_GRASS[idx];
 
         return (
           <TouchableOpacity
-            key={pos.index}
+            key={idx}
             activeOpacity={hasFlower ? 0.7 : 1}
-            onPress={hasFlower ? () => onStonePress(flower) : undefined}
+            onPress={hasFlower ? () => onFlowerPress(flower) : undefined}
             style={{
               position: 'absolute' as const,
-              left: pos.x - stoneSize / 2,
-              top: pos.y - stoneSize / 2,
-              width: stoneSize,
-              height: stoneSize,
+              left: col * CELL_W + offsetX,
+              top: row * CELL_H,
+              width: CELL_W,
+              height: CELL_H,
               alignItems: 'center' as const,
               justifyContent: 'center' as const,
             }}
           >
-            {hasFlower && (
-              <View style={[styles.stoneGlow, { backgroundColor: (RARITY_COLORS[ft!.rarity]?.glow || '#A5D6A7') + '40' }]} />
-            )}
             <View style={[
-              styles.stone,
-              hasFlower ? styles.stoneOccupied : styles.stoneEmpty,
+              gardenStyles.soilCell,
+              hasFlower ? gardenStyles.soilCellOccupied : gardenStyles.soilCellEmpty,
             ]}>
-              {hasFlower ? (
-                <MemoStoneFlower flower={flower} flowerType={ft} stoneSize={stoneSize} />
-              ) : (
-                <View style={styles.stoneEmptyDot} />
-              )}
+              <View style={gardenStyles.soilHighlight} />
+              {cellGrass.map((g, gi) => (
+                <View key={gi} style={{ position: 'absolute' as const, left: g.dx, top: g.dy }}>
+                  <ScaledText size={g.size}>{g.emoji}</ScaledText>
+                </View>
+              ))}
             </View>
-            <ScaledText size={8} color="#A5D6A7" style={{ marginTop: 1, opacity: 0.7 }}>
-              {pos.index + 1}
-            </ScaledText>
+            {hasFlower && (
+              <View style={{
+                position: 'absolute' as const, zIndex: 9,
+                width: 38 + seededRand(idx * 11) * 24,
+                height: 38 + seededRand(idx * 11) * 24,
+                borderRadius: 30,
+                backgroundColor: 'rgba(255,255,240,0.25)',
+              }} />
+            )}
+            {hasFlower && ft && (
+              <View style={{ position: 'absolute' as const, zIndex: 10 }}>
+                <MemoPlantedFlower flower={flower} flowerType={ft} row={row} />
+              </View>
+            )}
           </TouchableOpacity>
         );
       })}
@@ -310,62 +515,202 @@ function SteppingStonePath({ flowers, flowerTypeMap, onStonePress }: {
   );
 }
 
-function CollectionCard({ group, index, isZh, onPress: _onPress, expanded, onToggleExpand }: {
+function CreaturesLayer() {
+  const b1Flight = useRef(new Animated.Value(0)).current;
+  const b2Flight = useRef(new Animated.Value(0)).current;
+  const bee1Flight = useRef(new Animated.Value(0)).current;
+  const bee2Flight = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    Animated.loop(Animated.timing(b1Flight, { toValue: 1, duration: 7500, easing: Easing.linear, useNativeDriver: true })).start();
+    Animated.loop(Animated.timing(b2Flight, { toValue: 1, duration: 8200, easing: Easing.linear, useNativeDriver: true })).start();
+    Animated.loop(Animated.timing(bee1Flight, { toValue: 1, duration: 3800, easing: Easing.linear, useNativeDriver: true })).start();
+    Animated.loop(Animated.timing(bee2Flight, { toValue: 1, duration: 4200, easing: Easing.linear, useNativeDriver: true })).start();
+  }, [b1Flight, b2Flight, bee1Flight, bee2Flight]);
+
+  const gardenCenterX = SCREEN_WIDTH / 2;
+  const gardenBottom = GARDEN_HEIGHT * 0.55;
+
+  const b1x = b1Flight.interpolate({ inputRange: [0, 0.25, 0.5, 0.75, 1], outputRange: [gardenCenterX - 80, gardenCenterX + 40, gardenCenterX - 20, gardenCenterX + 70, gardenCenterX - 80] });
+  const b1y = b1Flight.interpolate({ inputRange: [0, 0.25, 0.5, 0.75, 1], outputRange: [gardenBottom - 40, gardenBottom - 70, gardenBottom - 30, gardenBottom - 60, gardenBottom - 40] });
+  const b1sx = b1Flight.interpolate({ inputRange: [0, 0.25, 0.5, 0.75, 1], outputRange: [1, -1, -1, 1, 1] });
+
+  const b2x = b2Flight.interpolate({ inputRange: [0, 0.25, 0.5, 0.75, 1], outputRange: [gardenCenterX + 60, gardenCenterX - 30, gardenCenterX + 50, gardenCenterX - 60, gardenCenterX + 60] });
+  const b2y = b2Flight.interpolate({ inputRange: [0, 0.25, 0.5, 0.75, 1], outputRange: [gardenBottom - 60, gardenBottom - 30, gardenBottom - 80, gardenBottom - 50, gardenBottom - 60] });
+
+  const bee1x = bee1Flight.interpolate({ inputRange: [0, 0.25, 0.5, 0.75, 1], outputRange: [gardenCenterX - 50, gardenCenterX - 35, gardenCenterX - 55, gardenCenterX - 30, gardenCenterX - 50] });
+  const bee1y = bee1Flight.interpolate({ inputRange: [0, 0.25, 0.5, 0.75, 1], outputRange: [gardenBottom - 20, gardenBottom - 35, gardenBottom - 15, gardenBottom - 28, gardenBottom - 20] });
+
+  const bee2x = bee2Flight.interpolate({ inputRange: [0, 0.25, 0.5, 0.75, 1], outputRange: [gardenCenterX + 30, gardenCenterX + 45, gardenCenterX + 25, gardenCenterX + 50, gardenCenterX + 30] });
+  const bee2y = bee2Flight.interpolate({ inputRange: [0, 0.25, 0.5, 0.75, 1], outputRange: [gardenBottom - 50, gardenBottom - 35, gardenBottom - 55, gardenBottom - 40, gardenBottom - 50] });
+
+  return (
+    <>
+      <Animated.View style={{ position: 'absolute' as const, zIndex: 22, transform: [{ translateX: b1x }, { translateY: b1y }, { scaleX: b1sx }] }}>
+        <ScaledText size={15}>🦋</ScaledText>
+      </Animated.View>
+      <Animated.View style={{ position: 'absolute' as const, zIndex: 22, transform: [{ translateX: b2x }, { translateY: b2y }] }}>
+        <ScaledText size={17}>🦋</ScaledText>
+      </Animated.View>
+      <Animated.View style={{ position: 'absolute' as const, zIndex: 22, transform: [{ translateX: bee1x }, { translateY: bee1y }] }}>
+        <ScaledText size={11}>🐝</ScaledText>
+      </Animated.View>
+      <Animated.View style={{ position: 'absolute' as const, zIndex: 22, transform: [{ translateX: bee2x }, { translateY: bee2y }] }}>
+        <ScaledText size={12}>🐝</ScaledText>
+      </Animated.View>
+    </>
+  );
+}
+
+function GoldenSparkles() {
+  const sparkles = useRef(
+    Array.from({ length: 6 }, (_, i) => ({
+      anim: new Animated.Value(0),
+      x: SCREEN_WIDTH * 0.2 + seededRand(i * 31) * SCREEN_WIDTH * 0.6,
+      y: GARDEN_HEIGHT * 0.35 + seededRand(i * 37) * GARDEN_HEIGHT * 0.45,
+      char: i % 2 === 0 ? '✦' : '✧',
+    }))
+  ).current;
+
+  useEffect(() => {
+    sparkles.forEach((s, i) => {
+      const duration = 1800 + seededRand(i * 41) * 1000;
+      const delay = seededRand(i * 43) * 2000;
+      const run = () => {
+        s.anim.setValue(0);
+        Animated.sequence([
+          Animated.delay(delay),
+          Animated.timing(s.anim, { toValue: 1, duration: duration / 2, useNativeDriver: true }),
+          Animated.timing(s.anim, { toValue: 0, duration: duration / 2, useNativeDriver: true }),
+        ]).start(() => run());
+      };
+      run();
+    });
+  }, [sparkles]);
+
+  return (
+    <>
+      {sparkles.map((s, i) => {
+        const opacity = s.anim;
+        const scale = s.anim.interpolate({ inputRange: [0, 0.5, 1], outputRange: [0.3, 1.2, 0.3] });
+        const rotate = s.anim.interpolate({ inputRange: [0, 1], outputRange: ['0deg', '180deg'] });
+        return (
+          <Animated.View key={i} style={{
+            position: 'absolute' as const, left: s.x, top: s.y, zIndex: 18,
+            opacity, transform: [{ scale }, { rotate }],
+          }}>
+            <ScaledText size={13} color="#FFD700">{s.char}</ScaledText>
+          </Animated.View>
+        );
+      })}
+    </>
+  );
+}
+
+function FenceRow() {
+  const postCount = 18;
+  const spacing = SCREEN_WIDTH / (postCount + 1);
+  return (
+    <View style={{ position: 'absolute' as const, bottom: 0, left: 0, right: 0, height: 28, zIndex: 12 }}>
+      <View style={{
+        position: 'absolute' as const, bottom: 10, left: 0, right: 0, height: 2.5,
+        backgroundColor: '#C69C4E', opacity: 0.3,
+      }} />
+      {Array.from({ length: postCount }, (_, i) => {
+        const tall = i % 2 === 0 ? 20 : 15;
+        return (
+          <View key={i} style={{
+            position: 'absolute' as const, bottom: 6, left: spacing * (i + 1) - 4.5,
+            width: 9, height: tall, borderRadius: 2,
+            backgroundColor: '#D7A54A', opacity: 0.5,
+          }}>
+            <View style={{
+              position: 'absolute' as const, top: 0, left: 0, right: 0, height: tall * 0.4,
+              backgroundColor: '#BF8C30', borderTopLeftRadius: 2, borderTopRightRadius: 2,
+            }} />
+          </View>
+        );
+      })}
+    </View>
+  );
+}
+
+function GardenScene({ flowers, flowerTypeMap, onFlowerPress }: {
+  flowers: PatientFlower[];
+  flowerTypeMap: Record<string, FlowerType>;
+  onFlowerPress: (f: PatientFlower) => void;
+}) {
+  return (
+    <View style={gardenStyles.container}>
+      <View style={[StyleSheet.absoluteFill, { backgroundColor: '#4E7A3E' }]} />
+      <View style={{ position: 'absolute' as const, top: 0, left: 0, right: 0, height: '55%', backgroundColor: '#7CB342' }} />
+      <View style={{ position: 'absolute' as const, top: 0, left: 0, right: 0, height: '35%', backgroundColor: '#AED581' }} />
+      <View style={{ position: 'absolute' as const, top: 0, left: 0, right: 0, height: '27%', backgroundColor: '#C5E1A5' }} />
+      <View style={{ position: 'absolute' as const, top: 0, left: 0, right: 0, height: '21%', backgroundColor: '#B8D4E8' }} />
+      <View style={{ position: 'absolute' as const, top: 0, left: 0, right: 0, height: '13%', backgroundColor: '#9ECAE1' }} />
+
+      <View style={gardenStyles.grassTexture1} />
+      <View style={gardenStyles.grassTexture2} />
+      <View style={gardenStyles.grassTexture3} />
+
+      <Mountains />
+      <SunWithFace />
+      <CloudsLayer />
+      <BirdsLayer />
+      <TreesAndGrassDecor />
+      <SoilGrid flowers={flowers} flowerTypeMap={flowerTypeMap} onFlowerPress={onFlowerPress} />
+      <CreaturesLayer />
+      <GoldenSparkles />
+      <FenceRow />
+    </View>
+  );
+}
+
+function CollectionCard({ group, index, isZh, expanded, onToggleExpand }: {
   group: GroupedFlower;
   index: number;
   isZh: boolean;
-  onPress: () => void;
   expanded: boolean;
   onToggleExpand: () => void;
 }) {
   const popAnim = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
-    // eslint-disable-next-line react-hooks/exhaustive-deps
     Animated.spring(popAnim, {
-      toValue: 1,
-      friction: 6,
-      tension: 50,
-      delay: index * 60,
-      useNativeDriver: true,
+      toValue: 1, friction: 6, tension: 50, delay: index * 60, useNativeDriver: true,
     }).start();
   }, [popAnim, index]);
 
   const scale = popAnim.interpolate({ inputRange: [0, 1], outputRange: [0.5, 1] });
-  const opacity = popAnim;
-
   const { flowerType, count, flowers: flowerInstances } = group;
   const rarity = flowerType.rarity || 'common';
   const rarityInfo = RARITY_COLORS[rarity] || RARITY_COLORS.common;
 
   return (
-    <Animated.View style={[styles.collectionCard, { transform: [{ scale }], opacity }]}>
+    <Animated.View style={[styles.collectionCard, { transform: [{ scale }], opacity: popAnim }]}>
       <TouchableOpacity onPress={onToggleExpand} activeOpacity={0.8} style={styles.collectionCardInner}>
         <View style={[styles.cardGlow, { backgroundColor: rarityInfo.glow + '18' }]} />
-
         {count > 1 && (
           <View style={styles.countBadge}>
             <ScaledText size={10} weight="bold" color="#FFF">×{count}</ScaledText>
           </View>
         )}
-
-        <Image
-          source={{ uri: flowerType.image_url }}
-          style={styles.cardFlowerImage}
-          resizeMode="contain"
-        />
-
-        <ScaledText size={11} weight="600" color={Colors.textPrimary} numberOfLines={1} style={styles.cardFlowerName}>
-          {isZh ? (flowerType.name_zh || flowerType.name_en) : flowerType.name_en}
-        </ScaledText>
-
-        <View style={[styles.cardRarityBadge, { backgroundColor: rarityInfo.bg }]}>
-          <View style={[styles.cardRarityDot, { backgroundColor: rarityInfo.dot }]} />
-          <ScaledText size={9} weight="700" color={rarityInfo.dot}>
-            {rarity.charAt(0).toUpperCase() + rarity.slice(1)}
-          </ScaledText>
+        <View style={{ flexDirection: 'row' as const, alignItems: 'center' as const, gap: 10, width: '100%' }}>
+          <View style={[styles.cardImageBg, { backgroundColor: rarityInfo.bg }]}>
+            <Image source={{ uri: flowerType.image_url }} style={styles.cardFlowerImage} resizeMode="contain" />
+          </View>
+          <View style={{ flex: 1 }}>
+            <ScaledText size={12} weight="600" color={Colors.textPrimary} numberOfLines={1}>
+              {isZh ? (flowerType.name_zh || flowerType.name_en) : flowerType.name_en}
+            </ScaledText>
+            <View style={[styles.cardRarityBadge, { backgroundColor: rarityInfo.bg }]}>
+              <View style={[styles.cardRarityDot, { backgroundColor: rarityInfo.dot }]} />
+              <ScaledText size={9} weight="700" color={rarityInfo.dot}>
+                {rarity.charAt(0).toUpperCase() + rarity.slice(1)}
+              </ScaledText>
+            </View>
+          </View>
         </View>
-
         {expanded && (
           <View style={styles.cardExpandedSection}>
             <View style={styles.cardDivider} />
@@ -374,10 +719,7 @@ function CollectionCard({ group, index, isZh, onPress: _onPress, expanded, onTog
             </ScaledText>
             {flowerInstances.slice(0, 5).map((fi) => (
               <ScaledText key={fi.id} size={9} color={Colors.textSecondary} style={{ marginTop: 2 }}>
-                {new Date(fi.obtained_at).toLocaleDateString(isZh ? 'zh-TW' : 'en-US', {
-                  month: 'short',
-                  day: 'numeric',
-                })}
+                {new Date(fi.obtained_at).toLocaleDateString(isZh ? 'zh-TW' : 'en-US', { month: 'short', day: 'numeric' })}
               </ScaledText>
             ))}
             {flowerInstances.length > 5 && (
@@ -396,25 +738,18 @@ const MemoCollectionCard = React.memo(CollectionCard);
 
 function CollectionProgress({ count, total, isZh }: { count: number; total: number; isZh: boolean }) {
   const progress = total > 0 ? count / total : 0;
-  const milestones = [5, 10, 15, 20];
-
   return (
     <View style={styles.progressContainer}>
       <View style={styles.progressHeader}>
         <ScaledText size={13} weight="700" color="#5D4037">
-          🌸 {isZh ? '花田收藏' : 'Collection'}
+          🌸 {count}/{total}
         </ScaledText>
-        <ScaledText size={13} weight="600" color="#8D6E63">
-          {count}/{total}
+        <ScaledText size={11} weight="600" color="#8D6E63">
+          {isZh ? '花田收藏' : 'Collection'}
         </ScaledText>
       </View>
       <View style={styles.progressBarBg}>
         <View style={[styles.progressBarFill, { width: `${Math.min(100, progress * 100)}%` }]} />
-        {milestones.map((m) => (
-          <View key={m} style={[styles.progressMilestone, { left: `${(m / total) * 100}%` }]}>
-            <ScaledText size={10}>{count >= m ? '🌸' : '🌱'}</ScaledText>
-          </View>
-        ))}
       </View>
     </View>
   );
@@ -441,10 +776,7 @@ export default function FlowerYieldScreen() {
         .select('consecutive_inactive_days, stars_available, fires_available')
         .eq('id', patientId!)
         .single();
-      if (error) {
-        log('[FlowerYield] Patient data fetch error:', error);
-        throw error;
-      }
+      if (error) { log('[FlowerYield] Patient data fetch error:', error); throw error; }
       return data || { consecutive_inactive_days: 0, stars_available: 0, fires_available: 0 };
     },
     enabled: !!patientId,
@@ -461,10 +793,7 @@ export default function FlowerYieldScreen() {
         .eq('patient_id', patientId!)
         .eq('is_stolen', false)
         .order('grid_position');
-      if (error) {
-        log('[FlowerYield] Flowers fetch error:', error);
-        throw error;
-      }
+      if (error) { log('[FlowerYield] Flowers fetch error:', error); throw error; }
       return (data || []) as PatientFlower[];
     },
     enabled: !!patientId,
@@ -476,10 +805,7 @@ export default function FlowerYieldScreen() {
     queryFn: async () => {
       log('[FlowerYield] Fetching flower types');
       const { data, error } = await supabase.from('flower_types').select('*');
-      if (error) {
-        log('[FlowerYield] Flower types fetch error:', error);
-        throw error;
-      }
+      if (error) { log('[FlowerYield] Flower types fetch error:', error); throw error; }
       return (data || []) as FlowerType[];
     },
     staleTime: 10 * 60 * 1000,
@@ -503,15 +829,12 @@ export default function FlowerYieldScreen() {
   const flowers = flowersQuery.data || [];
   const isLoading = patientDataQuery.isLoading || flowersQuery.isLoading || flowerTypesQuery.isLoading;
 
-  const flowersData = flowersQuery.data;
   const groupedFlowers = useMemo(() => {
     const groups: Record<string, GroupedFlower> = {};
-    (flowersData || []).forEach((f) => {
+    (flowersQuery.data || []).forEach((f) => {
       const ft = f.flower_types || flowerTypeMap[f.flower_type_id];
       if (!ft) return;
-      if (!groups[ft.id]) {
-        groups[ft.id] = { flowerType: ft, count: 0, flowers: [] };
-      }
+      if (!groups[ft.id]) { groups[ft.id] = { flowerType: ft, count: 0, flowers: [] }; }
       groups[ft.id].count += 1;
       groups[ft.id].flowers.push(f);
     });
@@ -521,7 +844,7 @@ export default function FlowerYieldScreen() {
       if (ra !== rb) return ra - rb;
       return b.count - a.count;
     });
-  }, [flowersData, flowerTypeMap]);
+  }, [flowersQuery.data, flowerTypeMap]);
 
   const selectedFlowerType = selectedFlower
     ? (selectedFlower.flower_types || flowerTypeMap[selectedFlower.flower_type_id])
@@ -531,7 +854,7 @@ export default function FlowerYieldScreen() {
     ? groupedFlowers.find((g) => g.flowerType.id === selectedFlowerType.id)?.count ?? 1
     : 1;
 
-  const handleStonePress = useCallback((flower: PatientFlower) => {
+  const handleFlowerPress = useCallback((flower: PatientFlower) => {
     setSelectedFlower(flower);
   }, []);
 
@@ -551,65 +874,31 @@ export default function FlowerYieldScreen() {
       <SafeAreaView style={styles.safeArea}>
         <View style={styles.header}>
           <TouchableOpacity onPress={() => router.back()} style={styles.backBtn} testID="flower-yield-back">
-            <ChevronLeft size={24} color="#5D4037" />
+            <ChevronLeft size={22} color="#5D4037" />
           </TouchableOpacity>
           <View style={styles.woodenSign}>
-            <ScaledText size={18} weight="bold" color="#4E342E" numberOfLines={1}>
+            <ScaledText size={17} weight="bold" color="#4E342E" numberOfLines={1}>
               {patientName ? (isZh ? `${patientName}的花田` : `${patientName}'s Garden`) : (isZh ? '我的花田' : 'My Garden')}
             </ScaledText>
           </View>
-          <View style={{ width: 40 }} />
+          <View style={styles.headerChips}>
+            <View style={styles.resourceChip}>
+              <ScaledText size={11} weight="600" color="#B8860B">⭐ {patientData?.stars_available ?? 0}</ScaledText>
+            </View>
+            <View style={styles.resourceChip}>
+              <ScaledText size={11} weight="600" color="#E65100">🔥 {patientData?.fires_available ?? 0}</ScaledText>
+            </View>
+          </View>
         </View>
 
-        <ScrollView
-          style={styles.scrollView}
-          contentContainerStyle={styles.scrollContent}
-          showsVerticalScrollIndicator={false}
-        >
-          <View style={styles.topBar}>
-            <View style={styles.resourceChip}>
-              <ScaledText size={12} weight="600" color="#B8860B">⭐ {patientData?.stars_available ?? 0}</ScaledText>
-            </View>
-            <View style={styles.resourceChip}>
-              <ScaledText size={12} weight="600" color="#E65100">🔥 {patientData?.fires_available ?? 0}</ScaledText>
-            </View>
-            <TouchableOpacity style={styles.drawBtn} onPress={() => router.push('/gacha-draw')} activeOpacity={0.75} testID="lucky-draw-btn">
-              <Sparkles size={14} color="#FFF" />
-              <ScaledText size={11} weight="700" color="#FFF">
-                {language === 'zh_hant' ? '抽出幸運花朵' : language === 'zh_hans' ? '抽出幸运花朵' : 'Lucky Flower Draw'}
-              </ScaledText>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={styles.chestBtn}
-              onPress={() => router.push('/treasure-chest')}
-              activeOpacity={0.75}
-              testID="treasure-chest-btn"
-            >
-              <Gift size={14} color="#8B4513" />
-              <ScaledText size={11} weight="700" color="#8B4513">
-                {language === 'zh_hant' ? '我的寶箱' : language === 'zh_hans' ? '我的宝箱' : 'Treasure'}
-              </ScaledText>
-            </TouchableOpacity>
-          </View>
-
-          <CollectionProgress count={flowers.length} total={TOTAL_SLOTS} isZh={isZh} />
-
+        <ScrollView style={styles.scrollView} contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
           {isLoading ? (
             <View style={styles.loadingContainer}>
               <ActivityIndicator size="large" color={Colors.primary} />
             </View>
           ) : (
             <>
-              <View style={styles.pathSectionHeader}>
-                <ScaledText size={14} weight="700" color="#5D4037">
-                  🌿 {isZh ? '花田小路' : 'Garden Path'}
-                </ScaledText>
-              </View>
-              <SteppingStonePath
-                flowers={flowers}
-                flowerTypeMap={flowerTypeMap}
-                onStonePress={handleStonePress}
-              />
+              <GardenScene flowers={flowers} flowerTypeMap={flowerTypeMap} onFlowerPress={handleFlowerPress} />
 
               {flowers.length === 0 && (
                 <View style={styles.emptyHint}>
@@ -619,21 +908,34 @@ export default function FlowerYieldScreen() {
                 </View>
               )}
 
+              <View style={styles.actionRow}>
+                <TouchableOpacity style={styles.drawBtn} onPress={() => router.push('/gacha-draw')} activeOpacity={0.75} testID="lucky-draw-btn">
+                  <Sparkles size={15} color="#FFF" />
+                  <ScaledText size={12} weight="700" color="#FFF">
+                    {language === 'zh_hant' ? '抽出幸運花朵' : language === 'zh_hans' ? '抽出幸运花朵' : 'Lucky Flower Draw'}
+                  </ScaledText>
+                </TouchableOpacity>
+                <TouchableOpacity style={styles.chestBtn} onPress={() => router.push('/treasure-chest')} activeOpacity={0.75} testID="treasure-chest-btn">
+                  <Gift size={14} color="#8B4513" />
+                  <ScaledText size={11} weight="700" color="#8B4513">
+                    {language === 'zh_hant' ? '我的寶箱' : language === 'zh_hans' ? '我的宝箱' : 'Treasure'}
+                  </ScaledText>
+                </TouchableOpacity>
+              </View>
+
+              <CollectionProgress count={flowers.length} total={TOTAL_SLOTS} isZh={isZh} />
+
               {groupedFlowers.length > 0 && (
                 <View style={styles.collectionSection}>
                   <TouchableOpacity onPress={toggleCollection} activeOpacity={0.7} style={styles.collectionHeader}>
-                    <ScaledText size={16} weight="bold" color="#5D4037">
+                    <ScaledText size={15} weight="bold" color="#5D4037">
                       🌸 {isZh ? '我的花朵收藏' : 'My Collection'}
                     </ScaledText>
                     <View style={styles.collectionToggle}>
                       <ScaledText size={12} color="#8D6E63">
                         {groupedFlowers.length} {isZh ? '種' : 'types'}
                       </ScaledText>
-                      {collectionExpanded ? (
-                        <ChevronUp size={16} color="#8D6E63" />
-                      ) : (
-                        <ChevronDown size={16} color="#8D6E63" />
-                      )}
+                      {collectionExpanded ? <ChevronUp size={16} color="#8D6E63" /> : <ChevronDown size={16} color="#8D6E63" />}
                     </View>
                   </TouchableOpacity>
 
@@ -645,10 +947,6 @@ export default function FlowerYieldScreen() {
                           group={group}
                           index={index}
                           isZh={isZh}
-                          onPress={() => {
-                            const firstFlower = group.flowers[0];
-                            if (firstFlower) setSelectedFlower(firstFlower);
-                          }}
                           expanded={expandedCardId === group.flowerType.id}
                           onToggleExpand={() => toggleCardExpand(group.flowerType.id)}
                         />
@@ -716,9 +1014,7 @@ export default function FlowerYieldScreen() {
                   <ScaledText size={12} color={Colors.textSecondary} style={{ marginTop: 10 }}>
                     {isZh ? '獲得日期：' : 'Acquired: '}
                     {new Date(selectedFlower.obtained_at).toLocaleDateString(isZh ? 'zh-TW' : 'en-US', {
-                      year: 'numeric',
-                      month: 'short',
-                      day: 'numeric',
+                      year: 'numeric', month: 'short', day: 'numeric',
                     })}
                   </ScaledText>
                 )}
@@ -733,6 +1029,67 @@ export default function FlowerYieldScreen() {
 
 const CARD_WIDTH = (SCREEN_WIDTH - 32 - 10) / 2;
 
+const gardenStyles = StyleSheet.create({
+  container: {
+    width: SCREEN_WIDTH,
+    height: GARDEN_HEIGHT,
+    overflow: 'hidden',
+    position: 'relative',
+  },
+  grassTexture1: {
+    position: 'absolute',
+    top: '38%',
+    left: -10,
+    right: -10,
+    height: 35,
+    backgroundColor: 'rgba(139,195,74,0.06)',
+    borderRadius: 18,
+    transform: [{ rotate: '-2deg' }],
+  },
+  grassTexture2: {
+    position: 'absolute',
+    top: '52%',
+    left: -10,
+    right: -10,
+    height: 28,
+    backgroundColor: 'rgba(104,159,56,0.05)',
+    borderRadius: 14,
+    transform: [{ rotate: '1.5deg' }],
+  },
+  grassTexture3: {
+    position: 'absolute',
+    top: '65%',
+    left: -10,
+    right: -10,
+    height: 22,
+    backgroundColor: 'rgba(85,139,47,0.05)',
+    borderRadius: 11,
+    transform: [{ rotate: '-1deg' }],
+  },
+  soilCell: {
+    width: CELL_W,
+    height: CELL_H,
+    overflow: 'hidden',
+    borderWidth: 0.5,
+    borderColor: 'rgba(93,64,55,0.2)',
+  },
+  soilCellOccupied: {
+    backgroundColor: '#6D4C41',
+  },
+  soilCellEmpty: {
+    backgroundColor: '#9E8E7E',
+    opacity: 0.65,
+  },
+  soilHighlight: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    height: 3,
+    backgroundColor: 'rgba(255,255,255,0.12)',
+  },
+});
+
 const styles = StyleSheet.create({
   root: {
     flex: 1,
@@ -744,13 +1101,14 @@ const styles = StyleSheet.create({
   header: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: 12,
-    paddingVertical: 8,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    gap: 6,
   },
   backBtn: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
+    width: 34,
+    height: 34,
+    borderRadius: 17,
     backgroundColor: '#FFF8E7',
     justifyContent: 'center',
     alignItems: 'center',
@@ -761,10 +1119,9 @@ const styles = StyleSheet.create({
     flex: 1,
     alignItems: 'center',
     backgroundColor: '#FFECB3',
-    marginHorizontal: 12,
-    paddingVertical: 10,
-    paddingHorizontal: 16,
-    borderRadius: 14,
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    borderRadius: 10,
     borderWidth: 2,
     borderColor: '#D7A54A',
     shadowColor: '#8D6E63',
@@ -773,52 +1130,68 @@ const styles = StyleSheet.create({
     shadowRadius: 4,
     elevation: 3,
   },
+  headerChips: {
+    flexDirection: 'row',
+    gap: 4,
+  },
+  resourceChip: {
+    backgroundColor: '#FFF8E1',
+    borderRadius: 8,
+    paddingHorizontal: 8,
+    paddingVertical: 5,
+    borderWidth: 1,
+    borderColor: '#FFE082',
+  },
   scrollView: {
     flex: 1,
   },
   scrollContent: {
     paddingBottom: 40,
   },
-  topBar: {
-    flexDirection: 'row',
+  loadingContainer: {
+    padding: 80,
     alignItems: 'center',
-    marginHorizontal: 16,
-    marginTop: 8,
-    marginBottom: 10,
-    gap: 6,
   },
-  resourceChip: {
-    backgroundColor: '#FFF8E1',
-    borderRadius: 10,
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-    borderWidth: 1,
-    borderColor: '#FFE082',
+  emptyHint: {
+    alignItems: 'center',
+    marginHorizontal: 40,
+    marginTop: 10,
+    marginBottom: 8,
+    backgroundColor: 'rgba(255,255,255,0.75)',
+    paddingVertical: 10,
+    borderRadius: 12,
+  },
+  actionRow: {
+    flexDirection: 'row',
+    marginHorizontal: 16,
+    marginTop: 12,
+    marginBottom: 10,
+    gap: 8,
   },
   drawBtn: {
+    flex: 2,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 5,
+    backgroundColor: '#E91E63',
+    paddingVertical: 12,
+    borderRadius: 16,
+    shadowColor: '#E91E63',
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.35,
+    shadowRadius: 6,
+    elevation: 4,
+  },
+  chestBtn: {
     flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     gap: 4,
-    backgroundColor: '#E91E63',
-    paddingVertical: 10,
-    borderRadius: 12,
-    shadowColor: '#E91E63',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.3,
-    shadowRadius: 4,
-    elevation: 3,
-  },
-  chestBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 4,
     backgroundColor: '#FFE0B2',
-    paddingVertical: 10,
-    paddingHorizontal: 12,
-    borderRadius: 12,
+    paddingVertical: 12,
+    borderRadius: 16,
     borderWidth: 1.5,
     borderColor: '#FFCC80',
   },
@@ -826,22 +1199,21 @@ const styles = StyleSheet.create({
     marginHorizontal: 16,
     marginBottom: 12,
     backgroundColor: '#FFF8E7',
-    borderRadius: 14,
-    padding: 12,
+    borderRadius: 12,
+    padding: 10,
     borderWidth: 1,
     borderColor: '#F0E0C0',
   },
   progressHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    marginBottom: 8,
+    marginBottom: 6,
   },
   progressBarBg: {
-    height: 20,
+    height: 14,
     backgroundColor: '#E8E0D0',
-    borderRadius: 10,
+    borderRadius: 7,
     overflow: 'hidden',
-    position: 'relative',
   },
   progressBarFill: {
     position: 'absolute',
@@ -849,116 +1221,7 @@ const styles = StyleSheet.create({
     left: 0,
     bottom: 0,
     backgroundColor: '#8BC34A',
-    borderRadius: 10,
-  },
-  progressMilestone: {
-    position: 'absolute',
-    top: 0,
-    bottom: 0,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginLeft: -8,
-  },
-  pathSectionHeader: {
-    marginHorizontal: 16,
-    marginBottom: 6,
-  },
-  pathContainer: {
-    marginHorizontal: 16,
-    borderRadius: 20,
-    overflow: 'hidden',
-    position: 'relative',
-    backgroundColor: '#D5EDCE',
-    borderWidth: 2,
-    borderColor: '#B8D4AA',
-    marginBottom: 16,
-  },
-  pathGrassBg: {
-    ...StyleSheet.absoluteFillObject,
-    overflow: 'hidden',
-  },
-  grassStripe1: {
-    position: 'absolute',
-    top: '20%',
-    left: -10,
-    right: -10,
-    height: 30,
-    backgroundColor: '#C8E6B4',
-    opacity: 0.4,
-    borderRadius: 15,
-    transform: [{ rotate: '-3deg' }],
-  },
-  grassStripe2: {
-    position: 'absolute',
-    top: '50%',
-    left: -10,
-    right: -10,
-    height: 25,
-    backgroundColor: '#B9DCA4',
-    opacity: 0.35,
-    borderRadius: 15,
-    transform: [{ rotate: '2deg' }],
-  },
-  grassStripe3: {
-    position: 'absolute',
-    top: '75%',
-    left: -10,
-    right: -10,
-    height: 20,
-    backgroundColor: '#C8E6B4',
-    opacity: 0.3,
-    borderRadius: 15,
-    transform: [{ rotate: '-1deg' }],
-  },
-  stone: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    justifyContent: 'center',
-    alignItems: 'center',
-    overflow: 'hidden',
-  },
-  stoneOccupied: {
-    backgroundColor: '#E8F5E9',
-    borderWidth: 2,
-    borderColor: '#A5D6A7',
-    shadowColor: '#2E7D32',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.15,
-    shadowRadius: 4,
-    elevation: 3,
-  },
-  stoneEmpty: {
-    backgroundColor: '#D7CCC8',
-    borderWidth: 1.5,
-    borderColor: '#BCAAA4',
-    opacity: 0.5,
-  },
-  stoneEmptyDot: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-    backgroundColor: '#BCAAA4',
-    opacity: 0.6,
-  },
-  stoneGlow: {
-    position: 'absolute',
-    width: 52,
-    height: 52,
-    borderRadius: 26,
-  },
-  emptyHint: {
-    alignItems: 'center',
-    marginHorizontal: 40,
-    marginTop: -8,
-    marginBottom: 16,
-    backgroundColor: 'rgba(255,255,255,0.75)',
-    paddingVertical: 10,
-    borderRadius: 12,
-  },
-  loadingContainer: {
-    padding: 60,
-    alignItems: 'center',
+    borderRadius: 7,
   },
   collectionSection: {
     marginHorizontal: 16,
@@ -967,9 +1230,9 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 12,
+    marginBottom: 10,
     backgroundColor: '#FFF8E7',
-    borderRadius: 14,
+    borderRadius: 12,
     paddingVertical: 10,
     paddingHorizontal: 14,
     borderWidth: 1,
@@ -989,11 +1252,10 @@ const styles = StyleSheet.create({
     width: CARD_WIDTH,
   },
   collectionCardInner: {
-    alignItems: 'center',
     backgroundColor: '#FFFDF5',
-    borderRadius: 16,
-    paddingVertical: 12,
-    paddingHorizontal: 8,
+    borderRadius: 14,
+    paddingVertical: 10,
+    paddingHorizontal: 10,
     borderWidth: 1,
     borderColor: '#F0E8D8',
     shadowColor: '#8D6E63',
@@ -1006,7 +1268,7 @@ const styles = StyleSheet.create({
   },
   cardGlow: {
     ...StyleSheet.absoluteFillObject,
-    borderRadius: 16,
+    borderRadius: 14,
   },
   countBadge: {
     position: 'absolute',
@@ -1020,27 +1282,31 @@ const styles = StyleSheet.create({
     minWidth: 24,
     alignItems: 'center',
   },
-  cardFlowerImage: {
-    width: 56,
-    height: 56,
-    marginBottom: 6,
+  cardImageBg: {
+    width: 44,
+    height: 44,
+    borderRadius: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
-  cardFlowerName: {
-    textAlign: 'center',
-    marginBottom: 4,
+  cardFlowerImage: {
+    width: 36,
+    height: 36,
   },
   cardRarityBadge: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 4,
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-    borderRadius: 8,
+    gap: 3,
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 6,
+    marginTop: 4,
+    alignSelf: 'flex-start',
   },
   cardRarityDot: {
-    width: 6,
-    height: 6,
-    borderRadius: 3,
+    width: 5,
+    height: 5,
+    borderRadius: 2.5,
   },
   cardExpandedSection: {
     marginTop: 8,

@@ -32,6 +32,14 @@ const RARITY_CAPSULE_COLORS: Record<string, string> = {
   legendary: '#BA68C8',
 };
 
+const RARITY_CAPSULE_IMAGES: Record<string, string> = {
+  common: 'https://pfgtnrlgetomfmrzbxgb.supabase.co/storage/v1/object/public/flowers/capsule-pink.png',
+  uncommon: 'https://pfgtnrlgetomfmrzbxgb.supabase.co/storage/v1/object/public/flowers/capsule-blue.png',
+  rare: 'https://pfgtnrlgetomfmrzbxgb.supabase.co/storage/v1/object/public/flowers/capsule-gold.png',
+  epic: 'https://pfgtnrlgetomfmrzbxgb.supabase.co/storage/v1/object/public/flowers/capsule-purple.png',
+  legendary: 'https://pfgtnrlgetomfmrzbxgb.supabase.co/storage/v1/object/public/flowers/capsule-purple.png',
+};
+
 const RARITY_GLOW_COLORS: Record<string, string> = {
   common: 'rgba(244,143,177,0.4)',
   uncommon: 'rgba(100,181,246,0.4)',
@@ -99,7 +107,7 @@ function CapsuleMachine({ shakeAnim }: { shakeAnim: Animated.Value }) {
     <Animated.View style={[styles.machineContainer, { transform: [{ rotate: machineShake }] }]}>
       <Image
         source={{ uri: GACHA_MACHINE_URL }}
-        style={{ width: '100%', height: undefined, aspectRatio: 0.67 }}
+        style={{ width: '100%', height: undefined, aspectRatio: 0.65 }}
         resizeMode="contain"
         onError={() => log('[GachaDraw] Failed to load gacha machine image')}
       />
@@ -108,35 +116,32 @@ function CapsuleMachine({ shakeAnim }: { shakeAnim: Animated.Value }) {
 }
 
 function CapsuleBall({
-  color,
+  rarity,
   dropAnim,
   splitAnim,
   visible,
 }: {
-  color: string;
+  rarity: string;
   dropAnim: Animated.Value;
   splitAnim: Animated.Value;
   visible: boolean;
 }) {
   if (!visible) return null;
 
+  const imageUrl = RARITY_CAPSULE_IMAGES[rarity] || RARITY_CAPSULE_IMAGES.common;
+
   const translateY = dropAnim.interpolate({
     inputRange: [0, 1],
     outputRange: [-60, 180],
   });
 
-  const leftHalfTranslate = splitAnim.interpolate({
-    inputRange: [0, 1],
-    outputRange: [0, -30],
-  });
-
-  const rightHalfTranslate = splitAnim.interpolate({
-    inputRange: [0, 1],
-    outputRange: [0, 30],
-  });
-
-  const halfOpacity = splitAnim.interpolate({
+  const scale = splitAnim.interpolate({
     inputRange: [0, 0.5, 1],
+    outputRange: [1, 1.2, 0],
+  });
+
+  const opacity = splitAnim.interpolate({
+    inputRange: [0, 0.8, 1],
     outputRange: [1, 0.6, 0],
   });
 
@@ -147,19 +152,15 @@ function CapsuleBall({
         { transform: [{ translateY }] },
       ]}
     >
-      <Animated.View
-        style={[
-          styles.capsuleHalf,
-          styles.capsuleLeft,
-          { backgroundColor: color, transform: [{ translateX: leftHalfTranslate }], opacity: halfOpacity },
-        ]}
-      />
-      <Animated.View
-        style={[
-          styles.capsuleHalf,
-          styles.capsuleRight,
-          { backgroundColor: color, transform: [{ translateX: rightHalfTranslate }], opacity: halfOpacity },
-        ]}
+      <Animated.Image
+        source={{ uri: imageUrl }}
+        style={{
+          width: 56,
+          height: 56,
+          transform: [{ scale }],
+          opacity,
+        }}
+        resizeMode="contain"
       />
     </Animated.View>
   );
@@ -251,7 +252,6 @@ export default function GachaDrawScreen() {
   const capsuleDropAnim = useRef(new Animated.Value(0)).current;
   const capsuleSplitAnim = useRef(new Animated.Value(0)).current;
   const revealAnim = useRef(new Animated.Value(0)).current;
-  const [capsuleColor, setCapsuleColor] = useState<string>('#F48FB1');
   const [showCapsule, setShowCapsule] = useState<boolean>(false);
 
   const patientDataQuery = useQuery({
@@ -302,9 +302,6 @@ export default function GachaDrawScreen() {
   }, [shakeAnim, capsuleDropAnim, capsuleSplitAnim, revealAnim]);
 
   const runDrawAnimation = useCallback((flower: FlowerType, isSecondDraw: boolean) => {
-    const rarity = flower.rarity || 'common';
-    const color = RARITY_CAPSULE_COLORS[rarity] || '#F48FB1';
-    setCapsuleColor(color);
     setCurrentFlower(flower);
 
     setDrawPhase('shaking');
@@ -572,7 +569,7 @@ export default function GachaDrawScreen() {
           <CapsuleMachine shakeAnim={shakeAnim} />
 
           <CapsuleBall
-            color={capsuleColor}
+            rarity={currentFlower?.rarity || 'common'}
             dropAnim={capsuleDropAnim}
             splitAnim={capsuleSplitAnim}
             visible={showCapsule}
@@ -767,8 +764,8 @@ const styles = StyleSheet.create({
   },
   machineContainer: {
     alignItems: 'center',
-    width: SCREEN_WIDTH * 0.55,
-    maxWidth: 240,
+    width: SCREEN_WIDTH * 0.75,
+    maxWidth: 340,
   },
 
   capsuleBallContainer: {
@@ -776,19 +773,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     zIndex: 20,
   },
-  capsuleHalf: {
-    width: 28,
-    height: 28,
-    borderRadius: 14,
-  },
-  capsuleLeft: {
-    borderTopRightRadius: 0,
-    borderBottomRightRadius: 0,
-  },
-  capsuleRight: {
-    borderTopLeftRadius: 0,
-    borderBottomLeftRadius: 0,
-  },
+
   revealContainer: {
     position: 'absolute',
     alignItems: 'center',

@@ -40,11 +40,13 @@ export default function SplashAdScreen() {
     router.replace(route as any);
   }, [router, params.nextRoute]);
 
+  const shouldNavigateRef = useRef(false);
+
   useEffect(() => {
     if (!params.imageUrl) {
       log('[SplashAd] No image URL, skipping');
-      navigateNext();
-      return;
+      const t = setTimeout(() => navigateNext(), 0);
+      return () => clearTimeout(t);
     }
 
     Animated.timing(fadeAnim, {
@@ -56,7 +58,7 @@ export default function SplashAdScreen() {
     timerRef.current = setInterval(() => {
       setCountdown((prev) => {
         if (prev <= 1) {
-          navigateNext();
+          shouldNavigateRef.current = true;
           return 0;
         }
         return prev - 1;
@@ -67,6 +69,13 @@ export default function SplashAdScreen() {
       if (timerRef.current) clearInterval(timerRef.current);
     };
   }, [params.imageUrl, fadeAnim, navigateNext]);
+
+  useEffect(() => {
+    if (countdown === 0 && shouldNavigateRef.current) {
+      shouldNavigateRef.current = false;
+      navigateNext();
+    }
+  }, [countdown, navigateNext]);
 
   const handleImagePress = useCallback(() => {
     if (params.linkUrl) {

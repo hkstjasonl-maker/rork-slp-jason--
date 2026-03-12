@@ -1,7 +1,6 @@
-import React, { useEffect, useMemo, useRef, useState, useCallback } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
   View,
-  ScrollView,
   StyleSheet,
   SafeAreaView,
   ActivityIndicator,
@@ -24,20 +23,16 @@ import Colors from '@/constants/colors';
 import { log } from '@/lib/logger';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
+const SUPABASE_STORAGE = 'https://pfgtnrlgetomfmrzbxgb.supabase.co/storage/v1/object/public/flowers/';
 
-const GRID_COLS = 4;
-const GRID_ROWS = 5;
-const TOTAL_SLOTS = GRID_COLS * GRID_ROWS;
+const TOTAL_SLOTS = 20;
 
-const DEFAULT_GARDEN_WIDTH = SCREEN_WIDTH - 40;
-const DEFAULT_GARDEN_HEIGHT = (DEFAULT_GARDEN_WIDTH / GRID_COLS) * GRID_ROWS;
-
-const RARITY_COLORS: Record<string, { bg: string; text: string; label: string }> = {
-  common: { bg: '#E8F5E9', text: '#2E7D32', label: '★' },
-  uncommon: { bg: '#E3F2FD', text: '#1565C0', label: '★★' },
-  rare: { bg: '#F3E5F5', text: '#7B1FA2', label: '★★★' },
-  epic: { bg: '#FFF3E0', text: '#E65100', label: '★★★★' },
-  legendary: { bg: '#FFF8E1', text: '#F57F17', label: '★★★★★' },
+const RARITY_COLORS: Record<string, { bg: string; dot: string; label: string }> = {
+  common: { bg: '#E8F5E9', dot: '#4CAF50', label: '★' },
+  uncommon: { bg: '#E3F2FD', dot: '#2196F3', label: '★★' },
+  rare: { bg: '#F3E5F5', dot: '#9C27B0', label: '★★★' },
+  epic: { bg: '#FFF3E0', dot: '#FF9800', label: '★★★★' },
+  legendary: { bg: '#FFF8E1', dot: '#FFD700', label: '★★★★★' },
 };
 
 interface FlowerType {
@@ -59,137 +54,163 @@ interface PatientFlower {
   flower_types?: FlowerType;
 }
 
-interface PatientGardenData {
-  consecutive_inactive_days: number;
-  stars_available: number;
-  fires_available: number;
-}
-
-function getFlowerPosition(gridPosition: number, gardenWidth: number, gardenHeight: number) {
-  const col = gridPosition % GRID_COLS;
-  const row = Math.floor(gridPosition / GRID_COLS);
-
-  const centerX = gardenWidth / 2;
-  const centerY = gardenHeight / 2;
-
-  const cellW = gardenWidth * 0.135;
-  const cellH = gardenHeight * 0.085;
-
-  const offsetCol = col - 1.5;
-  const offsetRow = row - 2;
-
-  const isoX = centerX + (offsetCol - offsetRow) * cellW;
-  const isoY = centerY + (offsetCol + offsetRow) * cellH - gardenHeight * 0.05;
-
-  return {
-    left: isoX - cellW * 0.45,
-    top: isoY - cellH * 0.5,
-    cellWidth: cellW * 1.8,
-    cellHeight: cellH * 2.8,
-  };
-}
-
-function FlowerItem({ flowerType, slotIndex, gardenWidth, gardenHeight, onPress }: {
-  flower: PatientFlower;
-  flowerType: FlowerType | undefined;
-  slotIndex: number; // mapped from grid_position
-  gardenWidth: number;
-  gardenHeight: number;
-  onPress: () => void;
-}) {
-  const swayAnim = useRef(new Animated.Value(0)).current;
+function SparkleParticles() {
+  const particles = useRef(
+    Array.from({ length: 8 }, () => ({
+      x: new Animated.Value(Math.random() * SCREEN_WIDTH * 0.8),
+      y: new Animated.Value(Math.random() * 200),
+      opacity: new Animated.Value(0),
+      scale: new Animated.Value(0.3 + Math.random() * 0.7),
+    }))
+  ).current;
 
   useEffect(() => {
-    const delay = Math.random() * 1000;
-    const duration = 1500 + Math.random() * 1000;
-
-    const animation = Animated.loop(
-      Animated.sequence([
-        Animated.timing(swayAnim, {
-          toValue: 1,
-          duration: duration,
-          easing: Easing.inOut(Easing.sin),
-          useNativeDriver: true,
-        }),
-        Animated.timing(swayAnim, {
-          toValue: -1,
-          duration: duration,
-          easing: Easing.inOut(Easing.sin),
-          useNativeDriver: true,
-        }),
-        Animated.timing(swayAnim, {
-          toValue: 0,
-          duration: duration,
-          easing: Easing.inOut(Easing.sin),
-          useNativeDriver: true,
-        }),
-      ])
-    );
-
-    const timer = setTimeout(() => animation.start(), delay);
-
+    const animations: Animated.CompositeAnimation[] = [];
+    particles.forEach((p, i) => {
+      const animate = () => {
+        p.opacity.setValue(0);
+        p.y.setValue(Math.random() * 180 + 20);
+        p.x.setValue(Math.random() * (SCREEN_WIDTH - 80) + 20);
+        const anim = Animated.sequence([
+          Animated.delay(i * 400 + Math.random() * 2000),
+          Animated.parallel([
+            Animated.timing(p.opacity, { toValue: 0.8, duration: 600, useNativeDriver: true }),
+            Animated.timing(p.y, { toValue: (p.y as any)._value - 30, duration: 2000, useNativeDriver: true }),
+          ]),
+          Animated.timing(p.opacity, { toValue: 0, duration: 600, useNativeDriver: true }),
+        ]);
+        anim.start(() => animate());
+        animations.push(anim);
+      };
+      animate();
+    });
     return () => {
-      clearTimeout(timer);
-      animation.stop();
+      animations.forEach((a) => a.stop());
     };
-  }, [swayAnim]);
-
-  const rotate = swayAnim.interpolate({
-    inputRange: [-1, 0, 1],
-    outputRange: ['-3deg', '0deg', '3deg'],
-  });
-
-  if (!flowerType) return null;
-
-  const pos = getFlowerPosition(slotIndex, gardenWidth, gardenHeight);
+  }, []);
 
   return (
-    <TouchableOpacity
-      onPress={onPress}
-      activeOpacity={0.8}
-      style={[
-        styles.flowerSlot,
-        {
-          left: pos.left,
-          top: pos.top,
-          width: pos.cellWidth * 0.9,
-          height: pos.cellHeight * 1.0,
-        },
-      ]}
-      testID={`flower-slot-${slotIndex}`}
-    >
-      <Animated.Image
-        source={{ uri: flowerType.image_url }}
-        style={{
-          width: '95%',
-          height: '95%',
-          resizeMode: 'contain' as const,
-          transform: [{ rotate }],
-        }}
-      />
-    </TouchableOpacity>
+    <>
+      {particles.map((p, i) => (
+        <Animated.View
+          key={i}
+          style={{
+            position: 'absolute' as const,
+            transform: [{ translateX: p.x }, { translateY: p.y }, { scale: p.scale }],
+            opacity: p.opacity,
+            zIndex: 15,
+          }}
+        >
+          <ScaledText size={14}>✨</ScaledText>
+        </Animated.View>
+      ))}
+    </>
   );
 }
 
-const MemoFlowerItem = React.memo(FlowerItem);
+function FlowerCard({ flower: _flower, flowerType, index, isZh, onPress }: {
+  flower: PatientFlower;
+  flowerType: FlowerType | undefined;
+  index: number;
+  isZh: boolean;
+  onPress: () => void;
+}) {
+  const popAnim = useRef(new Animated.Value(0)).current;
+  const swayAnim = useRef(new Animated.Value(0)).current;
 
+  useEffect(() => {
+    Animated.spring(popAnim, {
+      toValue: 1,
+      friction: 5,
+      tension: 40,
+      delay: index * 80,
+      useNativeDriver: true,
+    }).start();
 
+    const delay = Math.random() * 1000;
+    const duration = 2000 + Math.random() * 1000;
+    let loopAnim: Animated.CompositeAnimation;
+    const timer = setTimeout(() => {
+      loopAnim = Animated.loop(
+        Animated.sequence([
+          Animated.timing(swayAnim, { toValue: 1, duration, easing: Easing.inOut(Easing.sin), useNativeDriver: true }),
+          Animated.timing(swayAnim, { toValue: -1, duration, easing: Easing.inOut(Easing.sin), useNativeDriver: true }),
+          Animated.timing(swayAnim, { toValue: 0, duration, easing: Easing.inOut(Easing.sin), useNativeDriver: true }),
+        ])
+      );
+      loopAnim.start();
+    }, delay);
+
+    return () => {
+      clearTimeout(timer);
+      if (loopAnim) loopAnim.stop();
+    };
+  }, []);
+
+  const scale = popAnim.interpolate({ inputRange: [0, 1], outputRange: [0, 1] });
+  const rotate = swayAnim.interpolate({ inputRange: [-1, 0, 1], outputRange: ['-3deg', '0deg', '3deg'] });
+
+  if (!flowerType) return <View style={styles.flowerCardEmpty} />;
+
+  const rarity = flowerType.rarity || 'common';
+  const rarityInfo = RARITY_COLORS[rarity] || RARITY_COLORS.common;
+
+  return (
+    <Animated.View style={[styles.flowerCard, { transform: [{ scale }] }]}>
+      <TouchableOpacity onPress={onPress} activeOpacity={0.75} style={styles.flowerCardInner}>
+        <View style={[styles.flowerShadow, { backgroundColor: rarityInfo.dot + '20' }]} />
+        <Animated.Image
+          source={{ uri: flowerType.image_url }}
+          style={[styles.flowerCardImage, { transform: [{ rotate }] }]}
+          resizeMode="contain"
+        />
+        <ScaledText size={11} weight="600" color={Colors.textPrimary} numberOfLines={1} style={styles.flowerCardName}>
+          {isZh ? (flowerType.name_zh || flowerType.name_en) : flowerType.name_en}
+        </ScaledText>
+        <View style={[styles.rarityDot, { backgroundColor: rarityInfo.dot }]} />
+      </TouchableOpacity>
+    </Animated.View>
+  );
+}
+
+const MemoFlowerCard = React.memo(FlowerCard);
+
+function CollectionProgress({ count, total, isZh }: { count: number; total: number; isZh: boolean }) {
+  const progress = total > 0 ? count / total : 0;
+  const milestones = [5, 10, 15, 20];
+
+  return (
+    <View style={styles.progressContainer}>
+      <View style={styles.progressHeader}>
+        <ScaledText size={13} weight="700" color="#5D4037">
+          🌸 {isZh ? '花田收藏' : 'Collection'}
+        </ScaledText>
+        <ScaledText size={13} weight="600" color="#8D6E63">
+          {count}/{total}
+        </ScaledText>
+      </View>
+      <View style={styles.progressBarBg}>
+        <View style={[styles.progressBarFill, { width: `${Math.min(100, progress * 100)}%` }]} />
+        {milestones.map((m) => (
+          <View key={m} style={[styles.progressMilestone, { left: `${(m / total) * 100}%` }]}>
+            <ScaledText size={10}>{count >= m ? '🌸' : '🌱'}</ScaledText>
+          </View>
+        ))}
+      </View>
+    </View>
+  );
+}
 
 export default function FlowerYieldScreen() {
   const { patientId, patientName, language, flowersJustStolen, clearFlowersStolen } = useApp();
   const router = useRouter();
   const queryClient = useQueryClient();
+  const scrollY = useRef(new Animated.Value(0)).current;
 
   const [selectedFlower, setSelectedFlower] = useState<PatientFlower | null>(null);
   const [theftModalVisible, setTheftModalVisible] = useState<boolean>(false);
-  const [gardenSize, setGardenSize] = useState({ width: DEFAULT_GARDEN_WIDTH, height: DEFAULT_GARDEN_HEIGHT });
 
   const isZh = language === 'zh_hant' || language === 'zh_hans';
-
-  const gardenTitle = useMemo(() => {
-    const name = patientName || (isZh ? '你' : 'Your');
-    return isZh ? `${name}的花田` : `${name}'s Garden`;
-  }, [patientName, isZh]);
 
   const patientDataQuery = useQuery({
     queryKey: ['gardenPatientData', patientId],
@@ -204,11 +225,7 @@ export default function FlowerYieldScreen() {
         log('[FlowerYield] Patient data fetch error:', error);
         throw error;
       }
-      return (data || {
-        consecutive_inactive_days: 0,
-        stars_available: 0,
-        fires_available: 0,
-      }) as PatientGardenData;
+      return data || { consecutive_inactive_days: 0, stars_available: 0, fires_available: 0 };
     },
     enabled: !!patientId,
     staleTime: 5 * 1000,
@@ -238,9 +255,7 @@ export default function FlowerYieldScreen() {
     queryKey: ['flowerTypes'],
     queryFn: async () => {
       log('[FlowerYield] Fetching flower types');
-      const { data, error } = await supabase
-        .from('flower_types')
-        .select('*');
+      const { data, error } = await supabase.from('flower_types').select('*');
       if (error) {
         log('[FlowerYield] Flower types fetch error:', error);
         throw error;
@@ -252,9 +267,7 @@ export default function FlowerYieldScreen() {
 
   const flowerTypeMap = useMemo(() => {
     const map: Record<string, FlowerType> = {};
-    (flowerTypesQuery.data || []).forEach((ft) => {
-      map[ft.id] = ft;
-    });
+    (flowerTypesQuery.data || []).forEach((ft) => { map[ft.id] = ft; });
     return map;
   }, [flowerTypesQuery.data]);
 
@@ -266,12 +279,6 @@ export default function FlowerYieldScreen() {
     }
   }, [flowersJustStolen, queryClient, patientId]);
 
-  const getFlowerName = useCallback((ft: FlowerType | undefined): string => {
-    if (!ft) return '';
-    if (isZh) return ft.name_zh || ft.name_en;
-    return ft.name_en;
-  }, [isZh]);
-
   const patientData = patientDataQuery.data;
   const flowers = flowersQuery.data || [];
   const isLoading = patientDataQuery.isLoading || flowersQuery.isLoading || flowerTypesQuery.isLoading;
@@ -280,210 +287,159 @@ export default function FlowerYieldScreen() {
     ? (selectedFlower.flower_types || flowerTypeMap[selectedFlower.flower_type_id])
     : undefined;
 
+  const gardenTranslateY = scrollY.interpolate({
+    inputRange: [0, 200],
+    outputRange: [0, -30],
+    extrapolate: 'clamp',
+  });
 
+  const gardenScale = scrollY.interpolate({
+    inputRange: [-100, 0],
+    outputRange: [1.1, 1],
+    extrapolate: 'clamp',
+  });
 
   return (
     <View style={styles.root}>
       <Stack.Screen options={{ headerShown: false }} />
       <SafeAreaView style={styles.safeArea}>
         <View style={styles.header}>
-          <TouchableOpacity
-            onPress={() => router.back()}
-            style={styles.backBtn}
-            testID="flower-yield-back"
-          >
-            <ChevronLeft size={24} color={Colors.textPrimary} />
+          <TouchableOpacity onPress={() => router.back()} style={styles.backBtn} testID="flower-yield-back">
+            <ChevronLeft size={24} color="#5D4037" />
           </TouchableOpacity>
-          <View style={styles.headerTitleArea}>
-            <ScaledText size={20} weight="bold" color={Colors.textPrimary} numberOfLines={1}>
-              {gardenTitle}
+          <View style={styles.woodenSign}>
+            <ScaledText size={18} weight="bold" color="#4E342E" numberOfLines={1}>
+              {patientName ? (isZh ? `${patientName}的花田` : `${patientName}'s Garden`) : (isZh ? '我的花田' : 'My Garden')}
             </ScaledText>
           </View>
-          <View style={styles.headerSpacer} />
+          <View style={{ width: 40 }} />
         </View>
 
-        <ScrollView
+        <Animated.ScrollView
           style={styles.scrollView}
           contentContainerStyle={styles.scrollContent}
           showsVerticalScrollIndicator={false}
+          onScroll={Animated.event(
+            [{ nativeEvent: { contentOffset: { y: scrollY } } }],
+            { useNativeDriver: true }
+          )}
+          scrollEventThrottle={16}
         >
-          <View style={styles.resourceBar}>
-            <View style={styles.resourceItem}>
-              <ScaledText size={13} color={Colors.textSecondary}>
-                ⭐ {isZh ? '可用' : 'Available'}: {patientData?.stars_available ?? 0}
-              </ScaledText>
-              <ScaledText size={10} color={Colors.disabled}>
-                (5⭐ = 1 draw)
-              </ScaledText>
+          <View style={styles.topBar}>
+            <View style={styles.resourceChip}>
+              <ScaledText size={12} weight="600" color="#B8860B">⭐ {patientData?.stars_available ?? 0}</ScaledText>
             </View>
-            <View style={styles.resourceDivider} />
-            <View style={styles.resourceItem}>
-              <ScaledText size={13} color={Colors.textSecondary}>
-                🔥 {isZh ? '可用' : 'Available'}: {patientData?.fires_available ?? 0}
-              </ScaledText>
-              <ScaledText size={10} color={Colors.disabled}>
-                (10🔥 = 2 draws)
-              </ScaledText>
+            <View style={styles.resourceChip}>
+              <ScaledText size={12} weight="600" color="#E65100">🔥 {patientData?.fires_available ?? 0}</ScaledText>
             </View>
+            <TouchableOpacity style={styles.drawBtn} onPress={() => router.push('/gacha-draw')} activeOpacity={0.75} testID="lucky-draw-btn">
+              <Sparkles size={14} color="#FFF" />
+              <ScaledText size={11} weight="700" color="#FFF">
+                {language === 'zh_hant' ? '用星星變出美麗花田' : language === 'zh_hans' ? '用星星变出美丽花田' : 'Grow Flowers'}
+              </ScaledText>
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.chestBtn} onPress={() => router.push('/treasure-chest')} activeOpacity={0.75} testID="treasure-chest-btn">
+              <Gift size={14} color="#8B4513" />
+            </TouchableOpacity>
           </View>
 
-          <View style={styles.actionRow}>
-            <TouchableOpacity
-              style={styles.luckyDrawBtn}
-              activeOpacity={0.75}
-              testID="lucky-draw-btn"
-              onPress={() => router.push('/gacha-draw')}
-            >
-              <Sparkles size={18} color="#FFF" />
-              <ScaledText size={13} weight="700" color="#FFF">
-                {language === 'zh_hant' ? '用星星變出美麗花田' : language === 'zh_hans' ? '用星星变出美丽花田' : 'Grow Beautiful Flowers'}
-              </ScaledText>
-            </TouchableOpacity>
+          <CollectionProgress count={flowers.length} total={TOTAL_SLOTS} isZh={isZh} />
 
-            <TouchableOpacity
-              style={styles.treasureBtn}
-              activeOpacity={0.75}
-              testID="treasure-chest-btn"
-              onPress={() => router.push('/treasure-chest')}
-            >
-              <Gift size={18} color="#8B4513" />
-              <ScaledText size={13} weight="700" color="#8B4513">
-                {language === 'zh_hant' ? '我的寶箱' : language === 'zh_hans' ? '我的宝箱' : 'My Treasure Chest'}
-              </ScaledText>
-            </TouchableOpacity>
+          <View style={styles.gardenHeroContainer}>
+            <Animated.Image
+              source={{ uri: SUPABASE_STORAGE + 'garden-bg.png' }}
+              style={[styles.gardenHeroImage, {
+                transform: [{ translateY: gardenTranslateY }, { scale: gardenScale }],
+              }]}
+              resizeMode="contain"
+            />
+            <SparkleParticles />
+            {flowers.length === 0 && (
+              <View style={styles.emptyGardenHint}>
+                <ScaledText size={14} weight="600" color="#5D4037">
+                  {isZh ? '快去抽花裝飾你的花田吧！🌱' : 'Draw flowers to decorate your garden! 🌱'}
+                </ScaledText>
+              </View>
+            )}
           </View>
 
           {isLoading ? (
             <View style={styles.loadingContainer}>
               <ActivityIndicator size="large" color={Colors.primary} />
             </View>
-          ) : (
-            <View
-              style={styles.gardenContainer}
-              onLayout={(e) => {
-                const { width, height } = e.nativeEvent.layout;
-                if (width > 0 && height > 0) {
-                  setGardenSize({ width, height });
-                }
-              }}
-            >
-              <Image
-                source={{ uri: 'https://pfgtnrlgetomfmrzbxgb.supabase.co/storage/v1/object/public/flowers/garden-bg.png' }}
-                style={styles.gardenBackground}
-                resizeMode="contain"
-              />
-
-              {flowers.map((flower) => {
-                const ft = flower.flower_types || flowerTypeMap[flower.flower_type_id];
-                return (
-                  <MemoFlowerItem
-                    key={flower.id}
-                    flower={flower}
-                    flowerType={ft}
-                    slotIndex={flower.grid_position}
-                    gardenWidth={gardenSize.width}
-                    gardenHeight={gardenSize.height}
-                    onPress={() => setSelectedFlower(flower)}
-                  />
-                );
-              })}
-
-              {flowers.length === 0 && (
-                <View style={styles.emptyGardenOverlay}>
-                  <ScaledText size={16} weight="600" color="#5D4037" style={styles.emptyGardenText}>
-                    {isZh ? '花田還是空的！\n完成練習來抽花吧 🌱' : 'Your garden is empty!\nComplete exercises to draw flowers 🌱'}
-                  </ScaledText>
-                </View>
-              )}
-            </View>
-          )}
-
-          {flowers.length > 0 && (
-            <View style={styles.flowerCount}>
-              <ScaledText size={13} color={Colors.textSecondary}>
-                🌸 {flowers.length} / {TOTAL_SLOTS} {isZh ? '朵花' : 'flowers'}
+          ) : flowers.length > 0 ? (
+            <View style={styles.collectionSection}>
+              <ScaledText size={16} weight="bold" color="#5D4037" style={styles.collectionTitle}>
+                {isZh ? '🌸 我的花朵收藏' : '🌸 My Flower Collection'}
               </ScaledText>
+              <View style={styles.flowerGrid}>
+                {flowers.map((flower, index) => {
+                  const ft = flower.flower_types || flowerTypeMap[flower.flower_type_id];
+                  return (
+                    <MemoFlowerCard
+                      key={flower.id}
+                      flower={flower}
+                      flowerType={ft}
+                      index={index}
+                      isZh={isZh}
+                      onPress={() => setSelectedFlower(flower)}
+                    />
+                  );
+                })}
+              </View>
             </View>
-          )}
-        </ScrollView>
+          ) : null}
+
+          <View style={{ height: 40 }} />
+        </Animated.ScrollView>
       </SafeAreaView>
 
-      <Modal
-        visible={theftModalVisible}
-        transparent
-        animationType="fade"
-        onRequestClose={() => setTheftModalVisible(false)}
-      >
+      <Modal visible={theftModalVisible} transparent animationType="fade" onRequestClose={() => setTheftModalVisible(false)}>
         <View style={styles.modalOverlay}>
           <View style={styles.theftModal}>
-            <ScaledText size={40} style={styles.theftEmoji}>😢</ScaledText>
-            <ScaledText size={18} weight="bold" color="#5D4037" style={styles.theftTitle}>
+            <ScaledText size={40}>😢</ScaledText>
+            <ScaledText size={18} weight="bold" color="#5D4037" style={{ textAlign: 'center' as const, marginVertical: 12 }}>
               {isZh ? '你的花田被偷了！' : 'Your garden was raided!'}
             </ScaledText>
-            <ScaledText size={15} color="#795548" style={styles.theftBody}>
+            <ScaledText size={15} color="#795548" style={{ textAlign: 'center' as const, lineHeight: 22, marginBottom: 20 }}>
               {isZh
-                ? `Oh no! 😢 你的花田被偷了 ${flowersJustStolen} 朵花！\n記得每天做練習保護花田！`
-                : `Oh no! 😢 ${flowersJustStolen} flower${flowersJustStolen > 1 ? 's were' : ' was'} stolen from your garden!\nPractice daily to protect your flowers!`}
+                ? `${flowersJustStolen} 朵花因為你沒有練習而被偷走了！\n記得每天做練習保護花田！`
+                : `${flowersJustStolen} flower${flowersJustStolen > 1 ? 's were' : ' was'} stolen!\nPractice daily to protect your flowers!`}
             </ScaledText>
             <TouchableOpacity
               style={styles.theftCloseBtn}
-              onPress={() => {
-                setTheftModalVisible(false);
-                clearFlowersStolen();
-              }}
+              onPress={() => { setTheftModalVisible(false); clearFlowersStolen(); }}
               testID="theft-modal-close"
             >
-              <ScaledText size={15} weight="700" color="#FFF">
-                {isZh ? '我知道了' : 'I understand'}
-              </ScaledText>
+              <ScaledText size={15} weight="700" color="#FFF">{isZh ? '我知道了' : 'I understand'}</ScaledText>
             </TouchableOpacity>
           </View>
         </View>
       </Modal>
 
-      <Modal
-        visible={!!selectedFlower}
-        transparent
-        animationType="fade"
-        onRequestClose={() => setSelectedFlower(null)}
-      >
+      <Modal visible={!!selectedFlower} transparent animationType="fade" onRequestClose={() => setSelectedFlower(null)}>
         <Pressable style={styles.modalOverlay} onPress={() => setSelectedFlower(null)}>
           <View style={styles.tooltipModal}>
-            <TouchableOpacity
-              style={styles.tooltipClose}
-              onPress={() => setSelectedFlower(null)}
-              testID="tooltip-close"
-            >
+            <TouchableOpacity style={styles.tooltipClose} onPress={() => setSelectedFlower(null)} testID="tooltip-close">
               <X size={18} color={Colors.textSecondary} />
             </TouchableOpacity>
             {selectedFlowerType && (
               <>
-                <Image
-                  source={{ uri: selectedFlowerType.image_url }}
-                  style={styles.tooltipFlowerImage}
-                  resizeMode="contain"
-                />
-                <ScaledText size={18} weight="bold" color={Colors.textPrimary} style={styles.tooltipName}>
-                  {getFlowerName(selectedFlowerType)}
+                <Image source={{ uri: selectedFlowerType.image_url }} style={styles.tooltipFlowerImage} resizeMode="contain" />
+                <ScaledText size={18} weight="bold" color={Colors.textPrimary} style={{ textAlign: 'center' as const, marginBottom: 8 }}>
+                  {isZh ? (selectedFlowerType.name_zh || selectedFlowerType.name_en) : selectedFlowerType.name_en}
                 </ScaledText>
                 {selectedFlowerType.rarity && (
-                  <View style={[
-                    styles.rarityBadge,
-                    { backgroundColor: RARITY_COLORS[selectedFlowerType.rarity]?.bg ?? '#F5F5F5' },
-                  ]}>
-                    <ScaledText
-                      size={12}
-                      weight="700"
-                      color={RARITY_COLORS[selectedFlowerType.rarity]?.text ?? '#757575'}
-                    >
-                      {RARITY_COLORS[selectedFlowerType.rarity]?.label ?? selectedFlowerType.rarity}{' '}
+                  <View style={[styles.rarityBadge, { backgroundColor: (RARITY_COLORS[selectedFlowerType.rarity]?.bg) || '#F5F5F5' }]}>
+                    <View style={[styles.rarityDotLarge, { backgroundColor: (RARITY_COLORS[selectedFlowerType.rarity]?.dot) || '#999' }]} />
+                    <ScaledText size={12} weight="700" color={(RARITY_COLORS[selectedFlowerType.rarity]?.dot) || '#999'}>
                       {selectedFlowerType.rarity.charAt(0).toUpperCase() + selectedFlowerType.rarity.slice(1)}
                     </ScaledText>
                   </View>
                 )}
                 {selectedFlower?.obtained_at && (
-                  <ScaledText size={12} color={Colors.textSecondary} style={styles.tooltipDate}>
-                    {isZh ? '獲得日期：' : 'Acquired on: '}
+                  <ScaledText size={12} color={Colors.textSecondary} style={{ marginTop: 10 }}>
+                    {isZh ? '獲得日期：' : 'Acquired: '}
                     {new Date(selectedFlower.obtained_at).toLocaleDateString(isZh ? 'zh-TW' : 'en-US', {
                       year: 'numeric',
                       month: 'short',
@@ -503,7 +459,7 @@ export default function FlowerYieldScreen() {
 const styles = StyleSheet.create({
   root: {
     flex: 1,
-    backgroundColor: '#F0F7EC',
+    backgroundColor: '#F7F3E9',
   },
   safeArea: {
     flex: 1,
@@ -512,27 +468,33 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     paddingHorizontal: 12,
-    paddingVertical: 10,
+    paddingVertical: 8,
   },
   backBtn: {
     width: 40,
     height: 40,
     borderRadius: 20,
-    backgroundColor: Colors.card,
+    backgroundColor: '#FFF8E7',
     justifyContent: 'center',
     alignItems: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.08,
-    shadowRadius: 4,
-    elevation: 2,
+    borderWidth: 1.5,
+    borderColor: '#D7CCC8',
   },
-  headerTitleArea: {
+  woodenSign: {
     flex: 1,
     alignItems: 'center',
-  },
-  headerSpacer: {
-    width: 40,
+    backgroundColor: '#FFECB3',
+    marginHorizontal: 12,
+    paddingVertical: 10,
+    paddingHorizontal: 16,
+    borderRadius: 14,
+    borderWidth: 2,
+    borderColor: '#D7A54A',
+    shadowColor: '#8D6E63',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.15,
+    shadowRadius: 4,
+    elevation: 3,
   },
   scrollView: {
     flex: 1,
@@ -540,138 +502,164 @@ const styles = StyleSheet.create({
   scrollContent: {
     paddingBottom: 40,
   },
-  resourceBar: {
+  topBar: {
     flexDirection: 'row',
-    marginHorizontal: 20,
+    alignItems: 'center',
+    marginHorizontal: 16,
     marginTop: 8,
-    marginBottom: 8,
-    backgroundColor: Colors.card,
-    borderRadius: 14,
-    paddingVertical: 12,
-    paddingHorizontal: 16,
-    borderWidth: 1,
-    borderColor: Colors.border,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.05,
-    shadowRadius: 4,
-    elevation: 1,
-  },
-  resourceItem: {
-    flex: 1,
-    alignItems: 'center',
-    gap: 2,
-  },
-  resourceDivider: {
-    width: 1,
-    backgroundColor: Colors.border,
-    marginHorizontal: 8,
-  },
-  actionRow: {
-    flexDirection: 'row',
-    marginHorizontal: 20,
     marginBottom: 10,
-    gap: 10,
+    gap: 6,
   },
-  luckyDrawBtn: {
+  resourceChip: {
+    backgroundColor: '#FFF8E1',
+    borderRadius: 10,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderWidth: 1,
+    borderColor: '#FFE082',
+  },
+  drawBtn: {
     flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 6,
+    gap: 4,
     backgroundColor: '#E91E63',
-    paddingVertical: 14,
-    borderRadius: 16,
+    paddingVertical: 10,
+    borderRadius: 12,
     shadowColor: '#E91E63',
-    shadowOffset: { width: 0, height: 3 },
+    shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.3,
-    shadowRadius: 6,
-    elevation: 4,
+    shadowRadius: 4,
+    elevation: 3,
   },
-  treasureBtn: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 6,
+  chestBtn: {
+    width: 40,
+    height: 40,
+    borderRadius: 12,
     backgroundColor: '#FFE0B2',
-    paddingVertical: 14,
-    borderRadius: 16,
+    justifyContent: 'center',
+    alignItems: 'center',
     borderWidth: 1.5,
     borderColor: '#FFCC80',
+  },
+  progressContainer: {
+    marginHorizontal: 16,
+    marginBottom: 12,
+    backgroundColor: '#FFF8E7',
+    borderRadius: 14,
+    padding: 12,
+    borderWidth: 1,
+    borderColor: '#F0E0C0',
+  },
+  progressHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginBottom: 8,
+  },
+  progressBarBg: {
+    height: 20,
+    backgroundColor: '#E8E0D0',
+    borderRadius: 10,
+    overflow: 'hidden',
+    position: 'relative',
+  },
+  progressBarFill: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    bottom: 0,
+    backgroundColor: '#8BC34A',
+    borderRadius: 10,
+  },
+  progressMilestone: {
+    position: 'absolute',
+    top: 0,
+    bottom: 0,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginLeft: -8,
+  },
+  gardenHeroContainer: {
+    marginHorizontal: 8,
+    height: SCREEN_WIDTH - 16,
+    position: 'relative',
+    overflow: 'hidden',
+  },
+  gardenHeroImage: {
+    width: '100%',
+    height: '100%',
+  },
+  emptyGardenHint: {
+    position: 'absolute',
+    bottom: 40,
+    left: 0,
+    right: 0,
+    alignItems: 'center',
+    backgroundColor: 'rgba(255,255,255,0.7)',
+    marginHorizontal: 40,
+    paddingVertical: 10,
+    borderRadius: 12,
   },
   loadingContainer: {
     padding: 60,
     alignItems: 'center',
   },
-  gardenContainer: {
-    marginHorizontal: 20,
-    aspectRatio: 1,
-    borderRadius: 0,
-    overflow: 'hidden',
-    backgroundColor: 'transparent',
-    position: 'relative',
+  collectionSection: {
+    marginHorizontal: 16,
+    marginTop: 4,
   },
-  gardenBackground: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
+  collectionTitle: {
+    marginBottom: 12,
+  },
+  flowerGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+  },
+  flowerCard: {
+    width: (SCREEN_WIDTH - 32 - 24) / 4,
+    alignItems: 'center',
+  },
+  flowerCardEmpty: {
+    width: (SCREEN_WIDTH - 32 - 24) / 4,
+    height: 100,
+  },
+  flowerCardInner: {
+    alignItems: 'center',
+    backgroundColor: '#FFFDF5',
+    borderRadius: 14,
+    padding: 8,
+    borderWidth: 1,
+    borderColor: '#F0E8D8',
     width: '100%',
-    height: '100%',
+    shadowColor: '#8D6E63',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.08,
+    shadowRadius: 6,
+    elevation: 2,
   },
-  gardenDefaultBg: {
+  flowerShadow: {
     position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
+    bottom: 28,
+    width: '60%',
+    height: 8,
+    borderRadius: 50,
+    opacity: 0.5,
   },
-  grassCell: {
-    position: 'absolute',
+  flowerCardImage: {
+    width: 52,
+    height: 52,
+    marginBottom: 4,
   },
-  isoOverlay: {
-    position: 'absolute',
-    height: 6,
-    borderRadius: 3,
-    backgroundColor: 'rgba(0,0,0,0.06)',
-  },
-  flowerSlot: {
-    position: 'absolute',
-    justifyContent: 'center',
-    alignItems: 'center',
-    zIndex: 10,
-  },
-  flowerTouchable: {
-    width: '100%',
-    height: '100%',
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: 4,
-  },
-  flowerImage: {
-    width: '80%',
-    height: '80%',
-  },
-  emptyGardenOverlay: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: 'rgba(255,255,255,0.4)',
-    zIndex: 20,
-  },
-  emptyGardenText: {
+  flowerCardName: {
     textAlign: 'center',
-    lineHeight: 24,
+    marginBottom: 4,
   },
-  flowerCount: {
-    alignItems: 'center',
-    marginTop: 12,
+  rarityDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
   },
   modalOverlay: {
     flex: 1,
@@ -687,23 +675,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     borderWidth: 2,
     borderColor: '#FFE082',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.15,
-    shadowRadius: 12,
-    elevation: 8,
-  },
-  theftEmoji: {
-    marginBottom: 12,
-  },
-  theftTitle: {
-    marginBottom: 12,
-    textAlign: 'center',
-  },
-  theftBody: {
-    textAlign: 'center',
-    lineHeight: 22,
-    marginBottom: 20,
   },
   theftCloseBtn: {
     backgroundColor: '#8D6E63',
@@ -717,11 +688,6 @@ const styles = StyleSheet.create({
     padding: 24,
     marginHorizontal: 48,
     alignItems: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.15,
-    shadowRadius: 12,
-    elevation: 8,
   },
   tooltipClose: {
     position: 'absolute',
@@ -739,16 +705,17 @@ const styles = StyleSheet.create({
     height: 80,
     marginBottom: 12,
   },
-  tooltipName: {
-    marginBottom: 8,
-    textAlign: 'center',
-  },
   rarityBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
     paddingHorizontal: 12,
     paddingVertical: 5,
     borderRadius: 10,
   },
-  tooltipDate: {
-    marginTop: 10,
+  rarityDotLarge: {
+    width: 10,
+    height: 10,
+    borderRadius: 5,
   },
 });

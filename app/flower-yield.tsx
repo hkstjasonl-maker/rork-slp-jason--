@@ -11,7 +11,7 @@ import {
   Modal,
   Pressable,
   Image,
-  Dimensions,
+  useWindowDimensions,
   LayoutAnimation,
   Platform,
   UIManager,
@@ -30,7 +30,6 @@ if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental
   UIManager.setLayoutAnimationEnabledExperimental(true);
 }
 
-const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const GARDEN_HEIGHT = 520;
 const TOTAL_SLOTS = 20;
 const GRID_COLS = 4;
@@ -105,23 +104,29 @@ const BIRD_DATA = [
   { y: 14, size: 8, speed: 22000, startFrac: 0.4, dir: 1, flapSpeed: 600, count: 3 },
 ];
 
-const TREE_DATA = [
-  { emoji: '🌳', left: 18, top: 125, size: 34, opacity: 0.22 },
-  { emoji: '🌲', left: SCREEN_WIDTH - 55, top: 135, size: 30, opacity: 0.18 },
-  { emoji: '🌳', left: 80, top: 150, size: 22, opacity: 0.15 },
-  { emoji: '🌴', left: SCREEN_WIDTH - 110, top: 145, size: 24, opacity: 0.15 },
-];
+function getTreeData(sw: number) {
+  return [
+    { emoji: '🌳', left: 18, top: 125, size: 34, opacity: 0.22 },
+    { emoji: '🌲', left: sw - 55, top: 135, size: 30, opacity: 0.18 },
+    { emoji: '🌳', left: 80, top: 150, size: 22, opacity: 0.15 },
+    { emoji: '🌴', left: sw - 110, top: 145, size: 24, opacity: 0.15 },
+  ];
+}
 
-const GRASS_SPRITES: { emoji: string; left: number; top: number; size: number }[] = [];
 const grassEmojis = ['🌱', '🌿', '☘️', '🍀'];
-for (let i = 0; i < 14; i++) {
-  const isLeft = i < 7;
-  GRASS_SPRITES.push({
-    emoji: grassEmojis[i % 4],
-    left: isLeft ? seededRand(i * 7 + 1) * 30 + 4 : SCREEN_WIDTH - 36 + seededRand(i * 7 + 2) * 26,
-    top: 155 + seededRand(i * 7 + 3) * 220,
-    size: 7 + Math.floor(seededRand(i * 7 + 4) * 5),
-  });
+
+function getGrassSprites(sw: number) {
+  const sprites: { emoji: string; left: number; top: number; size: number }[] = [];
+  for (let i = 0; i < 14; i++) {
+    const isLeft = i < 7;
+    sprites.push({
+      emoji: grassEmojis[i % 4],
+      left: isLeft ? seededRand(i * 7 + 1) * 30 + 4 : sw - 36 + seededRand(i * 7 + 2) * 26,
+      top: 155 + seededRand(i * 7 + 3) * 220,
+      size: 7 + Math.floor(seededRand(i * 7 + 4) * 5),
+    });
+  }
+  return sprites;
 }
 
 const CELL_GRASS: { emoji: string; dx: number; dy: number; size: number }[][] = [];
@@ -197,12 +202,12 @@ const RollingHills = React.memo(function RollingHills() {
         backgroundColor: 'rgba(165,214,167,0.35)', zIndex: 3,
       }} />
       <View style={{
-        position: 'absolute' as const, bottom: GARDEN_HEIGHT * 0.48, left: SCREEN_WIDTH * 0.2, right: -40,
+        position: 'absolute' as const, bottom: GARDEN_HEIGHT * 0.48, left: '20%', right: -40,
         height: 50, borderTopLeftRadius: 250, borderTopRightRadius: 350,
         backgroundColor: 'rgba(129,199,132,0.3)', zIndex: 3,
       }} />
       <View style={{
-        position: 'absolute' as const, bottom: GARDEN_HEIGHT * 0.44, left: -50, right: SCREEN_WIDTH * 0.15,
+        position: 'absolute' as const, bottom: GARDEN_HEIGHT * 0.44, left: -50, right: '15%',
         height: 45, borderTopLeftRadius: 350, borderTopRightRadius: 180,
         backgroundColor: 'rgba(102,187,106,0.25)', zIndex: 3,
       }} />
@@ -318,27 +323,27 @@ function SunWithFace() {
   );
 }
 
-function SingleCloud({ data }: { data: typeof CLOUD_DATA[0] }) {
+function SingleCloud({ data, screenWidth }: { data: typeof CLOUD_DATA[0]; screenWidth: number }) {
   const translateX = useRef(new Animated.Value(0)).current;
   const padXOffset = useRef(new Animated.Value(-data.w * 0.3)).current;
   const combinedX = useRef(Animated.add(translateX, padXOffset)).current;
 
   useEffect(() => {
-    const startX = -data.w + (SCREEN_WIDTH + data.w) * data.startFrac;
+    const startX = -data.w + (screenWidth + data.w) * data.startFrac;
     const remainFrac = 1 - data.startFrac;
     translateX.setValue(startX);
     Animated.timing(translateX, {
-      toValue: SCREEN_WIDTH + 20,
+      toValue: screenWidth + 20,
       duration: data.duration * remainFrac,
       easing: Easing.linear,
       useNativeDriver: true,
     }).start(() => {
       translateX.setValue(-data.w - 20);
       Animated.loop(
-        Animated.timing(translateX, { toValue: SCREEN_WIDTH + 20, duration: data.duration, easing: Easing.linear, useNativeDriver: true })
+        Animated.timing(translateX, { toValue: screenWidth + 20, duration: data.duration, easing: Easing.linear, useNativeDriver: true })
       ).start();
     });
-  }, [translateX, data]);
+  }, [translateX, data, screenWidth]);
 
   const bumpH = data.h * 1.3;
   const padX = data.w * 0.3;
@@ -372,8 +377,8 @@ function SingleCloud({ data }: { data: typeof CLOUD_DATA[0] }) {
   );
 }
 
-function CloudsLayer() {
-  return <>{CLOUD_DATA.map((c, i) => <SingleCloud key={i} data={c} />)}</>;
+function CloudsLayer({ screenWidth }: { screenWidth: number }) {
+  return <>{CLOUD_DATA.map((c, i) => <SingleCloud key={i} data={c} screenWidth={screenWidth} />)}</>;
 }
 
 function BirdShape({ size, color }: { size: number; color: string }) {
@@ -393,13 +398,13 @@ function BirdShape({ size, color }: { size: number; color: string }) {
   );
 }
 
-function BirdGroup({ data }: { data: typeof BIRD_DATA[0] }) {
+function BirdGroup({ data, screenWidth }: { data: typeof BIRD_DATA[0]; screenWidth: number }) {
   const translateX = useRef(new Animated.Value(0)).current;
   const flapAnim = useRef(new Animated.Value(1)).current;
 
   useEffect(() => {
-    const fromX = data.dir > 0 ? -40 : SCREEN_WIDTH + 40;
-    const toX = data.dir > 0 ? SCREEN_WIDTH + 40 : -40;
+    const fromX = data.dir > 0 ? -40 : screenWidth + 40;
+    const toX = data.dir > 0 ? screenWidth + 40 : -40;
     const startX = fromX + (toX - fromX) * data.startFrac;
     const remainFrac = 1 - data.startFrac;
     translateX.setValue(startX);
@@ -420,7 +425,7 @@ function BirdGroup({ data }: { data: typeof BIRD_DATA[0] }) {
         ])
       ).start();
     }
-  }, [translateX, flapAnim, data]);
+  }, [translateX, flapAnim, data, screenWidth]);
 
   const birds = Array.from({ length: data.count }, (_, i) => i);
   const color = 'rgba(60,60,80,0.25)';
@@ -439,19 +444,22 @@ function BirdGroup({ data }: { data: typeof BIRD_DATA[0] }) {
   );
 }
 
-function BirdsLayer() {
-  return <>{BIRD_DATA.map((b, i) => <BirdGroup key={i} data={b} />)}</>;
+function BirdsLayer({ screenWidth }: { screenWidth: number }) {
+  return <>{BIRD_DATA.map((b, i) => <BirdGroup key={i} data={b} screenWidth={screenWidth} />)}</>;
 }
 
-const TreesAndGrassDecor = React.memo(function TreesAndGrassDecor() {
+const TreesAndGrassDecor = React.memo(function TreesAndGrassDecor({ screenWidth }: { screenWidth: number }) {
+  const treeData = useMemo(() => getTreeData(screenWidth), [screenWidth]);
+  const grassSprites = useMemo(() => getGrassSprites(screenWidth), [screenWidth]);
+
   return (
     <>
-      {TREE_DATA.map((t, i) => (
+      {treeData.map((t, i) => (
         <View key={`tree-${i}`} style={{ position: 'absolute' as const, left: t.left, top: t.top, opacity: t.opacity, zIndex: 6 }}>
           <ScaledText size={t.size}>{t.emoji}</ScaledText>
         </View>
       ))}
-      {GRASS_SPRITES.map((g, i) => (
+      {grassSprites.map((g, i) => (
         <View key={`grass-${i}`} style={{ position: 'absolute' as const, left: g.left, top: g.top, zIndex: 6 }}>
           <ScaledText size={g.size}>{g.emoji}</ScaledText>
         </View>
@@ -621,13 +629,12 @@ function SoilGrid({ flowers, flowerTypeMap, onFlowerPress }: {
     return map;
   }, [flowers]);
 
-  const gridLeft = (SCREEN_WIDTH - GRID_W) / 2;
-
   return (
     <View style={{
       position: 'absolute' as const,
       bottom: 28,
-      left: gridLeft,
+      left: '50%' as unknown as number,
+      marginLeft: -GRID_W / 2,
       width: GRID_W,
       height: GRID_H,
       transform: [{ perspective: 500 }, { rotateX: '45deg' }],
@@ -690,7 +697,7 @@ function SoilGrid({ flowers, flowerTypeMap, onFlowerPress }: {
   );
 }
 
-function CreaturesLayer() {
+function CreaturesLayer({ screenWidth }: { screenWidth: number }) {
   const b1Flight = useRef(new Animated.Value(0)).current;
   const b2Flight = useRef(new Animated.Value(0)).current;
   const bee1Flight = useRef(new Animated.Value(0)).current;
@@ -703,7 +710,7 @@ function CreaturesLayer() {
     Animated.loop(Animated.timing(bee2Flight, { toValue: 1, duration: 4200, easing: Easing.linear, useNativeDriver: true })).start();
   }, [b1Flight, b2Flight, bee1Flight, bee2Flight]);
 
-  const gardenCenterX = SCREEN_WIDTH / 2;
+  const gardenCenterX = screenWidth / 2;
   const gardenBottom = GARDEN_HEIGHT * 0.55;
 
   const b1x = b1Flight.interpolate({ inputRange: [0, 0.25, 0.5, 0.75, 1], outputRange: [gardenCenterX - 80, gardenCenterX + 40, gardenCenterX - 20, gardenCenterX + 70, gardenCenterX - 80] });
@@ -737,38 +744,39 @@ function CreaturesLayer() {
   );
 }
 
-function GoldenSparkles() {
-  const sparkles = useRef(
+function GoldenSparkles({ screenWidth }: { screenWidth: number }) {
+  const anims = useRef(Array.from({ length: 6 }, () => new Animated.Value(0))).current;
+
+  const sparkleData = useMemo(() =>
     Array.from({ length: 6 }, (_, i) => ({
-      anim: new Animated.Value(0),
-      x: SCREEN_WIDTH * 0.2 + seededRand(i * 31) * SCREEN_WIDTH * 0.6,
+      x: screenWidth * 0.2 + seededRand(i * 31) * screenWidth * 0.6,
       y: GARDEN_HEIGHT * 0.35 + seededRand(i * 37) * GARDEN_HEIGHT * 0.45,
       char: i % 2 === 0 ? '✦' : '✧',
     }))
-  ).current;
+  , [screenWidth]);
 
   useEffect(() => {
-    sparkles.forEach((s, i) => {
+    anims.forEach((anim, i) => {
       const duration = 1800 + seededRand(i * 41) * 1000;
       const delay = seededRand(i * 43) * 2000;
       const run = () => {
-        s.anim.setValue(0);
+        anim.setValue(0);
         Animated.sequence([
           Animated.delay(delay),
-          Animated.timing(s.anim, { toValue: 1, duration: duration / 2, useNativeDriver: true }),
-          Animated.timing(s.anim, { toValue: 0, duration: duration / 2, useNativeDriver: true }),
+          Animated.timing(anim, { toValue: 1, duration: duration / 2, useNativeDriver: true }),
+          Animated.timing(anim, { toValue: 0, duration: duration / 2, useNativeDriver: true }),
         ]).start(() => run());
       };
       run();
     });
-  }, [sparkles]);
+  }, [anims]);
 
   return (
     <>
-      {sparkles.map((s, i) => {
-        const opacity = s.anim;
-        const scale = s.anim.interpolate({ inputRange: [0, 0.5, 1], outputRange: [0.3, 1.2, 0.3] });
-        const rotate = s.anim.interpolate({ inputRange: [0, 1], outputRange: ['0deg', '180deg'] });
+      {sparkleData.map((s, i) => {
+        const opacity = anims[i];
+        const scale = anims[i].interpolate({ inputRange: [0, 0.5, 1], outputRange: [0.3, 1.2, 0.3] });
+        const rotate = anims[i].interpolate({ inputRange: [0, 1], outputRange: ['0deg', '180deg'] });
         return (
           <Animated.View key={i} style={{
             position: 'absolute' as const, left: s.x, top: s.y, zIndex: 18,
@@ -782,9 +790,9 @@ function GoldenSparkles() {
   );
 }
 
-const FenceRow = React.memo(function FenceRow() {
+const FenceRow = React.memo(function FenceRow({ screenWidth }: { screenWidth: number }) {
   const postCount = 18;
-  const spacing = SCREEN_WIDTH / (postCount + 1);
+  const spacing = screenWidth / (postCount + 1);
   return (
     <View style={{ position: 'absolute' as const, bottom: 0, left: 0, right: 0, height: 28, zIndex: 12 }}>
       <View style={{
@@ -810,13 +818,14 @@ const FenceRow = React.memo(function FenceRow() {
   );
 });
 
-const MemoGardenScene = React.memo(function GardenScene({ flowers, flowerTypeMap, onFlowerPress }: {
+const MemoGardenScene = React.memo(function GardenScene({ flowers, flowerTypeMap, onFlowerPress, screenWidth }: {
   flowers: PatientFlower[];
   flowerTypeMap: Record<string, FlowerType>;
   onFlowerPress: (f: PatientFlower) => void;
+  screenWidth: number;
 }) {
   return (
-    <View style={gardenStyles.container}>
+    <View style={[gardenStyles.container, { width: screenWidth }]}>
       <View style={[StyleSheet.absoluteFill, { backgroundColor: '#3E6B2E' }]} />
       <View style={{ position: 'absolute' as const, top: 0, left: 0, right: 0, height: '58%', backgroundColor: '#5A8B48' }} />
       <View style={{ position: 'absolute' as const, top: 0, left: 0, right: 0, height: '38%', backgroundColor: '#8BBD78' }} />
@@ -834,13 +843,13 @@ const MemoGardenScene = React.memo(function GardenScene({ flowers, flowerTypeMap
       <RollingHills />
       <AtmosphericHaze />
       <SunWithFace />
-      <CloudsLayer />
-      <BirdsLayer />
-      <TreesAndGrassDecor />
+      <CloudsLayer screenWidth={screenWidth} />
+      <BirdsLayer screenWidth={screenWidth} />
+      <TreesAndGrassDecor screenWidth={screenWidth} />
       <SoilGrid flowers={flowers} flowerTypeMap={flowerTypeMap} onFlowerPress={onFlowerPress} />
-      <CreaturesLayer />
-      <GoldenSparkles />
-      <FenceRow />
+      <CreaturesLayer screenWidth={screenWidth} />
+      <GoldenSparkles screenWidth={screenWidth} />
+      <FenceRow screenWidth={screenWidth} />
     </View>
   );
 });
@@ -938,6 +947,7 @@ export default function FlowerYieldScreen() {
   const { patientId, patientName, language, flowersJustStolen, clearFlowersStolen } = useApp();
   const router = useRouter();
   const queryClient = useQueryClient();
+  const { width: screenWidth } = useWindowDimensions();
 
   const [selectedFlower, setSelectedFlower] = useState<PatientFlower | null>(null);
   const [theftModalVisible, setTheftModalVisible] = useState<boolean>(false);
@@ -1058,6 +1068,8 @@ export default function FlowerYieldScreen() {
     setExpandedCardId((prev) => (prev === id ? null : id));
   }, []);
 
+
+
   return (
     <View style={styles.root}>
       <Stack.Screen options={{ headerShown: false }} />
@@ -1088,7 +1100,7 @@ export default function FlowerYieldScreen() {
             </View>
           ) : (
             <>
-              <MemoGardenScene flowers={flowers} flowerTypeMap={flowerTypeMap} onFlowerPress={handleFlowerPress} />
+              <MemoGardenScene flowers={flowers} flowerTypeMap={flowerTypeMap} onFlowerPress={handleFlowerPress} screenWidth={screenWidth} />
 
               {flowers.length === 0 && (
                 <View style={styles.emptyHint}>
@@ -1217,11 +1229,8 @@ export default function FlowerYieldScreen() {
   );
 }
 
-const CARD_WIDTH = (SCREEN_WIDTH - 32 - 10) / 2;
-
 const gardenStyles = StyleSheet.create({
   container: {
-    width: SCREEN_WIDTH,
     height: GARDEN_HEIGHT,
     overflow: 'hidden',
     position: 'relative',
@@ -1439,7 +1448,7 @@ const styles = StyleSheet.create({
     gap: 10,
   },
   collectionCard: {
-    width: CARD_WIDTH,
+    width: '48%' as unknown as number,
   },
   collectionCardInner: {
     backgroundColor: '#FFFDF5',

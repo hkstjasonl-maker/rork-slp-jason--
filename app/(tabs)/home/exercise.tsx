@@ -594,7 +594,7 @@ export default function ExerciseScreen() {
   const [showProcessing, setShowProcessing] = useState(false);
   const [showTranscriptOverlay, setShowTranscriptOverlay] = useState(false);
   const [showFaceGuide, setShowFaceGuide] = useState(false);
-  const [showLiveSubtitles, setShowLiveSubtitles] = useState(false);
+
   const [mirrorAudioIsPlaying, setMirrorAudioIsPlaying] = useState(false);
   const [mirrorAudioCurrentTime, setMirrorAudioCurrentTime] = useState(0);
   const [faceGuideForRecording, setFaceGuideForRecording] = useState(false);
@@ -1356,24 +1356,16 @@ export default function ExerciseScreen() {
     log('[LiveSub] Mirror audio playback update: playing=', playing, 'time=', currentTimeSec.toFixed(2), 'liveSubEnabled=', liveSubtitlesEnabled, 'subtitleUrl=', subtitleUrl);
     setMirrorAudioIsPlaying(playing);
     setMirrorAudioCurrentTime(currentTimeSec);
-    if (liveSubtitlesEnabled) {
-      setShowLiveSubtitles(playing);
-      log('[LiveSub] setShowLiveSubtitles =>', playing);
-    }
   }, [liveSubtitlesEnabled, subtitleUrl]);
 
   useEffect(() => {
-    const inMirror = mediaMode !== 'video';
-    if (liveSubtitlesEnabled && inMirror && mirrorAudioIsPlaying) {
-      setShowLiveSubtitles(true);
-    } else if (!mirrorAudioIsPlaying) {
-      setShowLiveSubtitles(false);
+    if (mediaMode !== 'video') {
+      log('[RenderDebug] Mirror/Split active. liveSubEnabled:', liveSubtitlesEnabled, 'transcript:', mirrorTranscript ? mirrorTranscript.substring(0, 50) : null, 'audioUrl:', mirrorAudioUrl, 'subtitleUrl:', subtitleUrl, 'audioPlaying:', mirrorAudioIsPlaying);
     }
-  }, [liveSubtitlesEnabled, mirrorAudioIsPlaying, mediaMode]);
+  }, [mediaMode, liveSubtitlesEnabled, mirrorTranscript, mirrorAudioUrl, subtitleUrl, mirrorAudioIsPlaying]);
 
   useEffect(() => {
     if (mediaMode === 'video') {
-      setShowLiveSubtitles(false);
       setMirrorAudioIsPlaying(false);
       setMirrorAudioCurrentTime(0);
     }
@@ -1495,17 +1487,6 @@ export default function ExerciseScreen() {
                   </View>
                 )}
 
-                {liveSubtitlesEnabled && !isRecording && (
-                  <LiveSubtitleOverlay
-                    subtitleUrl={subtitleUrl}
-                    isPlaying={mirrorAudioIsPlaying}
-                    audioCurrentTime={mirrorAudioCurrentTime}
-                    visible={showLiveSubtitles}
-                    subtitleSizeLevel={subtitleSizeLevel}
-                    forceOverlay={true}
-                  />
-                )}
-
                 {splitCameraReady && (
                   <View style={styles.recordButtonContainer}>
                     <TouchableOpacity
@@ -1552,10 +1533,24 @@ export default function ExerciseScreen() {
 
               </View>
 
+              {liveSubtitlesEnabled && !isRecording && (
+                <View style={styles.subtitleOverlayAbsolute} pointerEvents="none">
+                  <LiveSubtitleOverlay
+                    subtitleUrl={subtitleUrl}
+                    isPlaying={mirrorAudioIsPlaying}
+                    audioCurrentTime={mirrorAudioCurrentTime}
+                    visible={mirrorAudioIsPlaying}
+                    subtitleSizeLevel={subtitleSizeLevel}
+                    forceOverlay={true}
+                  />
+                </View>
+              )}
+
             </View>
           )}
 
           {mediaMode === 'mirror' && (
+            <View style={styles.mirrorWrapper}>
             <View style={styles.cameraVisible}>
               {hasCameraPermission && (
                 <MemoLiveCamera ref={cameraRef} onCameraReady={handleCameraReady} cameraMode={cameraMode} />
@@ -1609,17 +1604,6 @@ export default function ExerciseScreen() {
                 </View>
               )}
 
-              {liveSubtitlesEnabled && !isRecording && (
-                <LiveSubtitleOverlay
-                  subtitleUrl={subtitleUrl}
-                  isPlaying={mirrorAudioIsPlaying}
-                  audioCurrentTime={mirrorAudioCurrentTime}
-                  visible={showLiveSubtitles}
-                  subtitleSizeLevel={subtitleSizeLevel}
-                  forceOverlay={true}
-                />
-              )}
-
               {cameraReady && (
                 <View style={styles.recordButtonContainer}>
                   <TouchableOpacity
@@ -1666,6 +1650,21 @@ export default function ExerciseScreen() {
                   </ScaledText>
                 </View>
               )}
+
+            </View>
+
+            {liveSubtitlesEnabled && !isRecording && (
+              <View style={styles.subtitleOverlayAbsolute} pointerEvents="none">
+                <LiveSubtitleOverlay
+                  subtitleUrl={subtitleUrl}
+                  isPlaying={mirrorAudioIsPlaying}
+                  audioCurrentTime={mirrorAudioCurrentTime}
+                  visible={mirrorAudioIsPlaying}
+                  subtitleSizeLevel={subtitleSizeLevel}
+                  forceOverlay={true}
+                />
+              </View>
+            )}
 
             </View>
           )}
@@ -2086,6 +2085,18 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
     backgroundColor: '#000',
     position: 'relative' as const,
+  },
+  mirrorWrapper: {
+    flex: 1,
+    position: 'relative' as const,
+  },
+  subtitleOverlayAbsolute: {
+    position: 'absolute' as const,
+    left: 0,
+    right: 0,
+    top: 0,
+    bottom: 0,
+    zIndex: 100,
   },
   splitMirrorSection: {
     flex: 1,

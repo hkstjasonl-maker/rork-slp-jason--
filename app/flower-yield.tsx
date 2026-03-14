@@ -652,16 +652,19 @@ const MemoGardenScene = React.memo(function GardenScene({ flowers, flowerTypeMap
   gardenHeight: number;
 }) {
   const scale = gardenHeight / GARDEN_HEIGHT;
+  const innerWidth = screenWidth / scale;
+  const offsetX = -innerWidth * (1 - scale) / 2;
+  const offsetY = -GARDEN_HEIGHT * (1 - scale) / 2;
 
   return (
     <View style={[gardenStyles.container, { width: screenWidth, height: gardenHeight, overflow: 'hidden' as const }]}>
       <View style={{
-        width: screenWidth / scale,
+        width: innerWidth,
         height: GARDEN_HEIGHT,
         transform: [
-          { translateX: -(screenWidth / scale) * (1 - scale) / 2 },
-          { translateY: -GARDEN_HEIGHT * (1 - scale) / 2 },
-          { scale },
+          { translateX: offsetX },
+          { translateY: offsetY },
+          { scale: scale },
         ],
       }}>
         <View style={[StyleSheet.absoluteFill, { backgroundColor: '#3E6B2E' }]} />

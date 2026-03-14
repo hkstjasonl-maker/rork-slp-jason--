@@ -1348,13 +1348,14 @@ export default function ExerciseScreen() {
   }, []);
 
   const handleMirrorAudioPlaybackUpdate = useCallback((playing: boolean, currentTimeSec: number) => {
-    log('[LiveSub] Mirror audio playback update: playing=', playing, 'time=', currentTimeSec.toFixed(2));
+    log('[LiveSub] Mirror audio playback update: playing=', playing, 'time=', currentTimeSec.toFixed(2), 'liveSubEnabled=', liveSubtitlesEnabled, 'subtitleUrl=', subtitleUrl);
     setMirrorAudioIsPlaying(playing);
     setMirrorAudioCurrentTime(currentTimeSec);
-    if (liveSubtitlesEnabled) {
+    if (liveSubtitlesEnabled && subtitleUrl) {
       setShowLiveSubtitles(playing);
+      log('[LiveSub] setShowLiveSubtitles =>', playing);
     }
-  }, [liveSubtitlesEnabled]);
+  }, [liveSubtitlesEnabled, subtitleUrl]);
 
   useEffect(() => {
     if (mediaMode === 'video') {
@@ -1521,11 +1522,11 @@ export default function ExerciseScreen() {
 
               <RecordingWatermark exerciseName={exerciseTitle} patientName={patientName ?? undefined} visible={true} />
 
-              {showTranscriptOverlay && mirrorTranscript && !isRecording && (
+              {!liveSubtitlesEnabled && showTranscriptOverlay && mirrorTranscript && !isRecording && (
                 <TranscriptOverlay transcript={mirrorTranscript} onClose={() => setShowTranscriptOverlay(false)} />
               )}
 
-              {liveSubtitlesEnabled && showLiveSubtitles && !isRecording && (
+              {liveSubtitlesEnabled && !isRecording && (
                 <LiveSubtitleOverlay
                   subtitleUrl={subtitleUrl}
                   isPlaying={mirrorAudioIsPlaying}
@@ -1549,7 +1550,7 @@ export default function ExerciseScreen() {
                   {mirrorAudioUrl && (
                     <MirrorAudioButton audioUrl={mirrorAudioUrl} label={t('playInstructions')} stopLabel={t('stopInstructions')} onPlaybackUpdate={handleMirrorAudioPlaybackUpdate} />
                   )}
-                  {mirrorTranscript ? (
+                  {!liveSubtitlesEnabled && mirrorTranscript ? (
                     <TouchableOpacity
                       style={[mirrorAudioStyles.iconBtn, showTranscriptOverlay && mirrorAudioStyles.iconBtnActive]}
                       onPress={handleToggleTranscript}

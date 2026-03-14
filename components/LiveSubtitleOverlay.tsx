@@ -22,8 +22,10 @@ export default function LiveSubtitleOverlay({
 }: LiveSubtitleOverlayProps) {
   const [cues, setCues] = useState<SubtitleCue[]>([]);
   const [currentText, setCurrentText] = useState<string | null>(null);
+  const [_loadError, setLoadError] = useState<boolean>(false);
   const fadeAnim = useRef(new Animated.Value(0)).current;
   const prevTextRef = useRef<string | null>(null);
+  const fetchedUrlRef = useRef<string | null>(null);
 
   const fontSize = SUBTITLE_FONT_SIZES[subtitleSizeLevel] || 22;
   const lineHeight = Math.round(fontSize * 1.4);
@@ -32,7 +34,15 @@ export default function LiveSubtitleOverlay({
 
   useEffect(() => {
     if (!subtitleUrl) {
+      console.log('[LiveSubtitle] No subtitle URL provided');
       setCues([]);
+      setLoadError(false);
+      fetchedUrlRef.current = null;
+      return;
+    }
+
+    if (fetchedUrlRef.current === subtitleUrl) {
+      console.log('[LiveSubtitle] Already fetched URL:', subtitleUrl);
       return;
     }
 
@@ -41,21 +51,35 @@ export default function LiveSubtitleOverlay({
     const loadSubtitles = async () => {
       try {
         console.log('[LiveSubtitle] Fetching subtitle from:', subtitleUrl);
+        setLoadError(false);
         const response = await fetch(subtitleUrl);
         if (!response.ok) {
           console.warn('[LiveSubtitle] Subtitle fetch failed:', response.status, subtitleUrl);
-          if (!cancelled) setCues([]);
+          if (!cancelled) {
+            setCues([]);
+            setLoadError(true);
+          }
           return;
         }
         const text = await response.text();
+        console.log('[LiveSubtitle] Fetched text length:', text.length, 'first 200 chars:', text.substring(0, 200));
         if (!cancelled) {
           const parsed = parseVTT(text);
           console.log('[LiveSubtitle] Parsed', parsed.length, 'subtitle cues');
+          if (parsed.length > 0) {
+            console.log('[LiveSubtitle] First cue:', JSON.stringify(parsed[0]));
+            console.log('[LiveSubtitle] Last cue:', JSON.stringify(parsed[parsed.length - 1]));
+          }
           setCues(parsed);
+          fetchedUrlRef.current = subtitleUrl;
+          setLoadError(false);
         }
       } catch (err) {
         console.warn('[LiveSubtitle] Subtitle load error:', err);
-        if (!cancelled) setCues([]);
+        if (!cancelled) {
+          setCues([]);
+          setLoadError(true);
+        }
       }
     };
 
@@ -68,15 +92,21 @@ export default function LiveSubtitleOverlay({
 
   useEffect(() => {
     if (!isPlaying || cues.length === 0) {
+      if (currentText !== null) {
+        console.log('[LiveSubtitle] Clearing text: isPlaying=', isPlaying, 'cues=', cues.length);
+      }
       setCurrentText(null);
       return;
     }
 
     const cue = getCurrentCue(cues, audioCurrentTime);
     const newText = cue ? cue.text : null;
-    console.log('[LiveSubtitle] time=', audioCurrentTime.toFixed(2), 'cue=', newText ? newText.substring(0, 30) : 'none');
+
+    if (newText !== currentText) {
+      console.log('[LiveSubtitle] time=', audioCurrentTime.toFixed(2), 'cue=', newText ? newText.substring(0, 40) : 'none', 'totalCues=', cues.length);
+    }
     setCurrentText(newText);
-  }, [isPlaying, audioCurrentTime, cues]);
+  }, [isPlaying, audioCurrentTime, cues, currentText]);
 
   const animateTransition = useCallback(
     (show: boolean) => {

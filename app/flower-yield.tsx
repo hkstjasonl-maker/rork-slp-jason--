@@ -104,25 +104,25 @@ const BIRD_DATA = [
   { y: 14, size: 8, speed: 22000, startFrac: 0.4, dir: 1, flapSpeed: 600, count: 3 },
 ];
 
-function getTreeData(sw: number) {
+function getTreeData(sw: number, ratio: number = 1) {
   return [
-    { emoji: '🌳', left: 18, top: 125, size: 34, opacity: 0.22 },
-    { emoji: '🌲', left: sw - 55, top: 135, size: 30, opacity: 0.18 },
-    { emoji: '🌳', left: 80, top: 150, size: 22, opacity: 0.15 },
-    { emoji: '🌴', left: sw - 110, top: 145, size: 24, opacity: 0.15 },
+    { emoji: '🌳', left: 18, top: 125 * ratio, size: 34, opacity: 0.22 },
+    { emoji: '🌲', left: sw - 55, top: 135 * ratio, size: 30, opacity: 0.18 },
+    { emoji: '🌳', left: 80, top: 150 * ratio, size: 22, opacity: 0.15 },
+    { emoji: '🌴', left: sw - 110, top: 145 * ratio, size: 24, opacity: 0.15 },
   ];
 }
 
 const grassEmojis = ['🌱', '🌿', '☘️', '🍀'];
 
-function getGrassSprites(sw: number) {
+function getGrassSprites(sw: number, ratio: number = 1) {
   const sprites: { emoji: string; left: number; top: number; size: number }[] = [];
   for (let i = 0; i < 14; i++) {
     const isLeft = i < 7;
     sprites.push({
       emoji: grassEmojis[i % 4],
       left: isLeft ? seededRand(i * 7 + 1) * 30 + 4 : sw - 36 + seededRand(i * 7 + 2) * 26,
-      top: 155 + seededRand(i * 7 + 3) * 220,
+      top: (155 + seededRand(i * 7 + 3) * 220) * ratio,
       size: 7 + Math.floor(seededRand(i * 7 + 4) * 5),
     });
   }
@@ -144,8 +144,8 @@ for (let i = 0; i < TOTAL_SLOTS; i++) {
   CELL_GRASS.push(grasses);
 }
 
-const Mountains = React.memo(function Mountains() {
-  const mountainTop = GARDEN_HEIGHT * 0.35;
+const Mountains = React.memo(function Mountains({ gardenHeight }: { gardenHeight: number }) {
+  const mountainTop = gardenHeight * 0.35;
   return (
     <>
       {MOUNTAIN_DATA.map((m, i) => {
@@ -155,7 +155,7 @@ const Mountains = React.memo(function Mountains() {
               key={`m-${i}`}
               style={{
                 position: 'absolute' as const,
-                bottom: GARDEN_HEIGHT - mountainTop,
+                bottom: gardenHeight - mountainTop,
                 left: m.left,
                 width: m.w,
                 height: m.h,
@@ -172,7 +172,7 @@ const Mountains = React.memo(function Mountains() {
             key={`m-${i}`}
             style={{
               position: 'absolute' as const,
-              bottom: GARDEN_HEIGHT - mountainTop,
+              bottom: gardenHeight - mountainTop,
               left: m.left,
               width: 0,
               height: 0,
@@ -193,26 +193,26 @@ const Mountains = React.memo(function Mountains() {
   );
 });
 
-const RollingHills = React.memo(function RollingHills() {
+const RollingHills = React.memo(function RollingHills({ gardenHeight }: { gardenHeight: number }) {
   return (
     <>
       <View style={{
-        position: 'absolute' as const, bottom: GARDEN_HEIGHT * 0.52, left: -30, right: -30,
+        position: 'absolute' as const, bottom: gardenHeight * 0.52, left: -30, right: -30,
         height: 60, borderTopLeftRadius: 300, borderTopRightRadius: 200,
         backgroundColor: 'rgba(165,214,167,0.35)', zIndex: 3,
       }} />
       <View style={{
-        position: 'absolute' as const, bottom: GARDEN_HEIGHT * 0.48, left: '20%', right: -40,
+        position: 'absolute' as const, bottom: gardenHeight * 0.48, left: '20%', right: -40,
         height: 50, borderTopLeftRadius: 250, borderTopRightRadius: 350,
         backgroundColor: 'rgba(129,199,132,0.3)', zIndex: 3,
       }} />
       <View style={{
-        position: 'absolute' as const, bottom: GARDEN_HEIGHT * 0.44, left: -50, right: '15%',
+        position: 'absolute' as const, bottom: gardenHeight * 0.44, left: -50, right: '15%',
         height: 45, borderTopLeftRadius: 350, borderTopRightRadius: 180,
         backgroundColor: 'rgba(102,187,106,0.25)', zIndex: 3,
       }} />
       <View style={{
-        position: 'absolute' as const, bottom: GARDEN_HEIGHT * 0.40, left: -20, right: -20,
+        position: 'absolute' as const, bottom: gardenHeight * 0.40, left: -20, right: -20,
         height: 40, borderTopLeftRadius: 200, borderTopRightRadius: 280,
         backgroundColor: 'rgba(85,139,47,0.2)', zIndex: 3,
       }} />
@@ -220,20 +220,20 @@ const RollingHills = React.memo(function RollingHills() {
   );
 });
 
-const AtmosphericHaze = React.memo(function AtmosphericHaze() {
+const AtmosphericHaze = React.memo(function AtmosphericHaze({ gardenHeight }: { gardenHeight: number }) {
   return (
     <>
       <View style={{
-        position: 'absolute' as const, top: GARDEN_HEIGHT * 0.10, left: 0, right: 0,
-        height: GARDEN_HEIGHT * 0.18, backgroundColor: 'rgba(190,225,195,0.35)', zIndex: 2,
+        position: 'absolute' as const, top: gardenHeight * 0.10, left: 0, right: 0,
+        height: gardenHeight * 0.18, backgroundColor: 'rgba(190,225,195,0.35)', zIndex: 2,
       }} />
       <View style={{
-        position: 'absolute' as const, top: GARDEN_HEIGHT * 0.16, left: 0, right: 0,
-        height: GARDEN_HEIGHT * 0.14, backgroundColor: 'rgba(200,230,200,0.28)', zIndex: 2,
+        position: 'absolute' as const, top: gardenHeight * 0.16, left: 0, right: 0,
+        height: gardenHeight * 0.14, backgroundColor: 'rgba(200,230,200,0.28)', zIndex: 2,
       }} />
       <View style={{
-        position: 'absolute' as const, top: GARDEN_HEIGHT * 0.22, left: 0, right: 0,
-        height: GARDEN_HEIGHT * 0.10, backgroundColor: 'rgba(215,235,205,0.22)', zIndex: 2,
+        position: 'absolute' as const, top: gardenHeight * 0.22, left: 0, right: 0,
+        height: gardenHeight * 0.10, backgroundColor: 'rgba(215,235,205,0.22)', zIndex: 2,
       }} />
       <View style={{
         position: 'absolute' as const, bottom: 0, left: 0, right: 0,
@@ -448,9 +448,10 @@ function BirdsLayer({ screenWidth }: { screenWidth: number }) {
   return <>{BIRD_DATA.map((b, i) => <BirdGroup key={i} data={b} screenWidth={screenWidth} />)}</>;
 }
 
-const TreesAndGrassDecor = React.memo(function TreesAndGrassDecor({ screenWidth }: { screenWidth: number }) {
-  const treeData = useMemo(() => getTreeData(screenWidth), [screenWidth]);
-  const grassSprites = useMemo(() => getGrassSprites(screenWidth), [screenWidth]);
+const TreesAndGrassDecor = React.memo(function TreesAndGrassDecor({ screenWidth, gardenHeight }: { screenWidth: number; gardenHeight: number }) {
+  const ratio = gardenHeight / GARDEN_HEIGHT;
+  const treeData = useMemo(() => getTreeData(screenWidth, ratio), [screenWidth, ratio]);
+  const grassSprites = useMemo(() => getGrassSprites(screenWidth, ratio), [screenWidth, ratio]);
 
   return (
     <>
@@ -618,10 +619,12 @@ function PlantedFlower({ flower, flowerType, row }: {
 
 const MemoPlantedFlower = React.memo(PlantedFlower);
 
-function SoilGrid({ flowers, flowerTypeMap, onFlowerPress }: {
+function SoilGrid({ flowers, flowerTypeMap, onFlowerPress, screenWidth, gardenHeight }: {
   flowers: PatientFlower[];
   flowerTypeMap: Record<string, FlowerType>;
   onFlowerPress: (f: PatientFlower) => void;
+  screenWidth: number;
+  gardenHeight: number;
 }) {
   const flowerBySlot = useMemo(() => {
     const map: Record<number, PatientFlower> = {};
@@ -632,9 +635,8 @@ function SoilGrid({ flowers, flowerTypeMap, onFlowerPress }: {
   return (
     <View style={{
       position: 'absolute' as const,
-      bottom: 28,
-      left: '50%' as unknown as number,
-      marginLeft: -GRID_W / 2,
+      bottom: 28 * (gardenHeight / GARDEN_HEIGHT),
+      left: (screenWidth - GRID_W) / 2,
       width: GRID_W,
       height: GRID_H,
       transform: [{ perspective: 500 }, { rotateX: '45deg' }],
@@ -697,7 +699,7 @@ function SoilGrid({ flowers, flowerTypeMap, onFlowerPress }: {
   );
 }
 
-function CreaturesLayer({ screenWidth }: { screenWidth: number }) {
+function CreaturesLayer({ screenWidth, gardenHeight }: { screenWidth: number; gardenHeight: number }) {
   const b1Flight = useRef(new Animated.Value(0)).current;
   const b2Flight = useRef(new Animated.Value(0)).current;
   const bee1Flight = useRef(new Animated.Value(0)).current;
@@ -711,7 +713,7 @@ function CreaturesLayer({ screenWidth }: { screenWidth: number }) {
   }, [b1Flight, b2Flight, bee1Flight, bee2Flight]);
 
   const gardenCenterX = screenWidth / 2;
-  const gardenBottom = GARDEN_HEIGHT * 0.55;
+  const gardenBottom = gardenHeight * 0.55;
 
   const b1x = b1Flight.interpolate({ inputRange: [0, 0.25, 0.5, 0.75, 1], outputRange: [gardenCenterX - 80, gardenCenterX + 40, gardenCenterX - 20, gardenCenterX + 70, gardenCenterX - 80] });
   const b1y = b1Flight.interpolate({ inputRange: [0, 0.25, 0.5, 0.75, 1], outputRange: [gardenBottom - 40, gardenBottom - 70, gardenBottom - 30, gardenBottom - 60, gardenBottom - 40] });
@@ -744,16 +746,16 @@ function CreaturesLayer({ screenWidth }: { screenWidth: number }) {
   );
 }
 
-function GoldenSparkles({ screenWidth }: { screenWidth: number }) {
+function GoldenSparkles({ screenWidth, gardenHeight }: { screenWidth: number; gardenHeight: number }) {
   const anims = useRef(Array.from({ length: 6 }, () => new Animated.Value(0))).current;
 
   const sparkleData = useMemo(() =>
     Array.from({ length: 6 }, (_, i) => ({
       x: screenWidth * 0.2 + seededRand(i * 31) * screenWidth * 0.6,
-      y: GARDEN_HEIGHT * 0.35 + seededRand(i * 37) * GARDEN_HEIGHT * 0.45,
+      y: gardenHeight * 0.35 + seededRand(i * 37) * gardenHeight * 0.45,
       char: i % 2 === 0 ? '✦' : '✧',
     }))
-  , [screenWidth]);
+  , [screenWidth, gardenHeight]);
 
   useEffect(() => {
     anims.forEach((anim, i) => {
@@ -818,14 +820,15 @@ const FenceRow = React.memo(function FenceRow({ screenWidth }: { screenWidth: nu
   );
 });
 
-const MemoGardenScene = React.memo(function GardenScene({ flowers, flowerTypeMap, onFlowerPress, screenWidth }: {
+const MemoGardenScene = React.memo(function GardenScene({ flowers, flowerTypeMap, onFlowerPress, screenWidth, gardenHeight }: {
   flowers: PatientFlower[];
   flowerTypeMap: Record<string, FlowerType>;
   onFlowerPress: (f: PatientFlower) => void;
   screenWidth: number;
+  gardenHeight: number;
 }) {
   return (
-    <View style={[gardenStyles.container, { width: screenWidth }]}>
+    <View style={[gardenStyles.container, { width: screenWidth, height: gardenHeight }]}>
       <View style={[StyleSheet.absoluteFill, { backgroundColor: '#3E6B2E' }]} />
       <View style={{ position: 'absolute' as const, top: 0, left: 0, right: 0, height: '58%', backgroundColor: '#5A8B48' }} />
       <View style={{ position: 'absolute' as const, top: 0, left: 0, right: 0, height: '38%', backgroundColor: '#8BBD78' }} />
@@ -839,16 +842,16 @@ const MemoGardenScene = React.memo(function GardenScene({ flowers, flowerTypeMap
       <View style={gardenStyles.grassTexture2} />
       <View style={gardenStyles.grassTexture3} />
 
-      <Mountains />
-      <RollingHills />
-      <AtmosphericHaze />
+      <Mountains gardenHeight={gardenHeight} />
+      <RollingHills gardenHeight={gardenHeight} />
+      <AtmosphericHaze gardenHeight={gardenHeight} />
       <SunWithFace />
       <CloudsLayer screenWidth={screenWidth} />
       <BirdsLayer screenWidth={screenWidth} />
-      <TreesAndGrassDecor screenWidth={screenWidth} />
-      <SoilGrid flowers={flowers} flowerTypeMap={flowerTypeMap} onFlowerPress={onFlowerPress} />
-      <CreaturesLayer screenWidth={screenWidth} />
-      <GoldenSparkles screenWidth={screenWidth} />
+      <TreesAndGrassDecor screenWidth={screenWidth} gardenHeight={gardenHeight} />
+      <SoilGrid flowers={flowers} flowerTypeMap={flowerTypeMap} onFlowerPress={onFlowerPress} screenWidth={screenWidth} gardenHeight={gardenHeight} />
+      <CreaturesLayer screenWidth={screenWidth} gardenHeight={gardenHeight} />
+      <GoldenSparkles screenWidth={screenWidth} gardenHeight={gardenHeight} />
       <FenceRow screenWidth={screenWidth} />
     </View>
   );
@@ -947,7 +950,8 @@ export default function FlowerYieldScreen() {
   const { patientId, patientName, language, flowersJustStolen, clearFlowersStolen } = useApp();
   const router = useRouter();
   const queryClient = useQueryClient();
-  const { width: screenWidth } = useWindowDimensions();
+  const { width: screenWidth, height: screenHeight } = useWindowDimensions();
+  const gardenHeight = Math.min(GARDEN_HEIGHT, Math.max(350, screenHeight * 0.6));
 
   const [selectedFlower, setSelectedFlower] = useState<PatientFlower | null>(null);
   const [theftModalVisible, setTheftModalVisible] = useState<boolean>(false);
@@ -1093,14 +1097,14 @@ export default function FlowerYieldScreen() {
           </View>
         </View>
 
-        <ScrollView style={styles.scrollView} contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
+        <ScrollView style={styles.scrollView} contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false} contentInsetAdjustmentBehavior="never">
           {isLoading ? (
             <View style={styles.loadingContainer}>
               <ActivityIndicator size="large" color={Colors.primary} />
             </View>
           ) : (
             <>
-              <MemoGardenScene flowers={flowers} flowerTypeMap={flowerTypeMap} onFlowerPress={handleFlowerPress} screenWidth={screenWidth} />
+              <MemoGardenScene flowers={flowers} flowerTypeMap={flowerTypeMap} onFlowerPress={handleFlowerPress} screenWidth={screenWidth} gardenHeight={gardenHeight} />
 
               {flowers.length === 0 && (
                 <View style={styles.emptyHint}>
@@ -1231,9 +1235,9 @@ export default function FlowerYieldScreen() {
 
 const gardenStyles = StyleSheet.create({
   container: {
-    height: GARDEN_HEIGHT,
     overflow: 'hidden',
     position: 'relative',
+    backgroundColor: '#3E6B2E',
   },
   grassTexture1: {
     position: 'absolute',

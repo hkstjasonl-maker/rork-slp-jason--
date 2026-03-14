@@ -16,7 +16,7 @@
     "ios": {
       "supportsTablet": true,
       "requireFullScreen": true,
-      "bundleIdentifier": "com.dravive.slpjason",
+      "bundleIdentifier": "app.rork.slp-jason",
       "buildNumber": "1",
       "infoPlist": {
         "UISupportedInterfaceOrientations": [

@@ -58,6 +58,8 @@ export default function LiveSubtitleOverlay({
         setIsLoading(true);
         setLoadError(false);
         const response = await fetch(subtitleUrl);
+        console.log('[LiveSubtitleOverlay] Fetching subtitle URL:', subtitleUrl);
+        console.log('[LiveSubtitleOverlay] Fetch response status:', response.status);
         if (!response.ok) {
           console.warn('[LiveSubtitle] Subtitle fetch failed:', response.status, subtitleUrl);
           if (!cancelled) {
@@ -68,7 +70,7 @@ export default function LiveSubtitleOverlay({
           return;
         }
         const text = await response.text();
-        console.log('[LiveSubtitle] Fetched text length:', text.length, 'first 200 chars:', text.substring(0, 200));
+        console.log('[LiveSubtitleOverlay] Fetched text length:', text.length, 'first 200 chars:', text.substring(0, 200));
         if (!cancelled) {
           const parsed = parseVTT(text);
           console.log('[LiveSubtitle] Parsed', parsed.length, 'subtitle cues');
@@ -151,6 +153,8 @@ export default function LiveSubtitleOverlay({
 
     prevTextRef.current = currentText;
   }, [currentText, visible, fadeAnim, animateTransition]);
+
+  console.log('[LiveSubtitleOverlay] Render state:', { visible, isLoading, loadError, isPlaying, currentText, cuesCount: cues?.length, audioCurrentTime });
 
   if (!visible) {
     return null;

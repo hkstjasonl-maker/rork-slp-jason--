@@ -532,12 +532,11 @@ function PlantedFlower({ flower, flowerType, row }: {
 
 const MemoPlantedFlower = React.memo(PlantedFlower);
 
-const SoilGrid = React.memo(function SoilGrid({ flowers, flowerTypeMap, onFlowerPress, screenWidth, gardenHeight }: {
+const SoilGrid = React.memo(function SoilGrid({ flowers, flowerTypeMap, onFlowerPress, screenWidth }: {
   flowers: PatientFlower[];
   flowerTypeMap: Record<string, FlowerType>;
   onFlowerPress: (f: PatientFlower) => void;
   screenWidth: number;
-  gardenHeight: number;
 }) {
   const flowerBySlot = useMemo(() => {
     const map: Record<number, PatientFlower> = {};
@@ -551,7 +550,7 @@ const SoilGrid = React.memo(function SoilGrid({ flowers, flowerTypeMap, onFlower
     <View
       style={{
         position: 'absolute' as const,
-        bottom: 28 * (gardenHeight / GARDEN_HEIGHT),
+        bottom: 28,
         left: (screenWidth - GRID_W) / 2,
         width: GRID_W,
         height: GRID_H,
@@ -652,31 +651,40 @@ const MemoGardenScene = React.memo(function GardenScene({ flowers, flowerTypeMap
   screenWidth: number;
   gardenHeight: number;
 }) {
+  const scale = gardenHeight / GARDEN_HEIGHT;
+
   return (
-    <View style={[gardenStyles.container, { width: screenWidth, height: gardenHeight }]}>
-      <View style={[StyleSheet.absoluteFill, { backgroundColor: '#3E6B2E' }]} />
-      <View style={{ position: 'absolute' as const, top: 0, left: 0, right: 0, height: '58%', backgroundColor: '#5A8B48' }} />
-      <View style={{ position: 'absolute' as const, top: 0, left: 0, right: 0, height: '38%', backgroundColor: '#8BBD78' }} />
-      <View style={{ position: 'absolute' as const, top: 0, left: 0, right: 0, height: '26%', backgroundColor: '#B0D6A2' }} />
-      <View style={{ position: 'absolute' as const, top: 0, left: 0, right: 0, height: '18%', backgroundColor: '#CFDEC4' }} />
-      <View style={{ position: 'absolute' as const, top: 0, left: 0, right: 0, height: '13%', backgroundColor: '#CBDADB' }} />
-      <View style={{ position: 'absolute' as const, top: 0, left: 0, right: 0, height: '8%', backgroundColor: '#ACC6E4' }} />
-      <View style={{ position: 'absolute' as const, top: 0, left: 0, right: 0, height: '3%', backgroundColor: '#94B6E4' }} />
+    <View style={[gardenStyles.container, { width: screenWidth, height: gardenHeight, overflow: 'hidden' as const }]}>
+      <View style={{
+        width: screenWidth / scale,
+        height: GARDEN_HEIGHT,
+        transform: [{ scale }],
+        transformOrigin: 'top left',
+      }}>
+        <View style={[StyleSheet.absoluteFill, { backgroundColor: '#3E6B2E' }]} />
+        <View style={{ position: 'absolute' as const, top: 0, left: 0, right: 0, height: '58%', backgroundColor: '#5A8B48' }} />
+        <View style={{ position: 'absolute' as const, top: 0, left: 0, right: 0, height: '38%', backgroundColor: '#8BBD78' }} />
+        <View style={{ position: 'absolute' as const, top: 0, left: 0, right: 0, height: '26%', backgroundColor: '#B0D6A2' }} />
+        <View style={{ position: 'absolute' as const, top: 0, left: 0, right: 0, height: '18%', backgroundColor: '#CFDEC4' }} />
+        <View style={{ position: 'absolute' as const, top: 0, left: 0, right: 0, height: '13%', backgroundColor: '#CBDADB' }} />
+        <View style={{ position: 'absolute' as const, top: 0, left: 0, right: 0, height: '8%', backgroundColor: '#ACC6E4' }} />
+        <View style={{ position: 'absolute' as const, top: 0, left: 0, right: 0, height: '3%', backgroundColor: '#94B6E4' }} />
 
-      <View style={gardenStyles.grassTexture1} />
-      <View style={gardenStyles.grassTexture2} />
-      <View style={gardenStyles.grassTexture3} />
+        <View style={gardenStyles.grassTexture1} />
+        <View style={gardenStyles.grassTexture2} />
+        <View style={gardenStyles.grassTexture3} />
 
-      <Mountains gardenHeight={gardenHeight} />
-      <RollingHills gardenHeight={gardenHeight} />
-      <AtmosphericHaze gardenHeight={gardenHeight} />
-      <StaticSun />
-      <CloudsLayer screenWidth={screenWidth} />
-      <TreesAndGrassDecor screenWidth={screenWidth} gardenHeight={gardenHeight} />
-      <SoilGrid flowers={flowers} flowerTypeMap={flowerTypeMap} onFlowerPress={onFlowerPress} screenWidth={screenWidth} gardenHeight={gardenHeight} />
-      <StaticCreatures screenWidth={screenWidth} gardenHeight={gardenHeight} />
-      <StaticSparkles screenWidth={screenWidth} gardenHeight={gardenHeight} />
-      <FenceRow screenWidth={screenWidth} />
+        <Mountains gardenHeight={GARDEN_HEIGHT} />
+        <RollingHills gardenHeight={GARDEN_HEIGHT} />
+        <AtmosphericHaze gardenHeight={GARDEN_HEIGHT} />
+        <StaticSun />
+        <CloudsLayer screenWidth={screenWidth / scale} />
+        <TreesAndGrassDecor screenWidth={screenWidth / scale} gardenHeight={GARDEN_HEIGHT} />
+        <SoilGrid flowers={flowers} flowerTypeMap={flowerTypeMap} onFlowerPress={onFlowerPress} screenWidth={screenWidth / scale} />
+        <StaticCreatures screenWidth={screenWidth / scale} gardenHeight={GARDEN_HEIGHT} />
+        <StaticSparkles screenWidth={screenWidth / scale} gardenHeight={GARDEN_HEIGHT} />
+        <FenceRow screenWidth={screenWidth / scale} />
+      </View>
     </View>
   );
 });

@@ -117,16 +117,28 @@ function parseTxtTimestamps(text: string): SubtitleCue[] {
 function parseBracketedFormat(text: string): SubtitleCue[] {
   const cues: SubtitleCue[] = [];
   const clean = text.replace(/^\uFEFF/, '').replace(/\r\n/g, '\n');
-  const lines = clean.split('\n').filter(l => l.trim().length > 0);
+  const lines = clean.split('\n');
 
-  const pattern = /^\[(\d{1,2}:\d{2}(?::\d{2})?(?:[.,]\d+)?)\s*-->\s*(\d{1,2}:\d{2}(?::\d{2})?(?:[.,]\d+)?)\]\s*(.*)$/;
+  const timestampPattern = /^\[(\d{1,2}:\d{2}(?::\d{2})?(?:[.,]\d+)?)\s*-->\s*(\d{1,2}:\d{2}(?::\d{2})?(?:[.,]\d+)?)\]\s*(.*)$/;
 
-  for (const line of lines) {
-    const match = line.trim().match(pattern);
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i].trim();
+    if (line.length === 0) continue;
+
+    const match = line.match(timestampPattern);
     if (match) {
       const startTime = parseTimestamp(match[1]);
       const endTime = parseTimestamp(match[2]);
-      const cueText = (match[3] || '').trim();
+      let cueText = (match[3] || '').trim();
+
+      if (cueText.length === 0 && i + 1 < lines.length) {
+        const nextLine = lines[i + 1].trim();
+        if (nextLine.length > 0 && !nextLine.match(timestampPattern)) {
+          cueText = nextLine;
+          i++;
+        }
+      }
+
       if (cueText.length > 0) {
         cues.push({ startTime, endTime, text: cueText });
       }

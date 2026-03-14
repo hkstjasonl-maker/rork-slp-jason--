@@ -1,7 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState, useCallback } from 'react';
 import {
   View,
-  Text,
   ScrollView,
   StyleSheet,
   SafeAreaView,
@@ -412,6 +411,62 @@ const FlyingBirds = React.memo(function FlyingBirds({ screenWidth }: { screenWid
   );
 });
 
+const ButterflyShape = React.memo(function ButterflyShape({ size, color1, color2 }: { size: number; color1: string; color2: string }) {
+  const wingW = size * 0.4;
+  const wingH = size * 0.5;
+  const smallWingH = size * 0.32;
+  return (
+    <View style={{ width: size, height: size, alignItems: 'center', justifyContent: 'center' }}>
+      <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+        <View style={{ alignItems: 'flex-end', marginRight: -1 }}>
+          <View style={{ width: wingW, height: wingH, borderRadius: wingW * 0.8, backgroundColor: color1, marginBottom: -3, transform: [{ rotate: '-10deg' }] }} />
+          <View style={{ width: wingW * 0.75, height: smallWingH, borderRadius: wingW * 0.6, backgroundColor: color2, transform: [{ rotate: '-5deg' }] }} />
+        </View>
+        <View style={{ width: 2, height: size * 0.55, borderRadius: 1, backgroundColor: 'rgba(80,60,40,0.8)' }} />
+        <View style={{ alignItems: 'flex-start', marginLeft: -1 }}>
+          <View style={{ width: wingW, height: wingH, borderRadius: wingW * 0.8, backgroundColor: color1, marginBottom: -3, transform: [{ rotate: '10deg' }] }} />
+          <View style={{ width: wingW * 0.75, height: smallWingH, borderRadius: wingW * 0.6, backgroundColor: color2, transform: [{ rotate: '5deg' }] }} />
+        </View>
+      </View>
+    </View>
+  );
+});
+
+const LadybugShape = React.memo(function LadybugShape({ size }: { size: number }) {
+  const dotSize = size * 0.14;
+  return (
+    <View style={{ width: size, height: size, alignItems: 'center', justifyContent: 'center' }}>
+      <View style={{ width: size * 0.7, height: size * 0.6, borderRadius: size * 0.35, backgroundColor: '#E53935', overflow: 'hidden' }}>
+        <View style={{ position: 'absolute' as const, top: 0, left: '50%', marginLeft: -0.8, width: 1.6, height: '100%', backgroundColor: 'rgba(30,30,30,0.7)' }} />
+        <View style={{ position: 'absolute' as const, top: size * 0.1, left: size * 0.1, width: dotSize, height: dotSize, borderRadius: dotSize / 2, backgroundColor: 'rgba(20,20,20,0.8)' }} />
+        <View style={{ position: 'absolute' as const, top: size * 0.1, right: size * 0.1, width: dotSize, height: dotSize, borderRadius: dotSize / 2, backgroundColor: 'rgba(20,20,20,0.8)' }} />
+        <View style={{ position: 'absolute' as const, top: size * 0.3, left: size * 0.06, width: dotSize, height: dotSize, borderRadius: dotSize / 2, backgroundColor: 'rgba(20,20,20,0.8)' }} />
+        <View style={{ position: 'absolute' as const, top: size * 0.3, right: size * 0.06, width: dotSize, height: dotSize, borderRadius: dotSize / 2, backgroundColor: 'rgba(20,20,20,0.8)' }} />
+      </View>
+      <View style={{ position: 'absolute' as const, top: size * 0.12, width: size * 0.25, height: size * 0.22, borderRadius: size * 0.12, backgroundColor: 'rgba(30,30,30,0.9)' }} />
+    </View>
+  );
+});
+
+const BeeShape = React.memo(function BeeShape({ size }: { size: number }) {
+  const bodyW = size * 0.5;
+  const bodyH = size * 0.35;
+  const wingW = size * 0.3;
+  const wingH = size * 0.25;
+  return (
+    <View style={{ width: size, height: size, alignItems: 'center', justifyContent: 'center' }}>
+      <View style={{ position: 'absolute' as const, top: size * 0.12, left: size * 0.18, width: wingW, height: wingH, borderRadius: wingH, backgroundColor: 'rgba(220,240,255,0.6)', transform: [{ rotate: '-20deg' }] }} />
+      <View style={{ position: 'absolute' as const, top: size * 0.12, right: size * 0.18, width: wingW, height: wingH, borderRadius: wingH, backgroundColor: 'rgba(220,240,255,0.6)', transform: [{ rotate: '20deg' }] }} />
+      <View style={{ width: bodyW, height: bodyH, borderRadius: bodyH / 2, backgroundColor: '#FDD835', overflow: 'hidden', flexDirection: 'row' }}>
+        <View style={{ width: '33%', height: '100%', backgroundColor: '#FDD835' }} />
+        <View style={{ width: '20%', height: '100%', backgroundColor: 'rgba(30,30,30,0.85)' }} />
+        <View style={{ width: '27%', height: '100%', backgroundColor: '#FDD835' }} />
+        <View style={{ width: '20%', height: '100%', backgroundColor: 'rgba(30,30,30,0.85)' }} />
+      </View>
+    </View>
+  );
+});
+
 const FloatingInsects = React.memo(function FloatingInsects({ screenWidth, gardenHeight }: { screenWidth: number; gardenHeight: number }) {
   const bug1X = useRef(new Animated.Value(0)).current;
   const bug1Y = useRef(new Animated.Value(0)).current;
@@ -422,47 +477,45 @@ const FloatingInsects = React.memo(function FloatingInsects({ screenWidth, garde
 
   useEffect(() => {
     Animated.loop(Animated.sequence([
-      Animated.timing(bug1X, { toValue: 30, duration: 3000, easing: Easing.inOut(Easing.sin), useNativeDriver: true }),
-      Animated.timing(bug1X, { toValue: -20, duration: 3500, easing: Easing.inOut(Easing.sin), useNativeDriver: true }),
-      Animated.timing(bug1X, { toValue: 10, duration: 2500, easing: Easing.inOut(Easing.sin), useNativeDriver: true }),
+      Animated.timing(bug1X, { toValue: 35, duration: 3200, easing: Easing.inOut(Easing.sin), useNativeDriver: true }),
+      Animated.timing(bug1X, { toValue: -25, duration: 3800, easing: Easing.inOut(Easing.sin), useNativeDriver: true }),
+      Animated.timing(bug1X, { toValue: 12, duration: 2800, easing: Easing.inOut(Easing.sin), useNativeDriver: true }),
     ])).start();
     Animated.loop(Animated.sequence([
-      Animated.timing(bug1Y, { toValue: -15, duration: 2500, easing: Easing.inOut(Easing.sin), useNativeDriver: true }),
-      Animated.timing(bug1Y, { toValue: 10, duration: 3000, easing: Easing.inOut(Easing.sin), useNativeDriver: true }),
-    ])).start();
-
-    Animated.loop(Animated.sequence([
-      Animated.timing(bug2X, { toValue: 20, duration: 4000, easing: Easing.inOut(Easing.sin), useNativeDriver: true }),
-      Animated.timing(bug2X, { toValue: -15, duration: 4500, easing: Easing.inOut(Easing.sin), useNativeDriver: true }),
+      Animated.timing(bug1Y, { toValue: -18, duration: 2700, easing: Easing.inOut(Easing.sin), useNativeDriver: true }),
+      Animated.timing(bug1Y, { toValue: 12, duration: 3200, easing: Easing.inOut(Easing.sin), useNativeDriver: true }),
     ])).start();
     Animated.loop(Animated.sequence([
-      Animated.timing(bug2Y, { toValue: -10, duration: 3500, easing: Easing.inOut(Easing.sin), useNativeDriver: true }),
-      Animated.timing(bug2Y, { toValue: 8, duration: 3000, easing: Easing.inOut(Easing.sin), useNativeDriver: true }),
-    ])).start();
-
-    Animated.loop(Animated.sequence([
-      Animated.timing(bug3X, { toValue: 18, duration: 1800, easing: Easing.inOut(Easing.sin), useNativeDriver: true }),
-      Animated.timing(bug3X, { toValue: -22, duration: 2200, easing: Easing.inOut(Easing.sin), useNativeDriver: true }),
-      Animated.timing(bug3X, { toValue: 5, duration: 1500, easing: Easing.inOut(Easing.sin), useNativeDriver: true }),
+      Animated.timing(bug2X, { toValue: 22, duration: 4200, easing: Easing.inOut(Easing.sin), useNativeDriver: true }),
+      Animated.timing(bug2X, { toValue: -18, duration: 4800, easing: Easing.inOut(Easing.sin), useNativeDriver: true }),
     ])).start();
     Animated.loop(Animated.sequence([
-      Animated.timing(bug3Y, { toValue: -12, duration: 1500, easing: Easing.inOut(Easing.sin), useNativeDriver: true }),
-      Animated.timing(bug3Y, { toValue: 8, duration: 1800, easing: Easing.inOut(Easing.sin), useNativeDriver: true }),
-      Animated.timing(bug3Y, { toValue: -5, duration: 1200, easing: Easing.inOut(Easing.sin), useNativeDriver: true }),
+      Animated.timing(bug2Y, { toValue: -12, duration: 3800, easing: Easing.inOut(Easing.sin), useNativeDriver: true }),
+      Animated.timing(bug2Y, { toValue: 10, duration: 3200, easing: Easing.inOut(Easing.sin), useNativeDriver: true }),
+    ])).start();
+    Animated.loop(Animated.sequence([
+      Animated.timing(bug3X, { toValue: 20, duration: 2000, easing: Easing.inOut(Easing.sin), useNativeDriver: true }),
+      Animated.timing(bug3X, { toValue: -24, duration: 2400, easing: Easing.inOut(Easing.sin), useNativeDriver: true }),
+      Animated.timing(bug3X, { toValue: 8, duration: 1700, easing: Easing.inOut(Easing.sin), useNativeDriver: true }),
+    ])).start();
+    Animated.loop(Animated.sequence([
+      Animated.timing(bug3Y, { toValue: -14, duration: 1600, easing: Easing.inOut(Easing.sin), useNativeDriver: true }),
+      Animated.timing(bug3Y, { toValue: 10, duration: 2000, easing: Easing.inOut(Easing.sin), useNativeDriver: true }),
+      Animated.timing(bug3Y, { toValue: -6, duration: 1400, easing: Easing.inOut(Easing.sin), useNativeDriver: true }),
     ])).start();
   }, [bug1X, bug1Y, bug2X, bug2Y, bug3X, bug3Y]);
 
-  const gardenMid = gardenHeight * 0.55;
+  const mid = gardenHeight * 0.55;
   return (
     <>
-      <Animated.View style={{ position: 'absolute' as const, top: gardenMid - 20, left: screenWidth * 0.25, transform: [{ translateX: bug1X }, { translateY: bug1Y }] }} pointerEvents="none">
-        <Text style={{ fontSize: 18 }}>🦋</Text>
+      <Animated.View style={{ position: 'absolute' as const, top: mid - 25, left: screenWidth * 0.22, transform: [{ translateX: bug1X }, { translateY: bug1Y }] }} pointerEvents="none">
+        <ButterflyShape size={24} color1="rgba(180,130,220,0.7)" color2="rgba(150,100,200,0.5)" />
       </Animated.View>
-      <Animated.View style={{ position: 'absolute' as const, top: gardenMid + 30, left: screenWidth * 0.7, transform: [{ translateX: bug2X }, { translateY: bug2Y }] }} pointerEvents="none">
-        <Text style={{ fontSize: 14 }}>🐞</Text>
+      <Animated.View style={{ position: 'absolute' as const, top: mid + 25, left: screenWidth * 0.68, transform: [{ translateX: bug2X }, { translateY: bug2Y }] }} pointerEvents="none">
+        <LadybugShape size={16} />
       </Animated.View>
-      <Animated.View style={{ position: 'absolute' as const, top: gardenMid, left: screenWidth * 0.5, transform: [{ translateX: bug3X }, { translateY: bug3Y }] }} pointerEvents="none">
-        <Text style={{ fontSize: 15 }}>🐝</Text>
+      <Animated.View style={{ position: 'absolute' as const, top: mid - 5, left: screenWidth * 0.48, transform: [{ translateX: bug3X }, { translateY: bug3Y }] }} pointerEvents="none">
+        <BeeShape size={20} />
       </Animated.View>
     </>
   );
@@ -719,6 +772,76 @@ const FenceRow = React.memo(function FenceRow({ screenWidth }: { screenWidth: nu
   );
 });
 
+const GentleRain = React.memo(function GentleRain({ screenWidth, gardenHeight }: { screenWidth: number; gardenHeight: number }) {
+  const [isRaining, setIsRaining] = useState<boolean>(false);
+  const rainOpacity = useRef(new Animated.Value(0)).current;
+  const dropAnims = useRef(
+    Array.from({ length: 18 }, () => new Animated.Value(-20))
+  ).current;
+  const dropPositions = useRef(
+    Array.from({ length: 18 }, (_, i) => ((i * 67 + 23) % 100) / 100)
+  ).current;
+  const isRainingRef = useRef(false);
+
+  useEffect(() => {
+    const cycle = () => {
+      const shouldRain = Math.random() < 0.4;
+      if (shouldRain) {
+        isRainingRef.current = true;
+        setIsRaining(true);
+        Animated.timing(rainOpacity, { toValue: 1, duration: 2000, useNativeDriver: true }).start();
+        setTimeout(() => {
+          Animated.timing(rainOpacity, { toValue: 0, duration: 2000, useNativeDriver: true }).start(() => {
+            isRainingRef.current = false;
+            setIsRaining(false);
+          });
+        }, 8000 + Math.random() * 7000);
+      }
+      setTimeout(cycle, 30000 + Math.random() * 30000);
+    };
+    setTimeout(cycle, 10000 + Math.random() * 10000);
+  }, [rainOpacity]);
+
+  useEffect(() => {
+    if (!isRaining) return;
+    dropAnims.forEach((anim, i) => {
+      const startDrop = () => {
+        anim.setValue(-20);
+        Animated.timing(anim, {
+          toValue: gardenHeight + 20,
+          duration: 800 + (i % 5) * 150,
+          easing: Easing.linear,
+          useNativeDriver: true,
+        }).start(() => {
+          if (isRainingRef.current) setTimeout(startDrop, Math.random() * 400);
+        });
+      };
+      setTimeout(startDrop, i * 120 + Math.random() * 300);
+    });
+  }, [isRaining, dropAnims, gardenHeight]);
+
+  if (!isRaining) return null;
+
+  return (
+    <Animated.View style={{ position: 'absolute' as const, top: 0, left: 0, right: 0, bottom: 0, opacity: rainOpacity }} pointerEvents="none">
+      {dropAnims.map((anim, i) => (
+        <Animated.View
+          key={`rain-${i}`}
+          style={{
+            position: 'absolute' as const,
+            left: dropPositions[i] * screenWidth,
+            width: 1.5,
+            height: 12 + (i % 4) * 3,
+            borderRadius: 1,
+            backgroundColor: 'rgba(180,200,220,0.35)',
+            transform: [{ translateY: anim }, { rotate: '8deg' }],
+          }}
+        />
+      ))}
+    </Animated.View>
+  );
+});
+
 const MemoGardenScene = React.memo(function GardenScene({ flowers, flowerTypeMap, onFlowerPress, screenWidth, gardenHeight }: {
   flowers: PatientFlower[];
   flowerTypeMap: Record<string, FlowerType>;
@@ -746,6 +869,7 @@ const MemoGardenScene = React.memo(function GardenScene({ flowers, flowerTypeMap
       <SoilGrid flowers={flowers} flowerTypeMap={flowerTypeMap} onFlowerPress={onFlowerPress} screenWidth={screenWidth} />
       <StaticSparkles screenWidth={screenWidth} gardenHeight={gardenHeight} />
       <FenceRow screenWidth={screenWidth} />
+      <GentleRain screenWidth={screenWidth} gardenHeight={gardenHeight} />
     </View>
   );
 });

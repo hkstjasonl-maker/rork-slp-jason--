@@ -552,9 +552,9 @@ const SoilGrid = React.memo(function SoilGrid({ flowers, flowerTypeMap, onFlower
         left: (screenWidth - GRID_W) / 2,
         width: GRID_W,
         height: GRID_H,
-        transform: [{ rotateX: '45deg' }],
+        transform: [],
       }}
-      removeClippedSubviews={Platform.OS !== 'web'}
+      removeClippedSubviews={false}
     >
       {slots.map((idx) => {
         const col = idx % GRID_COLS;

@@ -153,7 +153,7 @@ const Mountains = React.memo(function Mountains({ gardenHeight }: { gardenHeight
                 borderTopLeftRadius: (m.w ?? 100) / 2,
                 borderTopRightRadius: (m.w ?? 100) / 2,
                 backgroundColor: m.color,
-                zIndex: 3,
+                zIndex: 5,
               }}
             />
           );
@@ -175,7 +175,7 @@ const Mountains = React.memo(function Mountains({ gardenHeight }: { gardenHeight
               borderLeftColor: 'transparent',
               borderRightColor: 'transparent',
               borderBottomColor: m.color,
-              zIndex: 3,
+              zIndex: 5,
             }}
           />
         );
@@ -190,22 +190,22 @@ const RollingHills = React.memo(function RollingHills({ gardenHeight }: { garden
       <View style={{
         position: 'absolute' as const, bottom: gardenHeight * 0.52, left: -30, right: -30,
         height: 60, borderTopLeftRadius: 300, borderTopRightRadius: 200,
-        backgroundColor: 'rgba(165,214,167,0.7)', zIndex: 3,
+        backgroundColor: 'rgba(165,214,167,0.7)', zIndex: 4,
       }} />
       <View style={{
         position: 'absolute' as const, bottom: gardenHeight * 0.48, left: '20%', right: -40,
         height: 50, borderTopLeftRadius: 250, borderTopRightRadius: 350,
-        backgroundColor: 'rgba(129,199,132,0.65)', zIndex: 3,
+        backgroundColor: 'rgba(129,199,132,0.65)', zIndex: 4,
       }} />
       <View style={{
         position: 'absolute' as const, bottom: gardenHeight * 0.44, left: -50, right: '15%',
         height: 45, borderTopLeftRadius: 350, borderTopRightRadius: 180,
-        backgroundColor: 'rgba(102,187,106,0.6)', zIndex: 3,
+        backgroundColor: 'rgba(102,187,106,0.6)', zIndex: 4,
       }} />
       <View style={{
         position: 'absolute' as const, bottom: gardenHeight * 0.40, left: -20, right: -20,
         height: 40, borderTopLeftRadius: 200, borderTopRightRadius: 280,
-        backgroundColor: 'rgba(85,139,47,0.55)', zIndex: 3,
+        backgroundColor: 'rgba(85,139,47,0.55)', zIndex: 4,
       }} />
     </>
   );
@@ -237,7 +237,7 @@ const AtmosphericHaze = React.memo(function AtmosphericHaze({ gardenHeight }: { 
 const StaticSun = React.memo(function StaticSun() {
   const rays = [0, 30, 60, 90, 120, 150];
   return (
-    <View style={{ position: 'absolute' as const, top: 8, right: 28, width: 52, height: 52, zIndex: 4 }}>
+    <View style={{ position: 'absolute' as const, top: 8, right: 28, width: 52, height: 52, zIndex: 6 }}>
       <View style={{
         position: 'absolute' as const, top: -74, left: -74, width: 200, height: 200,
         alignItems: 'center' as const, justifyContent: 'center' as const,
@@ -307,7 +307,7 @@ const SingleCloud = React.memo(function SingleCloud({ data, screenWidth }: { dat
   return (
     <Animated.View style={{
       position: 'absolute' as const, top: data.y - padY, width: data.w + padX * 2, height: data.h + bumpH * 0.5 + padY * 2,
-      transform: [{ translateX }], zIndex: 4,
+      transform: [{ translateX }], zIndex: 6,
     }}>
       <View style={{
         position: 'absolute' as const, bottom: padY, left: padX * 0.3, right: padX * 0.3, height: data.h * 1.4,
@@ -653,14 +653,14 @@ const MemoGardenScene = React.memo(function GardenScene({ flowers, flowerTypeMap
 }) {
   return (
     <View style={[gardenStyles.container, { width: screenWidth, height: gardenHeight }]}>
-        <View style={[StyleSheet.absoluteFill, { backgroundColor: '#3E6B2E' }]} />
-        <View style={{ position: 'absolute' as const, top: 0, left: 0, right: 0, height: '58%', backgroundColor: '#5A8B48' }} />
-        <View style={{ position: 'absolute' as const, top: 0, left: 0, right: 0, height: '38%', backgroundColor: '#8BBD78' }} />
-        <View style={{ position: 'absolute' as const, top: 0, left: 0, right: 0, height: '26%', backgroundColor: '#B0D6A2' }} />
-        <View style={{ position: 'absolute' as const, top: 0, left: 0, right: 0, height: '18%', backgroundColor: '#CFDEC4' }} />
-        <View style={{ position: 'absolute' as const, top: 0, left: 0, right: 0, height: '13%', backgroundColor: '#CBDADB' }} />
-        <View style={{ position: 'absolute' as const, top: 0, left: 0, right: 0, height: '8%', backgroundColor: '#ACC6E4' }} />
-        <View style={{ position: 'absolute' as const, top: 0, left: 0, right: 0, height: '3%', backgroundColor: '#94B6E4' }} />
+        <View style={[StyleSheet.absoluteFill, { backgroundColor: '#3E6B2E', zIndex: 1 }]} />
+        <View style={{ position: 'absolute' as const, top: 0, left: 0, right: 0, height: '58%', backgroundColor: 'rgba(90,139,72,0.85)', zIndex: 1 }} />
+        <View style={{ position: 'absolute' as const, top: 0, left: 0, right: 0, height: '38%', backgroundColor: 'rgba(139,189,120,0.85)', zIndex: 1 }} />
+        <View style={{ position: 'absolute' as const, top: 0, left: 0, right: 0, height: '26%', backgroundColor: 'rgba(176,214,162,0.85)', zIndex: 1 }} />
+        <View style={{ position: 'absolute' as const, top: 0, left: 0, right: 0, height: '18%', backgroundColor: 'rgba(207,222,196,0.9)', zIndex: 1 }} />
+        <View style={{ position: 'absolute' as const, top: 0, left: 0, right: 0, height: '13%', backgroundColor: 'rgba(203,218,219,0.9)', zIndex: 1 }} />
+        <View style={{ position: 'absolute' as const, top: 0, left: 0, right: 0, height: '8%', backgroundColor: 'rgba(172,198,228,0.95)', zIndex: 1 }} />
+        <View style={{ position: 'absolute' as const, top: 0, left: 0, right: 0, height: '3%', backgroundColor: 'rgba(148,182,228,0.95)', zIndex: 1 }} />
 
         <View style={gardenStyles.grassTexture1} />
         <View style={gardenStyles.grassTexture2} />
@@ -1060,6 +1060,7 @@ const gardenStyles = StyleSheet.create({
     backgroundColor: 'rgba(120,180,60,0.25)',
     borderRadius: 22,
     transform: [{ rotate: '-1.5deg' }],
+    zIndex: 2,
   },
   grassTexture2: {
     position: 'absolute',
@@ -1070,6 +1071,7 @@ const gardenStyles = StyleSheet.create({
     backgroundColor: 'rgba(90,150,45,0.2)',
     borderRadius: 16,
     transform: [{ rotate: '1deg' }],
+    zIndex: 2,
   },
   grassTexture3: {
     position: 'absolute',
@@ -1080,6 +1082,7 @@ const gardenStyles = StyleSheet.create({
     backgroundColor: 'rgba(85,139,47,0.2)',
     borderRadius: 11,
     transform: [{ rotate: '-1deg' }],
+    zIndex: 2,
   },
   soilCell: {
     width: CELL_W,

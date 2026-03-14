@@ -10,12 +10,12 @@ import {
   Easing,
   Modal,
   Pressable,
-  Image,
   useWindowDimensions,
   LayoutAnimation,
   Platform,
   UIManager,
 } from 'react-native';
+import { Image } from 'expo-image';
 import { Stack, useRouter } from 'expo-router';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Sparkles, Gift, X, ChevronLeft, ChevronDown, ChevronUp } from 'lucide-react-native';
@@ -93,15 +93,6 @@ const MOUNTAIN_DATA = [
 const CLOUD_DATA = [
   { y: 12, w: 72, h: 22, duration: 42000, startFrac: 0.15 },
   { y: 38, w: 56, h: 18, duration: 52000, startFrac: 0.55 },
-  { y: 6, w: 88, h: 26, duration: 48000, startFrac: 0.35 },
-  { y: 52, w: 62, h: 20, duration: 58000, startFrac: 0.75 },
-  { y: 24, w: 66, h: 19, duration: 46000, startFrac: 0.05 },
-];
-
-const BIRD_DATA = [
-  { y: 20, size: 12, speed: 26000, startFrac: 0.1, dir: 1, flapSpeed: 800, count: 2 },
-  { y: 40, size: 18, speed: 34000, startFrac: 0.7, dir: -1, flapSpeed: 0, count: 1 },
-  { y: 14, size: 8, speed: 22000, startFrac: 0.4, dir: 1, flapSpeed: 600, count: 3 },
 ];
 
 function getTreeData(sw: number, ratio: number = 1) {
@@ -243,46 +234,13 @@ const AtmosphericHaze = React.memo(function AtmosphericHaze({ gardenHeight }: { 
   );
 });
 
-function SunWithFace() {
-  const glowScale = useRef(new Animated.Value(1)).current;
-  const rayRotation = useRef(new Animated.Value(0)).current;
-  const blinkAnim = useRef(new Animated.Value(1)).current;
-
-  useEffect(() => {
-    const glowLoop = Animated.loop(
-      Animated.sequence([
-        Animated.timing(glowScale, { toValue: 1.08, duration: 2500, easing: Easing.inOut(Easing.sin), useNativeDriver: true }),
-        Animated.timing(glowScale, { toValue: 1, duration: 2500, easing: Easing.inOut(Easing.sin), useNativeDriver: true }),
-      ])
-    );
-    glowLoop.start();
-
-    const rayLoop = Animated.loop(
-      Animated.timing(rayRotation, { toValue: 1, duration: 12000, easing: Easing.linear, useNativeDriver: true })
-    );
-    rayLoop.start();
-
-    const blink = () => {
-      Animated.sequence([
-        Animated.delay(4000 + seededRand(Date.now()) * 2000),
-        Animated.timing(blinkAnim, { toValue: 0.1, duration: 80, useNativeDriver: true }),
-        Animated.timing(blinkAnim, { toValue: 1, duration: 80, useNativeDriver: true }),
-      ]).start(() => blink());
-    };
-    blink();
-
-    return () => { glowLoop.stop(); rayLoop.stop(); };
-  }, [glowScale, rayRotation, blinkAnim]);
-
-  const rayRotate = rayRotation.interpolate({ inputRange: [0, 1], outputRange: ['0deg', '360deg'] });
+const StaticSun = React.memo(function StaticSun() {
   const rays = [0, 30, 60, 90, 120, 150];
-
   return (
     <View style={{ position: 'absolute' as const, top: 8, right: 28, width: 52, height: 52, zIndex: 4 }}>
-      <Animated.View style={{
+      <View style={{
         position: 'absolute' as const, top: -74, left: -74, width: 200, height: 200,
         alignItems: 'center' as const, justifyContent: 'center' as const,
-        transform: [{ rotate: rayRotate }],
       }}>
         {rays.map((angle) => (
           <View key={angle} style={{
@@ -290,14 +248,14 @@ function SunWithFace() {
             backgroundColor: 'rgba(255,240,180,0.18)', transform: [{ rotate: `${angle}deg` }],
           }} />
         ))}
-      </Animated.View>
-      <Animated.View style={{
+      </View>
+      <View style={{
         position: 'absolute' as const, top: -34, left: -34, width: 120, height: 120, borderRadius: 60,
-        backgroundColor: 'rgba(255,248,200,0.25)', transform: [{ scale: glowScale }],
+        backgroundColor: 'rgba(255,248,200,0.25)',
       }} />
-      <Animated.View style={{
+      <View style={{
         position: 'absolute' as const, top: -14, left: -14, width: 80, height: 80, borderRadius: 40,
-        backgroundColor: 'rgba(255,245,180,0.15)', transform: [{ scale: glowScale }],
+        backgroundColor: 'rgba(255,245,180,0.15)',
       }} />
       <View style={{
         width: 44, height: 44, borderRadius: 22, backgroundColor: '#FFEE58',
@@ -307,8 +265,8 @@ function SunWithFace() {
         borderWidth: 2, borderColor: '#FFF176',
       }}>
         <View style={{ flexDirection: 'row' as const, gap: 9, marginTop: -3 }}>
-          <Animated.View style={{ width: 4, height: 4, borderRadius: 2, backgroundColor: '#795548', transform: [{ scaleY: blinkAnim }] }} />
-          <Animated.View style={{ width: 4, height: 4, borderRadius: 2, backgroundColor: '#795548', transform: [{ scaleY: blinkAnim }] }} />
+          <View style={{ width: 4, height: 4, borderRadius: 2, backgroundColor: '#795548' }} />
+          <View style={{ width: 4, height: 4, borderRadius: 2, backgroundColor: '#795548' }} />
         </View>
         <View style={{ flexDirection: 'row' as const, gap: 14, marginTop: 2 }}>
           <View style={{ width: 7, height: 4, borderRadius: 2, backgroundColor: 'rgba(255,138,101,0.4)' }} />
@@ -321,12 +279,10 @@ function SunWithFace() {
       </View>
     </View>
   );
-}
+});
 
-function SingleCloud({ data, screenWidth }: { data: typeof CLOUD_DATA[0]; screenWidth: number }) {
+const SingleCloud = React.memo(function SingleCloud({ data, screenWidth }: { data: typeof CLOUD_DATA[0]; screenWidth: number }) {
   const translateX = useRef(new Animated.Value(0)).current;
-  const padXOffset = useRef(new Animated.Value(-data.w * 0.3)).current;
-  const combinedX = useRef(Animated.add(translateX, padXOffset)).current;
 
   useEffect(() => {
     const startX = -data.w + (screenWidth + data.w) * data.startFrac;
@@ -351,7 +307,7 @@ function SingleCloud({ data, screenWidth }: { data: typeof CLOUD_DATA[0]; screen
   return (
     <Animated.View style={{
       position: 'absolute' as const, top: data.y - padY, width: data.w + padX * 2, height: data.h + bumpH * 0.5 + padY * 2,
-      transform: [{ translateX: combinedX }], zIndex: 4,
+      transform: [{ translateX }], zIndex: 4,
     }}>
       <View style={{
         position: 'absolute' as const, bottom: padY, left: padX * 0.3, right: padX * 0.3, height: data.h * 1.4,
@@ -375,78 +331,49 @@ function SingleCloud({ data, screenWidth }: { data: typeof CLOUD_DATA[0]; screen
       }} />
     </Animated.View>
   );
-}
+});
 
-function CloudsLayer({ screenWidth }: { screenWidth: number }) {
+const CloudsLayer = React.memo(function CloudsLayer({ screenWidth }: { screenWidth: number }) {
   return <>{CLOUD_DATA.map((c, i) => <SingleCloud key={i} data={c} screenWidth={screenWidth} />)}</>;
-}
+});
 
-function BirdShape({ size, color }: { size: number; color: string }) {
+const StaticCreatures = React.memo(function StaticCreatures({ screenWidth, gardenHeight }: { screenWidth: number; gardenHeight: number }) {
+  const cx = screenWidth / 2;
+  const bottom = gardenHeight * 0.55;
   return (
-    <View style={{ width: size, height: size / 2 }}>
-      <View style={{
-        position: 'absolute' as const, left: 0, top: size / 4 - 1,
-        width: size / 2, height: 2, backgroundColor: color,
-        transform: [{ rotate: '-25deg' }],
-      }} />
-      <View style={{
-        position: 'absolute' as const, right: 0, top: size / 4 - 1,
-        width: size / 2, height: 2, backgroundColor: color,
-        transform: [{ rotate: '25deg' }],
-      }} />
-    </View>
+    <>
+      <View style={{ position: 'absolute' as const, zIndex: 22, left: cx - 60, top: bottom - 50 }}>
+        <ScaledText size={15}>🦋</ScaledText>
+      </View>
+      <View style={{ position: 'absolute' as const, zIndex: 22, left: cx + 40, top: bottom - 70 }}>
+        <ScaledText size={17}>🦋</ScaledText>
+      </View>
+    </>
   );
-}
+});
 
-function BirdGroup({ data, screenWidth }: { data: typeof BIRD_DATA[0]; screenWidth: number }) {
-  const translateX = useRef(new Animated.Value(0)).current;
-  const flapAnim = useRef(new Animated.Value(1)).current;
-
-  useEffect(() => {
-    const fromX = data.dir > 0 ? -40 : screenWidth + 40;
-    const toX = data.dir > 0 ? screenWidth + 40 : -40;
-    const startX = fromX + (toX - fromX) * data.startFrac;
-    const remainFrac = 1 - data.startFrac;
-    translateX.setValue(startX);
-    Animated.timing(translateX, {
-      toValue: toX, duration: data.speed * remainFrac, easing: Easing.linear, useNativeDriver: true,
-    }).start(() => {
-      translateX.setValue(fromX);
-      Animated.loop(
-        Animated.timing(translateX, { toValue: toX, duration: data.speed, easing: Easing.linear, useNativeDriver: true })
-      ).start();
-    });
-
-    if (data.flapSpeed > 0) {
-      Animated.loop(
-        Animated.sequence([
-          Animated.timing(flapAnim, { toValue: 0.5, duration: data.flapSpeed / 2, easing: Easing.inOut(Easing.sin), useNativeDriver: true }),
-          Animated.timing(flapAnim, { toValue: 1, duration: data.flapSpeed / 2, easing: Easing.inOut(Easing.sin), useNativeDriver: true }),
-        ])
-      ).start();
-    }
-  }, [translateX, flapAnim, data, screenWidth]);
-
-  const birds = Array.from({ length: data.count }, (_, i) => i);
-  const color = 'rgba(60,60,80,0.25)';
+const StaticSparkles = React.memo(function StaticSparkles({ screenWidth, gardenHeight }: { screenWidth: number; gardenHeight: number }) {
+  const sparkleData = useMemo(() =>
+    Array.from({ length: 4 }, (_, i) => ({
+      x: screenWidth * 0.2 + seededRand(i * 31) * screenWidth * 0.6,
+      y: gardenHeight * 0.35 + seededRand(i * 37) * gardenHeight * 0.45,
+      char: i % 2 === 0 ? '✦' : '✧',
+      opacity: 0.3 + seededRand(i * 41) * 0.4,
+    }))
+  , [screenWidth, gardenHeight]);
 
   return (
-    <Animated.View style={{
-      position: 'absolute' as const, top: data.y, flexDirection: 'row' as const, gap: 8,
-      transform: [{ translateX }], zIndex: 5,
-    }}>
-      {birds.map((_, i) => (
-        <Animated.View key={i} style={{ transform: [{ scaleY: data.flapSpeed > 0 ? flapAnim : 1 }], marginLeft: i * 6, marginTop: i * 4 }}>
-          <BirdShape size={data.size} color={color} />
-        </Animated.View>
+    <>
+      {sparkleData.map((s, i) => (
+        <View key={i} style={{
+          position: 'absolute' as const, left: s.x, top: s.y, zIndex: 18, opacity: s.opacity,
+        }}>
+          <ScaledText size={13} color="#FFD700">{s.char}</ScaledText>
+        </View>
       ))}
-    </Animated.View>
+    </>
   );
-}
-
-function BirdsLayer({ screenWidth }: { screenWidth: number }) {
-  return <>{BIRD_DATA.map((b, i) => <BirdGroup key={i} data={b} screenWidth={screenWidth} />)}</>;
-}
+});
 
 const TreesAndGrassDecor = React.memo(function TreesAndGrassDecor({ screenWidth, gardenHeight }: { screenWidth: number; gardenHeight: number }) {
   const ratio = gardenHeight / GARDEN_HEIGHT;
@@ -476,13 +403,11 @@ function PlantedFlower({ flower, flowerType, row }: {
 }) {
   const swayAnim = useRef(new Animated.Value(0)).current;
   const popAnim = useRef(new Animated.Value(0)).current;
-  const bobAnim = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
     Animated.spring(popAnim, { toValue: 1, friction: 5, tension: 50, useNativeDriver: true }).start();
 
     const swayDuration = 1800 + seededRand(flower.grid_position * 17) * 1200;
-    const bobDuration = 2400 + seededRand(flower.grid_position * 19) * 1000;
     const delay = seededRand(flower.grid_position * 23) * 800;
 
     const timer = setTimeout(() => {
@@ -493,20 +418,12 @@ function PlantedFlower({ flower, flowerType, row }: {
           Animated.timing(swayAnim, { toValue: 0, duration: swayDuration * 0.9, easing: Easing.inOut(Easing.sin), useNativeDriver: true }),
         ])
       ).start();
-
-      Animated.loop(
-        Animated.sequence([
-          Animated.timing(bobAnim, { toValue: 1, duration: bobDuration, easing: Easing.inOut(Easing.sin), useNativeDriver: true }),
-          Animated.timing(bobAnim, { toValue: 0, duration: bobDuration, easing: Easing.inOut(Easing.sin), useNativeDriver: true }),
-        ])
-      ).start();
     }, delay);
     return () => clearTimeout(timer);
-  }, [swayAnim, popAnim, bobAnim, flower.grid_position]);
+  }, [swayAnim, popAnim, flower.grid_position]);
 
   const swayAmplitude = 2.5 + (row / (GRID_ROWS - 1)) * 1.5;
   const rotate = swayAnim.interpolate({ inputRange: [-1, 0, 1], outputRange: [`-${swayAmplitude}deg`, '0deg', `${swayAmplitude}deg`] });
-  const translateY = bobAnim.interpolate({ inputRange: [0, 1], outputRange: [0, -3] });
   const translateX = swayAnim.interpolate({ inputRange: [-1, 0, 1], outputRange: [-1.5, 0, 1.5] });
 
   const rowFrac = row / (GRID_ROWS - 1);
@@ -549,7 +466,6 @@ function PlantedFlower({ flower, flowerType, row }: {
           { perspective: 400 },
           { rotateX: `${flowerTilt}deg` },
           { rotate },
-          { translateY },
           { translateX },
           { scale: popAnim },
         ],
@@ -558,14 +474,11 @@ function PlantedFlower({ flower, flowerType, row }: {
         <Image
           source={{ uri: flowerType.image_url }}
           style={{
-            width: imgSize,
-            height: imgSize,
-            shadowColor: '#000',
-            shadowOffset: { width: 0, height: 4 },
-            shadowOpacity: 0.25,
-            shadowRadius: 5,
+            width: 48,
+            height: 48,
           }}
-          resizeMode="contain"
+          contentFit="contain"
+          cachePolicy="memory-disk"
         />
       </Animated.View>
       <View style={{
@@ -619,7 +532,7 @@ function PlantedFlower({ flower, flowerType, row }: {
 
 const MemoPlantedFlower = React.memo(PlantedFlower);
 
-function SoilGrid({ flowers, flowerTypeMap, onFlowerPress, screenWidth, gardenHeight }: {
+const SoilGrid = React.memo(function SoilGrid({ flowers, flowerTypeMap, onFlowerPress, screenWidth, gardenHeight }: {
   flowers: PatientFlower[];
   flowerTypeMap: Record<string, FlowerType>;
   onFlowerPress: (f: PatientFlower) => void;
@@ -632,17 +545,22 @@ function SoilGrid({ flowers, flowerTypeMap, onFlowerPress, screenWidth, gardenHe
     return map;
   }, [flowers]);
 
+  const slots = useMemo(() => Array.from({ length: TOTAL_SLOTS }, (_, idx) => idx), []);
+
   return (
-    <View style={{
-      position: 'absolute' as const,
-      bottom: 28 * (gardenHeight / GARDEN_HEIGHT),
-      left: (screenWidth - GRID_W) / 2,
-      width: GRID_W,
-      height: GRID_H,
-      transform: [{ perspective: 500 }, { rotateX: '45deg' }],
-      zIndex: 8,
-    }}>
-      {Array.from({ length: TOTAL_SLOTS }, (_, idx) => {
+    <View
+      style={{
+        position: 'absolute' as const,
+        bottom: 28 * (gardenHeight / GARDEN_HEIGHT),
+        left: (screenWidth - GRID_W) / 2,
+        width: GRID_W,
+        height: GRID_H,
+        transform: [{ perspective: 500 }, { rotateX: '45deg' }],
+        zIndex: 8,
+      }}
+      removeClippedSubviews={Platform.OS !== 'web'}
+    >
+      {slots.map((idx) => {
         const col = idx % GRID_COLS;
         const row = Math.floor(idx / GRID_COLS);
         const flower = flowerBySlot[idx];
@@ -697,100 +615,7 @@ function SoilGrid({ flowers, flowerTypeMap, onFlowerPress, screenWidth, gardenHe
       })}
     </View>
   );
-}
-
-function CreaturesLayer({ screenWidth, gardenHeight }: { screenWidth: number; gardenHeight: number }) {
-  const b1Flight = useRef(new Animated.Value(0)).current;
-  const b2Flight = useRef(new Animated.Value(0)).current;
-  const bee1Flight = useRef(new Animated.Value(0)).current;
-  const bee2Flight = useRef(new Animated.Value(0)).current;
-
-  useEffect(() => {
-    Animated.loop(Animated.timing(b1Flight, { toValue: 1, duration: 7500, easing: Easing.linear, useNativeDriver: true })).start();
-    Animated.loop(Animated.timing(b2Flight, { toValue: 1, duration: 8200, easing: Easing.linear, useNativeDriver: true })).start();
-    Animated.loop(Animated.timing(bee1Flight, { toValue: 1, duration: 3800, easing: Easing.linear, useNativeDriver: true })).start();
-    Animated.loop(Animated.timing(bee2Flight, { toValue: 1, duration: 4200, easing: Easing.linear, useNativeDriver: true })).start();
-  }, [b1Flight, b2Flight, bee1Flight, bee2Flight]);
-
-  const gardenCenterX = screenWidth / 2;
-  const gardenBottom = gardenHeight * 0.55;
-
-  const b1x = b1Flight.interpolate({ inputRange: [0, 0.25, 0.5, 0.75, 1], outputRange: [gardenCenterX - 80, gardenCenterX + 40, gardenCenterX - 20, gardenCenterX + 70, gardenCenterX - 80] });
-  const b1y = b1Flight.interpolate({ inputRange: [0, 0.25, 0.5, 0.75, 1], outputRange: [gardenBottom - 40, gardenBottom - 70, gardenBottom - 30, gardenBottom - 60, gardenBottom - 40] });
-  const b1sx = b1Flight.interpolate({ inputRange: [0, 0.25, 0.5, 0.75, 1], outputRange: [1, -1, -1, 1, 1] });
-
-  const b2x = b2Flight.interpolate({ inputRange: [0, 0.25, 0.5, 0.75, 1], outputRange: [gardenCenterX + 60, gardenCenterX - 30, gardenCenterX + 50, gardenCenterX - 60, gardenCenterX + 60] });
-  const b2y = b2Flight.interpolate({ inputRange: [0, 0.25, 0.5, 0.75, 1], outputRange: [gardenBottom - 60, gardenBottom - 30, gardenBottom - 80, gardenBottom - 50, gardenBottom - 60] });
-
-  const bee1x = bee1Flight.interpolate({ inputRange: [0, 0.25, 0.5, 0.75, 1], outputRange: [gardenCenterX - 50, gardenCenterX - 35, gardenCenterX - 55, gardenCenterX - 30, gardenCenterX - 50] });
-  const bee1y = bee1Flight.interpolate({ inputRange: [0, 0.25, 0.5, 0.75, 1], outputRange: [gardenBottom - 20, gardenBottom - 35, gardenBottom - 15, gardenBottom - 28, gardenBottom - 20] });
-
-  const bee2x = bee2Flight.interpolate({ inputRange: [0, 0.25, 0.5, 0.75, 1], outputRange: [gardenCenterX + 30, gardenCenterX + 45, gardenCenterX + 25, gardenCenterX + 50, gardenCenterX + 30] });
-  const bee2y = bee2Flight.interpolate({ inputRange: [0, 0.25, 0.5, 0.75, 1], outputRange: [gardenBottom - 50, gardenBottom - 35, gardenBottom - 55, gardenBottom - 40, gardenBottom - 50] });
-
-  return (
-    <>
-      <Animated.View style={{ position: 'absolute' as const, zIndex: 22, transform: [{ translateX: b1x }, { translateY: b1y }, { scaleX: b1sx }] }}>
-        <ScaledText size={15}>🦋</ScaledText>
-      </Animated.View>
-      <Animated.View style={{ position: 'absolute' as const, zIndex: 22, transform: [{ translateX: b2x }, { translateY: b2y }] }}>
-        <ScaledText size={17}>🦋</ScaledText>
-      </Animated.View>
-      <Animated.View style={{ position: 'absolute' as const, zIndex: 22, transform: [{ translateX: bee1x }, { translateY: bee1y }] }}>
-        <ScaledText size={11}>🐝</ScaledText>
-      </Animated.View>
-      <Animated.View style={{ position: 'absolute' as const, zIndex: 22, transform: [{ translateX: bee2x }, { translateY: bee2y }] }}>
-        <ScaledText size={12}>🐝</ScaledText>
-      </Animated.View>
-    </>
-  );
-}
-
-function GoldenSparkles({ screenWidth, gardenHeight }: { screenWidth: number; gardenHeight: number }) {
-  const anims = useRef(Array.from({ length: 6 }, () => new Animated.Value(0))).current;
-
-  const sparkleData = useMemo(() =>
-    Array.from({ length: 6 }, (_, i) => ({
-      x: screenWidth * 0.2 + seededRand(i * 31) * screenWidth * 0.6,
-      y: gardenHeight * 0.35 + seededRand(i * 37) * gardenHeight * 0.45,
-      char: i % 2 === 0 ? '✦' : '✧',
-    }))
-  , [screenWidth, gardenHeight]);
-
-  useEffect(() => {
-    anims.forEach((anim, i) => {
-      const duration = 1800 + seededRand(i * 41) * 1000;
-      const delay = seededRand(i * 43) * 2000;
-      const run = () => {
-        anim.setValue(0);
-        Animated.sequence([
-          Animated.delay(delay),
-          Animated.timing(anim, { toValue: 1, duration: duration / 2, useNativeDriver: true }),
-          Animated.timing(anim, { toValue: 0, duration: duration / 2, useNativeDriver: true }),
-        ]).start(() => run());
-      };
-      run();
-    });
-  }, [anims]);
-
-  return (
-    <>
-      {sparkleData.map((s, i) => {
-        const opacity = anims[i];
-        const scale = anims[i].interpolate({ inputRange: [0, 0.5, 1], outputRange: [0.3, 1.2, 0.3] });
-        const rotate = anims[i].interpolate({ inputRange: [0, 1], outputRange: ['0deg', '180deg'] });
-        return (
-          <Animated.View key={i} style={{
-            position: 'absolute' as const, left: s.x, top: s.y, zIndex: 18,
-            opacity, transform: [{ scale }, { rotate }],
-          }}>
-            <ScaledText size={13} color="#FFD700">{s.char}</ScaledText>
-          </Animated.View>
-        );
-      })}
-    </>
-  );
-}
+});
 
 const FenceRow = React.memo(function FenceRow({ screenWidth }: { screenWidth: number }) {
   const postCount = 18;
@@ -845,13 +670,12 @@ const MemoGardenScene = React.memo(function GardenScene({ flowers, flowerTypeMap
       <Mountains gardenHeight={gardenHeight} />
       <RollingHills gardenHeight={gardenHeight} />
       <AtmosphericHaze gardenHeight={gardenHeight} />
-      <SunWithFace />
+      <StaticSun />
       <CloudsLayer screenWidth={screenWidth} />
-      <BirdsLayer screenWidth={screenWidth} />
       <TreesAndGrassDecor screenWidth={screenWidth} gardenHeight={gardenHeight} />
       <SoilGrid flowers={flowers} flowerTypeMap={flowerTypeMap} onFlowerPress={onFlowerPress} screenWidth={screenWidth} gardenHeight={gardenHeight} />
-      <CreaturesLayer screenWidth={screenWidth} gardenHeight={gardenHeight} />
-      <GoldenSparkles screenWidth={screenWidth} gardenHeight={gardenHeight} />
+      <StaticCreatures screenWidth={screenWidth} gardenHeight={gardenHeight} />
+      <StaticSparkles screenWidth={screenWidth} gardenHeight={gardenHeight} />
       <FenceRow screenWidth={screenWidth} />
     </View>
   );
@@ -888,7 +712,7 @@ function CollectionCard({ group, index, isZh, expanded, onToggleExpand }: {
         )}
         <View style={{ flexDirection: 'row' as const, alignItems: 'center' as const, gap: 10, width: '100%' }}>
           <View style={[styles.cardImageBg, { backgroundColor: rarityInfo.bg }]}>
-            <Image source={{ uri: flowerType.image_url }} style={styles.cardFlowerImage} resizeMode="contain" />
+            <Image source={{ uri: flowerType.image_url }} style={styles.cardFlowerImage} contentFit="contain" cachePolicy="memory-disk" />
           </View>
           <View style={{ flex: 1 }}>
             <ScaledText size={12} weight="600" color={Colors.textPrimary} numberOfLines={1}>
@@ -927,7 +751,7 @@ function CollectionCard({ group, index, isZh, expanded, onToggleExpand }: {
 
 const MemoCollectionCard = React.memo(CollectionCard);
 
-function CollectionProgress({ count, total, isZh }: { count: number; total: number; isZh: boolean }) {
+const CollectionProgress = React.memo(function CollectionProgress({ count, total, isZh }: { count: number; total: number; isZh: boolean }) {
   const progress = total > 0 ? count / total : 0;
   return (
     <View style={styles.progressContainer}>
@@ -944,7 +768,7 @@ function CollectionProgress({ count, total, isZh }: { count: number; total: numb
       </View>
     </View>
   );
-}
+});
 
 export default function FlowerYieldScreen() {
   const { patientId, patientName, language, flowersJustStolen, clearFlowersStolen } = useApp();
@@ -1003,17 +827,6 @@ export default function FlowerYieldScreen() {
     },
     staleTime: 10 * 60 * 1000,
   });
-
-  useEffect(() => {
-    if (Platform.OS !== 'web' && flowersQuery.data) {
-      const urls = new Set<string>();
-      flowersQuery.data.forEach(f => {
-        const ft = f.flower_types;
-        if (ft?.image_url) urls.add(ft.image_url);
-      });
-      urls.forEach(url => Image.prefetch(url).catch(() => {}));
-    }
-  }, [flowersQuery.data]);
 
   const flowerTypeMap = useMemo(() => {
     const map: Record<string, FlowerType> = {};
@@ -1199,7 +1012,7 @@ export default function FlowerYieldScreen() {
             </TouchableOpacity>
             {selectedFlowerType && (
               <>
-                <Image source={{ uri: selectedFlowerType.image_url }} style={styles.tooltipFlowerImage} resizeMode="contain" />
+                <Image source={{ uri: selectedFlowerType.image_url }} style={styles.tooltipFlowerImage} contentFit="contain" cachePolicy="memory-disk" />
                 <ScaledText size={18} weight="bold" color={Colors.textPrimary} style={{ textAlign: 'center' as const, marginBottom: 4 }}>
                   {isZh ? (selectedFlowerType.name_zh || selectedFlowerType.name_en) : selectedFlowerType.name_en}
                 </ScaledText>

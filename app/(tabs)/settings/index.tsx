@@ -38,6 +38,7 @@ import {
 import { AppTutorial } from '@/components/AppTutorial';
 import MiniMahjongGame from '@/components/MiniMahjongGame';
 import { GameLevel } from '@/utils/mahjongGame';
+import { initAudio } from '@/utils/soundEffects';
 
 const FONT_SIZE_OPTIONS: { key: FontSizeLevel; labelKey: string }[] = [
   { key: 'small', labelKey: 'fontSmall' },
@@ -313,7 +314,9 @@ export default function SettingsScreen() {
                   </ScaledText>
                   <TouchableOpacity
                     style={styles.playNowButton}
-                    onPress={() => setShowMahjongGame(true)}
+                    onPress={() => {
+                      void initAudio().then(() => setShowMahjongGame(true));
+                    }}
                     activeOpacity={0.8}
                     testID="mahjong-play-now"
                   >

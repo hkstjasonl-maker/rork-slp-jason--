@@ -25,6 +25,7 @@ import { ScaledText } from '@/components/ScaledText';
 import { supabase } from '@/lib/supabase';
 import Colors from '@/constants/colors';
 import { log } from '@/lib/logger';
+import { initAudio, playZenAmbient, stopZenAmbient, playZenChime } from '@/utils/soundEffects';
 
 if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
   UIManager.setLayoutAnimationEnabledExperimental(true);
@@ -976,6 +977,16 @@ export default function FlowerYieldScreen() {
   const [expandedCardId, setExpandedCardId] = useState<string | null>(null);
 
   const isZh = language === 'zh_hant' || language === 'zh_hans';
+
+  useEffect(() => {
+    void initAudio().then(() => {
+      void playZenAmbient();
+      void playZenChime();
+    });
+    return () => {
+      void stopZenAmbient();
+    };
+  }, []);
 
   const patientDataQuery = useQuery({
     queryKey: ['gardenPatientData', patientId],

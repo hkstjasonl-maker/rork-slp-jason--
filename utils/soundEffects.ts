@@ -62,6 +62,46 @@ export async function playAssistantOpen() {
   await playSound('assistant', 'https://cdn.freesound.org/previews/242/242501_4284968-lq.mp3', 0.35);
 }
 
+let ambientSound: Audio.Sound | null = null;
+
+export async function playZenAmbient() {
+  try {
+    if (ambientSound) {
+      try { await ambientSound.stopAsync(); } catch {}
+      try { await ambientSound.unloadAsync(); } catch {}
+    }
+    const { sound } = await Audio.Sound.createAsync(
+      { uri: 'https://cdn.freesound.org/previews/531/531947_6078422-lq.mp3' },
+      { shouldPlay: true, volume: 0.15, isLooping: true }
+    );
+    ambientSound = sound;
+  } catch (e) {
+    console.warn('Ambient sound failed:', e);
+  }
+}
+
+export async function stopZenAmbient() {
+  try {
+    if (ambientSound) {
+      await ambientSound.stopAsync();
+      await ambientSound.unloadAsync();
+      ambientSound = null;
+    }
+  } catch {}
+}
+
+export async function playZenChime() {
+  await playSound('zen_chime', 'https://cdn.freesound.org/previews/411/411089_5121236-lq.mp3', 0.25);
+}
+
+export async function playCountdownTick() {
+  await playSound('cd_tick', 'https://cdn.freesound.org/previews/536/536420_11943129-lq.mp3', 0.15);
+}
+
+export async function playCountdownEnd() {
+  await playSound('cd_end', 'https://cdn.freesound.org/previews/320/320655_5260872-lq.mp3', 0.4);
+}
+
 export async function cleanupSounds() {
   for (const [_key, sound] of Object.entries(soundCache)) {
     try { await sound.unloadAsync(); } catch {}

@@ -1356,11 +1356,20 @@ export default function ExerciseScreen() {
     log('[LiveSub] Mirror audio playback update: playing=', playing, 'time=', currentTimeSec.toFixed(2), 'liveSubEnabled=', liveSubtitlesEnabled, 'subtitleUrl=', subtitleUrl);
     setMirrorAudioIsPlaying(playing);
     setMirrorAudioCurrentTime(currentTimeSec);
-    if (liveSubtitlesEnabled && subtitleUrl) {
+    if (liveSubtitlesEnabled) {
       setShowLiveSubtitles(playing);
       log('[LiveSub] setShowLiveSubtitles =>', playing);
     }
   }, [liveSubtitlesEnabled, subtitleUrl]);
+
+  useEffect(() => {
+    const inMirror = mediaMode !== 'video';
+    if (liveSubtitlesEnabled && inMirror && mirrorAudioIsPlaying) {
+      setShowLiveSubtitles(true);
+    } else if (!mirrorAudioIsPlaying) {
+      setShowLiveSubtitles(false);
+    }
+  }, [liveSubtitlesEnabled, mirrorAudioIsPlaying, mediaMode]);
 
   useEffect(() => {
     if (mediaMode === 'video') {
@@ -1456,16 +1465,6 @@ export default function ExerciseScreen() {
                   <TranscriptOverlay transcript={mirrorTranscript} onClose={() => setShowTranscriptOverlay(false)} />
                 )}
 
-                {liveSubtitlesEnabled && !isRecording && (
-                  <LiveSubtitleOverlay
-                    subtitleUrl={subtitleUrl}
-                    isPlaying={mirrorAudioIsPlaying}
-                    audioCurrentTime={mirrorAudioCurrentTime}
-                    visible={showLiveSubtitles}
-                    subtitleSizeLevel={subtitleSizeLevel}
-                  />
-                )}
-
                 {isRecording && (
                   <View style={styles.recordingIndicator}>
                     <Animated.View style={[styles.recordingDot, { opacity: recordPulse }]} />
@@ -1475,7 +1474,7 @@ export default function ExerciseScreen() {
                   </View>
                 )}
 
-                {splitCameraReady && !isRecording && (mirrorAudioUrl || mirrorTranscript) && (
+                {splitCameraReady && !isRecording && (
                   <View style={styles.mirrorAudioControls}>
                     {mirrorAudioUrl && (
                       <MirrorAudioButton audioUrl={mirrorAudioUrl} label={t('playInstructions')} stopLabel={t('stopInstructions')} onPlaybackUpdate={handleMirrorAudioPlaybackUpdate} />
@@ -1539,6 +1538,7 @@ export default function ExerciseScreen() {
                     </ScaledText>
                   </View>
                 )}
+
               </View>
 
             </View>
@@ -1568,16 +1568,6 @@ export default function ExerciseScreen() {
                 <TranscriptOverlay transcript={mirrorTranscript} onClose={() => setShowTranscriptOverlay(false)} />
               )}
 
-              {liveSubtitlesEnabled && !isRecording && (
-                <LiveSubtitleOverlay
-                  subtitleUrl={subtitleUrl}
-                  isPlaying={mirrorAudioIsPlaying}
-                  audioCurrentTime={mirrorAudioCurrentTime}
-                  visible={showLiveSubtitles}
-                  subtitleSizeLevel={subtitleSizeLevel}
-                />
-              )}
-
               {isRecording && (
                 <View style={styles.recordingIndicator}>
                   <Animated.View style={[styles.recordingDot, { opacity: recordPulse }]} />
@@ -1587,7 +1577,7 @@ export default function ExerciseScreen() {
                 </View>
               )}
 
-              {cameraReady && !isRecording && (mirrorAudioUrl || mirrorTranscript) && (
+              {cameraReady && !isRecording && (
                 <View style={styles.mirrorAudioControls}>
                   {mirrorAudioUrl && (
                     <MirrorAudioButton audioUrl={mirrorAudioUrl} label={t('playInstructions')} stopLabel={t('stopInstructions')} onPlaybackUpdate={handleMirrorAudioPlaybackUpdate} />
@@ -1654,6 +1644,7 @@ export default function ExerciseScreen() {
                   </ScaledText>
                 </View>
               )}
+
             </View>
           )}
 
@@ -2025,6 +2016,17 @@ export default function ExerciseScreen() {
           />
         )}
       </SafeAreaView>
+
+      {isInMirror && liveSubtitlesEnabled && !isRecording && (
+        <LiveSubtitleOverlay
+          subtitleUrl={subtitleUrl}
+          isPlaying={mirrorAudioIsPlaying}
+          audioCurrentTime={mirrorAudioCurrentTime}
+          visible={showLiveSubtitles}
+          subtitleSizeLevel={subtitleSizeLevel}
+          forceOverlay={true}
+        />
+      )}
     </View>
   );
 }

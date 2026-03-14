@@ -11,6 +11,7 @@ interface LiveSubtitleOverlayProps {
   audioCurrentTime: number;
   visible: boolean;
   subtitleSizeLevel?: SubtitleSizeLevel;
+  forceOverlay?: boolean;
 }
 
 export default function LiveSubtitleOverlay({
@@ -19,10 +20,12 @@ export default function LiveSubtitleOverlay({
   audioCurrentTime,
   visible,
   subtitleSizeLevel = 'medium',
+  forceOverlay = false,
 }: LiveSubtitleOverlayProps) {
   const [cues, setCues] = useState<SubtitleCue[]>([]);
   const [currentText, setCurrentText] = useState<string | null>(null);
-  const [_loadError, setLoadError] = useState<boolean>(false);
+  const [isLoading, setIsLoading] = useState<boolean>(false);
+  const [loadError, setLoadError] = useState<boolean>(false);
   const fadeAnim = useRef(new Animated.Value(0)).current;
   const prevTextRef = useRef<string | null>(null);
   const fetchedUrlRef = useRef<string | null>(null);
@@ -37,12 +40,13 @@ export default function LiveSubtitleOverlay({
       console.log('[LiveSubtitle] No subtitle URL provided');
       setCues([]);
       setLoadError(false);
+      setIsLoading(false);
       fetchedUrlRef.current = null;
       return;
     }
 
-    if (fetchedUrlRef.current === subtitleUrl) {
-      console.log('[LiveSubtitle] Already fetched URL:', subtitleUrl);
+    if (fetchedUrlRef.current === subtitleUrl && cues.length > 0) {
+      console.log('[LiveSubtitle] Already fetched URL:', subtitleUrl, 'cues:', cues.length);
       return;
     }
 
@@ -51,6 +55,7 @@ export default function LiveSubtitleOverlay({
     const loadSubtitles = async () => {
       try {
         console.log('[LiveSubtitle] Fetching subtitle from:', subtitleUrl);
+        setIsLoading(true);
         setLoadError(false);
         const response = await fetch(subtitleUrl);
         if (!response.ok) {
@@ -58,6 +63,7 @@ export default function LiveSubtitleOverlay({
           if (!cancelled) {
             setCues([]);
             setLoadError(true);
+            setIsLoading(false);
           }
           return;
         }
@@ -73,12 +79,14 @@ export default function LiveSubtitleOverlay({
           setCues(parsed);
           fetchedUrlRef.current = subtitleUrl;
           setLoadError(false);
+          setIsLoading(false);
         }
       } catch (err) {
         console.warn('[LiveSubtitle] Subtitle load error:', err);
         if (!cancelled) {
           setCues([]);
           setLoadError(true);
+          setIsLoading(false);
         }
       }
     };
@@ -88,7 +96,7 @@ export default function LiveSubtitleOverlay({
     return () => {
       cancelled = true;
     };
-  }, [subtitleUrl]);
+  }, [subtitleUrl, cues.length]);
 
   useEffect(() => {
     if (!isPlaying || cues.length === 0) {
@@ -144,12 +152,46 @@ export default function LiveSubtitleOverlay({
     prevTextRef.current = currentText;
   }, [currentText, visible, fadeAnim, animateTransition]);
 
-  if (!visible || currentText === null) {
+  if (!visible) {
+    return null;
+  }
+
+  const containerStyle = forceOverlay ? styles.forceOverlayContainer : styles.container;
+
+  if (isLoading) {
+    return (
+      <View style={containerStyle} pointerEvents="none">
+        <View style={[styles.banner, styles.statusBanner, { paddingVertical: 8, paddingHorizontal: 14 }]}>
+          <ScaledText size={14} weight="600" color="#FFFFFF" style={styles.text}>
+            {'⏳ Loading subtitles...'}
+          </ScaledText>
+        </View>
+      </View>
+    );
+  }
+
+  if (loadError) {
+    return null;
+  }
+
+  if (isPlaying && currentText === null && cues.length > 0) {
+    return (
+      <View style={containerStyle} pointerEvents="none">
+        <Animated.View style={[styles.banner, styles.statusBanner, { opacity: 0.7, paddingVertical: 8, paddingHorizontal: 14 }]}>
+          <ScaledText size={14} weight="600" color="#FFFFFF" style={styles.text}>
+            {'🔊 ...'}
+          </ScaledText>
+        </Animated.View>
+      </View>
+    );
+  }
+
+  if (currentText === null) {
     return null;
   }
 
   return (
-    <View style={styles.container} pointerEvents="none">
+    <View style={containerStyle} pointerEvents="none">
       <Animated.View style={[styles.banner, { opacity: fadeAnim, paddingVertical: paddingV, paddingHorizontal: paddingH }]}>
         <ScaledText
           size={fontSize}
@@ -172,13 +214,27 @@ const styles = StyleSheet.create({
     bottom: 100,
     alignItems: 'center',
     paddingHorizontal: 12,
-    zIndex: 10,
+    zIndex: 9999,
+  },
+  forceOverlayContainer: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    bottom: 140,
+    alignItems: 'center',
+    paddingHorizontal: 16,
+    zIndex: 9999,
+    elevation: 9999,
   },
   banner: {
     backgroundColor: 'rgba(0,0,0,0.82)',
     borderRadius: 14,
-    maxWidth: '96%' as const,
-    minWidth: '50%' as const,
+    maxWidth: '96%',
+    minWidth: '50%',
+  },
+  statusBanner: {
+    backgroundColor: 'rgba(0,0,0,0.6)',
+    minWidth: 'auto' as unknown as number,
   },
   text: {
     textAlign: 'center' as const,

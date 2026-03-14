@@ -644,29 +644,14 @@ const FenceRow = React.memo(function FenceRow({ screenWidth }: { screenWidth: nu
   );
 });
 
-const MemoGardenScene = React.memo(function GardenScene({ flowers, flowerTypeMap, onFlowerPress, screenWidth, gardenHeight }: {
+const MemoGardenScene = React.memo(function GardenScene({ flowers, flowerTypeMap, onFlowerPress, screenWidth }: {
   flowers: PatientFlower[];
   flowerTypeMap: Record<string, FlowerType>;
   onFlowerPress: (f: PatientFlower) => void;
   screenWidth: number;
-  gardenHeight: number;
 }) {
-  const scale = gardenHeight / GARDEN_HEIGHT;
-  const innerWidth = screenWidth / scale;
-  const offsetX = -innerWidth * (1 - scale) / 2;
-  const offsetY = -GARDEN_HEIGHT * (1 - scale) / 2;
-
   return (
-    <View style={[gardenStyles.container, { width: screenWidth, height: gardenHeight, overflow: 'hidden' as const }]}>
-      <View style={{
-        width: innerWidth,
-        height: GARDEN_HEIGHT,
-        transform: [
-          { translateX: offsetX },
-          { translateY: offsetY },
-          { scale: scale },
-        ],
-      }}>
+    <View style={[gardenStyles.container, { width: screenWidth, height: GARDEN_HEIGHT }]}>
         <View style={[StyleSheet.absoluteFill, { backgroundColor: '#3E6B2E' }]} />
         <View style={{ position: 'absolute' as const, top: 0, left: 0, right: 0, height: '58%', backgroundColor: '#5A8B48' }} />
         <View style={{ position: 'absolute' as const, top: 0, left: 0, right: 0, height: '38%', backgroundColor: '#8BBD78' }} />
@@ -684,13 +669,12 @@ const MemoGardenScene = React.memo(function GardenScene({ flowers, flowerTypeMap
         <RollingHills gardenHeight={GARDEN_HEIGHT} />
         <AtmosphericHaze gardenHeight={GARDEN_HEIGHT} />
         <StaticSun />
-        <CloudsLayer screenWidth={screenWidth / scale} />
-        <TreesAndGrassDecor screenWidth={screenWidth / scale} gardenHeight={GARDEN_HEIGHT} />
-        <SoilGrid flowers={flowers} flowerTypeMap={flowerTypeMap} onFlowerPress={onFlowerPress} screenWidth={screenWidth / scale} />
-        <StaticCreatures screenWidth={screenWidth / scale} gardenHeight={GARDEN_HEIGHT} />
-        <StaticSparkles screenWidth={screenWidth / scale} gardenHeight={GARDEN_HEIGHT} />
-        <FenceRow screenWidth={screenWidth / scale} />
-      </View>
+        <CloudsLayer screenWidth={screenWidth} />
+        <TreesAndGrassDecor screenWidth={screenWidth} gardenHeight={GARDEN_HEIGHT} />
+        <SoilGrid flowers={flowers} flowerTypeMap={flowerTypeMap} onFlowerPress={onFlowerPress} screenWidth={screenWidth} />
+        <StaticCreatures screenWidth={screenWidth} gardenHeight={GARDEN_HEIGHT} />
+        <StaticSparkles screenWidth={screenWidth} gardenHeight={GARDEN_HEIGHT} />
+        <FenceRow screenWidth={screenWidth} />
     </View>
   );
 });
@@ -788,8 +772,8 @@ export default function FlowerYieldScreen() {
   const { patientId, patientName, language, flowersJustStolen, clearFlowersStolen } = useApp();
   const router = useRouter();
   const queryClient = useQueryClient();
-  const { width: screenWidth, height: screenHeight } = useWindowDimensions();
-  const gardenHeight = Math.min(360, Math.max(280, screenHeight * 0.38));
+  const { width: screenWidth } = useWindowDimensions();
+
 
   const [selectedFlower, setSelectedFlower] = useState<PatientFlower | null>(null);
   const [theftModalVisible, setTheftModalVisible] = useState<boolean>(false);
@@ -931,7 +915,7 @@ export default function FlowerYieldScreen() {
             </View>
           ) : (
             <>
-              <MemoGardenScene flowers={flowers} flowerTypeMap={flowerTypeMap} onFlowerPress={handleFlowerPress} screenWidth={screenWidth} gardenHeight={gardenHeight} />
+              <MemoGardenScene flowers={flowers} flowerTypeMap={flowerTypeMap} onFlowerPress={handleFlowerPress} screenWidth={screenWidth} />
 
               {flowers.length === 0 && (
                 <View style={styles.emptyHint}>

@@ -160,7 +160,9 @@ function MirrorAudioButtonInner({ audioUrl, label, stopLabel, onPlaybackUpdate }
   const soundRef = useRef<Audio.Sound | null>(null);
   const [isPlaying, setIsPlaying] = useState(false);
   const onPlaybackUpdateRef = useRef(onPlaybackUpdate);
-  onPlaybackUpdateRef.current = onPlaybackUpdate;
+  useEffect(() => {
+    onPlaybackUpdateRef.current = onPlaybackUpdate;
+  });
 
   useEffect(() => {
     return () => {
@@ -189,13 +191,16 @@ function MirrorAudioButtonInner({ audioUrl, label, stopLabel, onPlaybackUpdate }
           });
           const { sound } = await Audio.Sound.createAsync(
             { uri: audioUrl },
-            { shouldPlay: true, progressUpdateIntervalMillis: 200 }
+            { shouldPlay: true, progressUpdateIntervalMillis: 150 }
           );
           soundRef.current = sound;
           sound.setOnPlaybackStatusUpdate((status) => {
             if (status.isLoaded) {
+              const pos = status.positionMillis / 1000;
               if (status.isPlaying) {
-                onPlaybackUpdateRef.current?.(true, status.positionMillis / 1000);
+                onPlaybackUpdateRef.current?.(true, pos);
+              } else if (!status.isBuffering && !status.didJustFinish) {
+                onPlaybackUpdateRef.current?.(false, pos);
               }
               if (status.didJustFinish) {
                 setIsPlaying(false);
@@ -1446,6 +1451,21 @@ export default function ExerciseScreen() {
                   </ScaledText>
                 </View>
                 <RecordingWatermark exerciseName={exerciseTitle} patientName={patientName ?? undefined} visible={true} />
+
+                {!liveSubtitlesEnabled && showTranscriptOverlay && mirrorTranscript && !isRecording && (
+                  <TranscriptOverlay transcript={mirrorTranscript} onClose={() => setShowTranscriptOverlay(false)} />
+                )}
+
+                {liveSubtitlesEnabled && !isRecording && (
+                  <LiveSubtitleOverlay
+                    subtitleUrl={subtitleUrl}
+                    isPlaying={mirrorAudioIsPlaying}
+                    audioCurrentTime={mirrorAudioCurrentTime}
+                    visible={showLiveSubtitles}
+                    subtitleSizeLevel={subtitleSizeLevel}
+                  />
+                )}
+
                 {isRecording && (
                   <View style={styles.recordingIndicator}>
                     <Animated.View style={[styles.recordingDot, { opacity: recordPulse }]} />
@@ -1454,6 +1474,28 @@ export default function ExerciseScreen() {
                     </ScaledText>
                   </View>
                 )}
+
+                {splitCameraReady && !isRecording && (mirrorAudioUrl || mirrorTranscript) && (
+                  <View style={styles.mirrorAudioControls}>
+                    {mirrorAudioUrl && (
+                      <MirrorAudioButton audioUrl={mirrorAudioUrl} label={t('playInstructions')} stopLabel={t('stopInstructions')} onPlaybackUpdate={handleMirrorAudioPlaybackUpdate} />
+                    )}
+                    {!liveSubtitlesEnabled && mirrorTranscript ? (
+                      <TouchableOpacity
+                        style={[mirrorAudioStyles.iconBtn, showTranscriptOverlay && mirrorAudioStyles.iconBtnActive]}
+                        onPress={handleToggleTranscript}
+                        activeOpacity={0.7}
+                        testID="split-transcript-toggle"
+                      >
+                        <FileText size={16} color={Colors.white} />
+                        <ScaledText size={10} weight="600" color={Colors.white} numberOfLines={1}>
+                          {showTranscriptOverlay ? t('hideTranscript') : t('viewTranscript')}
+                        </ScaledText>
+                      </TouchableOpacity>
+                    ) : null}
+                  </View>
+                )}
+
                 {splitCameraReady && (
                   <View style={styles.recordButtonContainer}>
                     <TouchableOpacity

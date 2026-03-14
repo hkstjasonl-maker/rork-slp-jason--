@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useRef, useState, useCallback } from 'react';
 import {
   View,
+  Text,
   ScrollView,
   StyleSheet,
   SafeAreaView,
@@ -649,30 +650,14 @@ const MemoGardenScene = React.memo(function GardenScene({ flowers, flowerTypeMap
   gardenHeight: number;
 }) {
   return (
-    <View style={[gardenStyles.container, { width: screenWidth, height: gardenHeight }]}>
-        <View style={[StyleSheet.absoluteFill, { backgroundColor: '#3E6B2E' }]} />
-        <View style={{ position: 'absolute' as const, top: 0, left: 0, right: 0, height: '58%', backgroundColor: 'rgba(90,139,72,0.85)' }} />
-        <View style={{ position: 'absolute' as const, top: 0, left: 0, right: 0, height: '38%', backgroundColor: 'rgba(139,189,120,0.85)' }} />
-        <View style={{ position: 'absolute' as const, top: 0, left: 0, right: 0, height: '26%', backgroundColor: 'rgba(176,214,162,0.85)' }} />
-        <View style={{ position: 'absolute' as const, top: 0, left: 0, right: 0, height: '18%', backgroundColor: 'rgba(207,222,196,0.9)' }} />
-        <View style={{ position: 'absolute' as const, top: 0, left: 0, right: 0, height: '13%', backgroundColor: 'rgba(203,218,219,0.9)' }} />
-        <View style={{ position: 'absolute' as const, top: 0, left: 0, right: 0, height: '8%', backgroundColor: 'rgba(172,198,228,0.95)' }} />
-        <View style={{ position: 'absolute' as const, top: 0, left: 0, right: 0, height: '3%', backgroundColor: 'rgba(148,182,228,0.95)' }} />
-
-        <View style={gardenStyles.grassTexture1} />
-        <View style={gardenStyles.grassTexture2} />
-        <View style={gardenStyles.grassTexture3} />
-
-        <Mountains gardenHeight={gardenHeight} />
-        <RollingHills gardenHeight={gardenHeight} />
-        <AtmosphericHaze gardenHeight={gardenHeight} />
-        <TreesAndGrassDecor screenWidth={screenWidth} gardenHeight={gardenHeight} />
-        <SoilGrid flowers={flowers} flowerTypeMap={flowerTypeMap} onFlowerPress={onFlowerPress} screenWidth={screenWidth} />
-        <FenceRow screenWidth={screenWidth} />
-        <StaticSun />
-        <CloudsLayer screenWidth={screenWidth} />
-        <StaticCreatures screenWidth={screenWidth} gardenHeight={gardenHeight} />
-        <StaticSparkles screenWidth={screenWidth} gardenHeight={gardenHeight} />
+    <View style={{ width: screenWidth, height: gardenHeight, backgroundColor: '#87CEEB' }}>
+      <View style={{ position: 'absolute' as const, bottom: 0, left: 0, right: 0, height: '40%', backgroundColor: '#3E6B2E' }} />
+      <View style={{ position: 'absolute' as const, top: 20, right: 30, width: 50, height: 50, borderRadius: 25, backgroundColor: '#FFD700' }} />
+      <View style={{ position: 'absolute' as const, top: 10, left: 40, width: 70, height: 25, borderRadius: 12, backgroundColor: 'rgba(255,255,255,0.8)' }} />
+      <View style={{ position: 'absolute' as const, bottom: 60, left: screenWidth / 2 - 50, width: 100, height: 30, backgroundColor: '#8B4513', borderRadius: 4 }} />
+      <Text style={{ position: 'absolute' as const, bottom: 100, left: 20, fontSize: 14, color: '#FFF' }}>
+        {flowers.length} flowers loaded
+      </Text>
     </View>
   );
 });

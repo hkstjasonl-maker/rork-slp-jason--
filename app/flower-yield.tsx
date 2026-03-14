@@ -336,45 +336,77 @@ const CloudsLayer = React.memo(function CloudsLayer({ screenWidth }: { screenWid
   return <>{CLOUD_DATA.map((c, i) => <SingleCloud key={i} data={c} screenWidth={screenWidth} />)}</>;
 });
 
+const BirdShape = React.memo(function BirdShape({ size, color }: { size: number; color: string }) {
+  const wingW = size * 0.48;
+  const wingH = size * 0.22;
+  return (
+    <View style={{ width: size, height: size * 0.5, flexDirection: 'row', alignItems: 'flex-end', justifyContent: 'center' }}>
+      <View style={{
+        width: wingW, height: wingH,
+        borderTopLeftRadius: wingW,
+        borderTopRightRadius: wingW * 0.2,
+        borderBottomLeftRadius: 0,
+        borderBottomRightRadius: 0,
+        backgroundColor: 'transparent',
+        borderTopWidth: 2.5,
+        borderLeftWidth: 1.5,
+        borderColor: color,
+        transform: [{ rotate: '-15deg' }],
+        marginRight: -2,
+      }} />
+      <View style={{
+        width: wingW, height: wingH,
+        borderTopLeftRadius: wingW * 0.2,
+        borderTopRightRadius: wingW,
+        borderBottomLeftRadius: 0,
+        borderBottomRightRadius: 0,
+        backgroundColor: 'transparent',
+        borderTopWidth: 2.5,
+        borderRightWidth: 1.5,
+        borderColor: color,
+        transform: [{ rotate: '15deg' }],
+        marginLeft: -2,
+      }} />
+    </View>
+  );
+});
+
 const FlyingBirds = React.memo(function FlyingBirds({ screenWidth }: { screenWidth: number }) {
   const bird1X = useRef(new Animated.Value(-30)).current;
   const bird2X = useRef(new Animated.Value(-30)).current;
+  const bird3X = useRef(new Animated.Value(-30)).current;
 
   useEffect(() => {
-    const animateBird1 = () => {
-      bird1X.setValue(screenWidth + 30);
-      Animated.timing(bird1X, {
-        toValue: -50,
-        duration: 12000,
-        easing: Easing.linear,
-        useNativeDriver: true,
-      }).start(() => {
-        setTimeout(animateBird1, 8000 + Math.random() * 6000);
-      });
+    const animateBird = (val: Animated.Value, fromRight: boolean, duration: number, delay: number, pause: number) => {
+      const go = () => {
+        val.setValue(fromRight ? screenWidth + 40 : -50);
+        Animated.timing(val, {
+          toValue: fromRight ? -50 : screenWidth + 40,
+          duration,
+          easing: Easing.linear,
+          useNativeDriver: true,
+        }).start(() => {
+          setTimeout(go, pause + Math.random() * 5000);
+        });
+      };
+      setTimeout(go, delay);
     };
-    const animateBird2 = () => {
-      bird2X.setValue(-40);
-      Animated.timing(bird2X, {
-        toValue: screenWidth + 40,
-        duration: 16000,
-        easing: Easing.linear,
-        useNativeDriver: true,
-      }).start(() => {
-        setTimeout(animateBird2, 12000 + Math.random() * 8000);
-      });
-    };
-    const t1 = setTimeout(animateBird1, 2000);
-    const t2 = setTimeout(animateBird2, 7000);
-    return () => { clearTimeout(t1); clearTimeout(t2); };
-  }, [bird1X, bird2X, screenWidth]);
+
+    animateBird(bird1X, true, 11000, 1000, 9000);
+    animateBird(bird2X, false, 14000, 5000, 12000);
+    animateBird(bird3X, true, 9000, 10000, 15000);
+  }, [bird1X, bird2X, bird3X, screenWidth]);
 
   return (
     <>
-      <Animated.View style={{ position: 'absolute' as const, top: 25, transform: [{ translateX: bird1X }] }} pointerEvents="none">
-        <Text style={{ fontSize: 16 }}>🕊️</Text>
+      <Animated.View style={{ position: 'absolute' as const, top: 22, transform: [{ translateX: bird1X }] }} pointerEvents="none">
+        <BirdShape size={22} color="rgba(60,60,80,0.7)" />
       </Animated.View>
-      <Animated.View style={{ position: 'absolute' as const, top: 55, transform: [{ translateX: bird2X }] }} pointerEvents="none">
-        <Text style={{ fontSize: 13 }}>🐦</Text>
+      <Animated.View style={{ position: 'absolute' as const, top: 48, transform: [{ translateX: bird2X }] }} pointerEvents="none">
+        <BirdShape size={16} color="rgba(70,70,90,0.5)" />
+      </Animated.View>
+      <Animated.View style={{ position: 'absolute' as const, top: 35, transform: [{ translateX: bird3X }] }} pointerEvents="none">
+        <BirdShape size={13} color="rgba(80,80,100,0.4)" />
       </Animated.View>
     </>
   );

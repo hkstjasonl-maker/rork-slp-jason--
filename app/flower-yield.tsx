@@ -648,25 +648,12 @@ const MemoGardenScene = React.memo(function GardenScene({ flowers, flowerTypeMap
   screenWidth: number;
   gardenHeight: number;
 }) {
-  const mountainTop = gardenHeight * 0.35;
   return (
-    <View style={{ width: screenWidth, height: gardenHeight, position: 'relative' as const, backgroundColor: '#3E6B2E' }}>
-      <View style={[StyleSheet.absoluteFill, { backgroundColor: '#3E6B2E' }]} />
-      <View style={{ position: 'absolute' as const, top: 0, left: 0, right: 0, height: '58%', backgroundColor: '#5A8B48' }} />
-      <View style={{ position: 'absolute' as const, top: 0, left: 0, right: 0, height: '38%', backgroundColor: '#8BBD78' }} />
-      <View style={{ position: 'absolute' as const, top: 0, left: 0, right: 0, height: '26%', backgroundColor: '#B0D6A2' }} />
-      <View style={{ position: 'absolute' as const, top: 0, left: 0, right: 0, height: '18%', backgroundColor: '#CFDEC4' }} />
-      <View style={{ position: 'absolute' as const, top: 0, left: 0, right: 0, height: '13%', backgroundColor: '#CBDADB' }} />
-      <View style={{ position: 'absolute' as const, top: 0, left: 0, right: 0, height: '8%', backgroundColor: '#ACC6E4' }} />
-      <View style={{ position: 'absolute' as const, top: 0, left: 0, right: 0, height: '3%', backgroundColor: '#94B6E4' }} />
+    <View style={{ width: screenWidth, height: gardenHeight, backgroundColor: '#87CEEB' }}>
+      <View style={{ position: 'absolute' as const, bottom: 0, left: 0, right: 0, height: '50%', backgroundColor: '#3E6B2E' }} />
 
       <View style={{ position: 'absolute' as const, top: 12, right: 30, width: 50, height: 50, borderRadius: 25, backgroundColor: '#FFD700' }} />
-
-      <View style={{ position: 'absolute' as const, bottom: gardenHeight - mountainTop, left: 40, width: 0, height: 0, backgroundColor: 'transparent', borderStyle: 'solid' as const, borderLeftWidth: 45, borderRightWidth: 45, borderBottomWidth: 95, borderLeftColor: 'transparent', borderRightColor: 'transparent', borderBottomColor: 'rgba(110,140,155,0.5)' }} />
-      <View style={{ position: 'absolute' as const, bottom: gardenHeight - mountainTop, left: 180, width: 150, height: 70, borderTopLeftRadius: 75, borderTopRightRadius: 75, backgroundColor: 'rgba(120,145,160,0.5)' }} />
-
       <View style={{ position: 'absolute' as const, top: 15, left: 60, width: 70, height: 22, borderRadius: 11, backgroundColor: 'rgba(255,255,255,0.8)' }} />
-
       <View style={{ position: 'absolute' as const, bottom: gardenHeight * 0.48, left: -30, right: -30, height: 50, borderTopLeftRadius: 250, borderTopRightRadius: 200, backgroundColor: 'rgba(129,199,132,0.65)' }} />
 
       <SoilGrid flowers={flowers} flowerTypeMap={flowerTypeMap} onFlowerPress={onFlowerPress} screenWidth={screenWidth} />

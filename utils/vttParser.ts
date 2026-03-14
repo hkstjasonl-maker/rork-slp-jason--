@@ -143,23 +143,26 @@ export function parseVTT(vttText: string): SubtitleCue[] {
 
   let cues: SubtitleCue[];
 
+  // Try bracketed format first for txt files since they commonly use this format
   if (format === 'txt') {
-    cues = parseTxtTimestamps(vttText);
+    cues = parseBracketedFormat(vttText);
+    if (cues.length === 0) {
+      console.log('[vttParser] Bracketed format returned 0 cues, trying txt timestamps');
+      cues = parseTxtTimestamps(vttText);
+      cues = cues.filter(c => !isNaN(c.startTime) && !isNaN(c.endTime));
+    }
   } else {
     cues = parseVTTOrSRT(vttText);
-  }
-
-  cues = cues.filter(c => !isNaN(c.startTime) && !isNaN(c.endTime));
-
-  if (cues.length === 0 && format !== 'txt') {
-    console.log('[vttParser] VTT/SRT parse returned 0 valid cues, trying txt fallback');
-    cues = parseTxtTimestamps(vttText);
     cues = cues.filter(c => !isNaN(c.startTime) && !isNaN(c.endTime));
-  }
-
-  if (cues.length === 0) {
-    console.log('[vttParser] Still 0 valid cues, trying bracketed format fallback');
-    cues = parseBracketedFormat(vttText);
+    if (cues.length === 0) {
+      console.log('[vttParser] VTT/SRT parse returned 0 valid cues, trying txt fallback');
+      cues = parseTxtTimestamps(vttText);
+      cues = cues.filter(c => !isNaN(c.startTime) && !isNaN(c.endTime));
+    }
+    if (cues.length === 0) {
+      console.log('[vttParser] Still 0 valid cues, trying bracketed format fallback');
+      cues = parseBracketedFormat(vttText);
+    }
   }
 
   cues.sort((a, b) => a.startTime - b.startTime);

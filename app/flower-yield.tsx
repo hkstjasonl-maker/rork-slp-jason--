@@ -80,14 +80,14 @@ function seededRand(seed: number): number {
 }
 
 const MOUNTAIN_DATA = [
-  { type: 'dome' as const, left: -20, w: 180, h: 55, color: 'rgba(130,155,170,0.07)' },
-  { type: 'peak' as const, left: 40, bL: 45, bR: 45, bB: 95, color: 'rgba(110,140,155,0.08)' },
-  { type: 'dome' as const, left: 100, w: 150, h: 70, color: 'rgba(120,145,160,0.06)' },
-  { type: 'peak' as const, left: 180, bL: 55, bR: 55, bB: 85, color: 'rgba(125,150,165,0.09)' },
-  { type: 'dome' as const, left: 230, w: 130, h: 65, color: 'rgba(115,140,155,0.07)' },
-  { type: 'peak' as const, left: 300, bL: 40, bR: 40, bB: 100, color: 'rgba(130,155,170,0.08)' },
-  { type: 'dome' as const, left: 340, w: 160, h: 50, color: 'rgba(120,145,160,0.06)' },
-  { type: 'peak' as const, left: 380, bL: 30, bR: 30, bB: 75, color: 'rgba(110,135,150,0.09)' },
+  { type: 'dome' as const, left: -20, w: 180, h: 55, color: 'rgba(130,155,170,0.45)' },
+  { type: 'peak' as const, left: 40, bL: 45, bR: 45, bB: 95, color: 'rgba(110,140,155,0.5)' },
+  { type: 'dome' as const, left: 100, w: 150, h: 70, color: 'rgba(120,145,160,0.4)' },
+  { type: 'peak' as const, left: 180, bL: 55, bR: 55, bB: 85, color: 'rgba(125,150,165,0.55)' },
+  { type: 'dome' as const, left: 230, w: 130, h: 65, color: 'rgba(115,140,155,0.45)' },
+  { type: 'peak' as const, left: 300, bL: 40, bR: 40, bB: 100, color: 'rgba(130,155,170,0.5)' },
+  { type: 'dome' as const, left: 340, w: 160, h: 50, color: 'rgba(120,145,160,0.4)' },
+  { type: 'peak' as const, left: 380, bL: 30, bR: 30, bB: 75, color: 'rgba(110,135,150,0.55)' },
 ];
 
 const CLOUD_DATA = [
@@ -190,22 +190,22 @@ const RollingHills = React.memo(function RollingHills({ gardenHeight }: { garden
       <View style={{
         position: 'absolute' as const, bottom: gardenHeight * 0.52, left: -30, right: -30,
         height: 60, borderTopLeftRadius: 300, borderTopRightRadius: 200,
-        backgroundColor: 'rgba(165,214,167,0.35)', zIndex: 3,
+        backgroundColor: 'rgba(165,214,167,0.7)', zIndex: 3,
       }} />
       <View style={{
         position: 'absolute' as const, bottom: gardenHeight * 0.48, left: '20%', right: -40,
         height: 50, borderTopLeftRadius: 250, borderTopRightRadius: 350,
-        backgroundColor: 'rgba(129,199,132,0.3)', zIndex: 3,
+        backgroundColor: 'rgba(129,199,132,0.65)', zIndex: 3,
       }} />
       <View style={{
         position: 'absolute' as const, bottom: gardenHeight * 0.44, left: -50, right: '15%',
         height: 45, borderTopLeftRadius: 350, borderTopRightRadius: 180,
-        backgroundColor: 'rgba(102,187,106,0.25)', zIndex: 3,
+        backgroundColor: 'rgba(102,187,106,0.6)', zIndex: 3,
       }} />
       <View style={{
         position: 'absolute' as const, bottom: gardenHeight * 0.40, left: -20, right: -20,
         height: 40, borderTopLeftRadius: 200, borderTopRightRadius: 280,
-        backgroundColor: 'rgba(85,139,47,0.2)', zIndex: 3,
+        backgroundColor: 'rgba(85,139,47,0.55)', zIndex: 3,
       }} />
     </>
   );
@@ -245,7 +245,7 @@ const StaticSun = React.memo(function StaticSun() {
         {rays.map((angle) => (
           <View key={angle} style={{
             position: 'absolute' as const, width: 3, height: 160, borderRadius: 1.5,
-            backgroundColor: 'rgba(255,240,180,0.18)', transform: [{ rotate: `${angle}deg` }],
+            backgroundColor: 'rgba(255,240,180,0.5)', transform: [{ rotate: `${angle}deg` }],
           }} />
         ))}
       </View>
@@ -311,23 +311,23 @@ const SingleCloud = React.memo(function SingleCloud({ data, screenWidth }: { dat
     }}>
       <View style={{
         position: 'absolute' as const, bottom: padY, left: padX * 0.3, right: padX * 0.3, height: data.h * 1.4,
-        borderRadius: data.h, backgroundColor: 'rgba(255,255,255,0.18)',
+        borderRadius: data.h, backgroundColor: 'rgba(255,255,255,0.7)',
       }} />
       <View style={{
         position: 'absolute' as const, bottom: padY, left: padX, right: padX, height: data.h,
-        borderRadius: data.h / 2, backgroundColor: 'rgba(255,255,255,0.25)',
+        borderRadius: data.h / 2, backgroundColor: 'rgba(255,255,255,0.85)',
       }} />
       <View style={{
         position: 'absolute' as const, bottom: padY + data.h * 0.25, left: padX + data.w * 0.1,
-        width: bumpH * 1.2, height: bumpH * 1.2, borderRadius: bumpH * 0.6, backgroundColor: 'rgba(255,255,255,0.22)',
+        width: bumpH * 1.2, height: bumpH * 1.2, borderRadius: bumpH * 0.6, backgroundColor: 'rgba(255,255,255,0.75)',
       }} />
       <View style={{
         position: 'absolute' as const, bottom: padY + data.h * 0.2, left: padX + data.w * 0.42,
-        width: bumpH * 1.4, height: bumpH * 1.4, borderRadius: bumpH * 0.7, backgroundColor: 'rgba(255,255,255,0.2)',
+        width: bumpH * 1.4, height: bumpH * 1.4, borderRadius: bumpH * 0.7, backgroundColor: 'rgba(255,255,255,0.7)',
       }} />
       <View style={{
         position: 'absolute' as const, bottom: padY - data.h * 0.15, left: padX * 0.5, right: padX * 0.5, height: data.h * 0.8,
-        borderRadius: data.h, backgroundColor: 'rgba(255,255,255,0.12)',
+        borderRadius: data.h, backgroundColor: 'rgba(255,255,255,0.5)',
       }} />
     </Animated.View>
   );
@@ -1057,7 +1057,7 @@ const gardenStyles = StyleSheet.create({
     left: -20,
     right: -20,
     height: 40,
-    backgroundColor: 'rgba(120,180,60,0.06)',
+    backgroundColor: 'rgba(120,180,60,0.25)',
     borderRadius: 22,
     transform: [{ rotate: '-1.5deg' }],
   },
@@ -1067,7 +1067,7 @@ const gardenStyles = StyleSheet.create({
     left: -15,
     right: -15,
     height: 32,
-    backgroundColor: 'rgba(90,150,45,0.05)',
+    backgroundColor: 'rgba(90,150,45,0.2)',
     borderRadius: 16,
     transform: [{ rotate: '1deg' }],
   },
@@ -1077,7 +1077,7 @@ const gardenStyles = StyleSheet.create({
     left: -10,
     right: -10,
     height: 22,
-    backgroundColor: 'rgba(85,139,47,0.05)',
+    backgroundColor: 'rgba(85,139,47,0.2)',
     borderRadius: 11,
     transform: [{ rotate: '-1deg' }],
   },

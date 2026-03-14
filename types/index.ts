@@ -2,6 +2,8 @@ export type Language = 'en' | 'zh_hant' | 'zh_hans';
 
 export type FontSizeLevel = 'small' | 'medium' | 'large' | 'extraLarge';
 
+export type SubtitleSizeLevel = 'small' | 'medium' | 'large' | 'extraLarge';
+
 export interface Patient {
   id: string;
   access_code: string;
@@ -277,6 +279,13 @@ export const FONT_SCALES: Record<FontSizeLevel, number> = {
   medium: 1.0,
   large: 1.25,
   extraLarge: 1.6,
+};
+
+export const SUBTITLE_FONT_SIZES: Record<SubtitleSizeLevel, number> = {
+  small: 16,
+  medium: 22,
+  large: 30,
+  extraLarge: 38,
 };
 
 export const BASE_FONT_SIZE = 16;

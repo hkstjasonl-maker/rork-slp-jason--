@@ -3,7 +3,7 @@ import createContextHook from '@nkzw/create-context-hook';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { AppState, AppStateStatus } from 'react-native';
 import translations from '@/constants/i18n';
-import { Language, FontSizeLevel, FONT_SCALES, Acknowledgement } from '@/types';
+import { Language, FontSizeLevel, SubtitleSizeLevel, FONT_SCALES, Acknowledgement } from '@/types';
 import { setupSessionTracking } from '@/lib/analytics';
 import { checkAndQueueCampaigns, QueuedCampaign } from '@/lib/marketingDraw';
 import { supabase } from '@/lib/supabase';
@@ -17,6 +17,7 @@ const STORAGE_KEYS = {
   ACCESS_CODE: 'app_access_code',
   FONT_SIZE_LEVEL: 'app_font_size_level',
   TUTORIAL_COMPLETED: 'app_tutorial_completed',
+  SUBTITLE_SIZE_LEVEL: 'app_subtitle_size_level',
 };
 
 export const [AppProvider, useApp] = createContextHook(() => {
@@ -41,6 +42,7 @@ export const [AppProvider, useApp] = createContextHook(() => {
   const [liveSubtitlesEnabled, setLiveSubtitlesEnabledState] = useState<boolean>(false);
   const [mahjongGameEnabled, setMahjongGameEnabledState] = useState<boolean>(true);
   const [mahjongGameLevel, setMahjongGameLevelState] = useState<string>('basic');
+  const [subtitleSizeLevel, setSubtitleSizeLevelState] = useState<SubtitleSizeLevel>('medium');
 
   const [flowersJustStolen, setFlowersJustStolen] = useState<number>(0);
   const [drawQueue, setDrawQueue] = useState<QueuedCampaign[]>([]);
@@ -53,7 +55,7 @@ export const [AppProvider, useApp] = createContextHook(() => {
 
   const loadPersistedState = async () => {
     try {
-      const [lang, terms, pid, pname, code, fsize, tutorialVal] = await Promise.all([
+      const [lang, terms, pid, pname, code, fsize, tutorialVal, subSize] = await Promise.all([
         AsyncStorage.getItem(STORAGE_KEYS.LANGUAGE),
         AsyncStorage.getItem(STORAGE_KEYS.TERMS_ACCEPTED),
         AsyncStorage.getItem(STORAGE_KEYS.PATIENT_ID),
@@ -61,6 +63,7 @@ export const [AppProvider, useApp] = createContextHook(() => {
         AsyncStorage.getItem(STORAGE_KEYS.ACCESS_CODE),
         AsyncStorage.getItem(STORAGE_KEYS.FONT_SIZE_LEVEL),
         AsyncStorage.getItem(STORAGE_KEYS.TUTORIAL_COMPLETED),
+        AsyncStorage.getItem(STORAGE_KEYS.SUBTITLE_SIZE_LEVEL),
       ]);
       if (lang) setLanguageState(lang as Language);
       if (terms === 'true') setTermsAcceptedState(true);
@@ -69,6 +72,7 @@ export const [AppProvider, useApp] = createContextHook(() => {
       if (code) setAccessCodeState(code);
       if (fsize) setFontSizeLevelState(fsize as FontSizeLevel);
       if (tutorialVal === 'true') setTutorialCompletedState(true);
+      if (subSize) setSubtitleSizeLevelState(subSize as SubtitleSizeLevel);
     } catch (e) {
       log('Failed to load persisted state:', e);
     } finally {
@@ -370,6 +374,12 @@ export const [AppProvider, useApp] = createContextHook(() => {
     }
   }, [patientId]);
 
+  const setSubtitleSizeLevel = useCallback(async (level: SubtitleSizeLevel) => {
+    log('[AppContext] Setting subtitle size level to', level);
+    setSubtitleSizeLevelState(level);
+    await AsyncStorage.setItem(STORAGE_KEYS.SUBTITLE_SIZE_LEVEL, level);
+  }, []);
+
   const clearFlowersStolen = useCallback(() => setFlowersJustStolen(0), []);
 
   const patientIdRef = useRef(patientId);
@@ -489,6 +499,7 @@ export const [AppProvider, useApp] = createContextHook(() => {
     managingOrgNameZh,
     managingOrgLogoUrl,
     liveSubtitlesEnabled,
+    subtitleSizeLevel,
     mahjongGameEnabled,
     mahjongGameLevel,
     acknowledgements,
@@ -505,6 +516,7 @@ export const [AppProvider, useApp] = createContextHook(() => {
     clearPatient,
     setFontSizeLevel,
     setLiveSubtitlesEnabled,
+    setSubtitleSizeLevel,
     setMahjongGameEnabled,
     setMahjongGameLevel,
     setTutorialCompleted,
@@ -516,7 +528,7 @@ export const [AppProvider, useApp] = createContextHook(() => {
     reinforcementAudioUrl, tutorialCompleted,
     therapistPhotoUrl, therapistCartoonUrl, therapistNameEn, therapistNameZh,
     managingOrgNameEn, managingOrgNameZh, managingOrgLogoUrl,
-    liveSubtitlesEnabled,
+    liveSubtitlesEnabled, subtitleSizeLevel,
     mahjongGameEnabled, mahjongGameLevel,
     acknowledgements,
     flowersJustStolen,
@@ -525,7 +537,7 @@ export const [AppProvider, useApp] = createContextHook(() => {
     drawQueue, currentDraw, addToDrawQueue, dismissCurrentDraw,
     setLanguage,
     setTermsAccepted, setPatient, clearPatient, setFontSizeLevel,
-    setLiveSubtitlesEnabled, setMahjongGameEnabled, setMahjongGameLevel,
+    setLiveSubtitlesEnabled, setSubtitleSizeLevel, setMahjongGameEnabled, setMahjongGameLevel,
     setTutorialCompleted, resetTutorial, t,
   ]);
 });

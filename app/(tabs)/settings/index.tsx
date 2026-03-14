@@ -18,7 +18,7 @@ import { ScaledText } from '@/components/ScaledText';
 import { CopyrightFooter } from '@/components/CopyrightFooter';
 import Colors from '@/constants/colors';
 import { JASON_PHOTO } from '@/constants/images';
-import { FontSizeLevel, Language } from '@/types';
+import { FontSizeLevel, SubtitleSizeLevel, Language } from '@/types';
 import {
   Type,
   Globe,
@@ -33,6 +33,7 @@ import {
   Shield,
   Trash2,
   Dices,
+  Captions,
 } from 'lucide-react-native';
 import { AppTutorial } from '@/components/AppTutorial';
 import MiniMahjongGame from '@/components/MiniMahjongGame';
@@ -51,6 +52,13 @@ const LANGUAGE_OPTIONS: { key: Language; label: string }[] = [
   { key: 'en', label: 'English' },
 ];
 
+const SUBTITLE_SIZE_OPTIONS: { key: SubtitleSizeLevel; labelKey: string }[] = [
+  { key: 'small', labelKey: 'subtitleSmall' },
+  { key: 'medium', labelKey: 'subtitleMedium' },
+  { key: 'large', labelKey: 'subtitleLarge' },
+  { key: 'extraLarge', labelKey: 'subtitleExtraLarge' },
+];
+
 export default function SettingsScreen() {
   const {
     t,
@@ -64,6 +72,8 @@ export default function SettingsScreen() {
     managingOrgLogoUrl,
     liveSubtitlesEnabled,
     setLiveSubtitlesEnabled,
+    subtitleSizeLevel,
+    setSubtitleSizeLevel,
     mahjongGameEnabled,
     mahjongGameLevel,
     setMahjongGameEnabled,
@@ -338,6 +348,13 @@ export default function SettingsScreen() {
                         ? '即时字幕（听障辅助）'
                         : 'Live Subtitles (Hearing Accessibility)'}
                   </ScaledText>
+                  <ScaledText size={12} color={Colors.textSecondary}>
+                    {language === 'zh_hant'
+                      ? '播放音頻指導時自動顯示字幕'
+                      : language === 'zh_hans'
+                        ? '播放音频指导时自动显示字幕'
+                        : 'Auto-shows subtitles when audio plays'}
+                  </ScaledText>
                 </View>
                 <Switch
                   value={liveSubtitlesEnabled}
@@ -346,6 +363,37 @@ export default function SettingsScreen() {
                   thumbColor="#fff"
                 />
               </View>
+              {liveSubtitlesEnabled && (
+                <View style={styles.subtitleSizeSection}>
+                  <View style={styles.subtitleSizeHeader}>
+                    <Captions size={16} color={Colors.primary} />
+                    <ScaledText size={13} weight="600" color={Colors.textSecondary}>
+                      {t('subtitleSize')}
+                    </ScaledText>
+                  </View>
+                  <View style={styles.segmentedRow}>
+                    {SUBTITLE_SIZE_OPTIONS.map((option) => (
+                      <TouchableOpacity
+                        key={option.key}
+                        style={[
+                          styles.segmentButton,
+                          subtitleSizeLevel === option.key && styles.segmentButtonActive,
+                        ]}
+                        onPress={() => void setSubtitleSizeLevel(option.key)}
+                        activeOpacity={0.7}
+                      >
+                        <ScaledText
+                          size={12}
+                          weight={subtitleSizeLevel === option.key ? 'bold' : 'normal'}
+                          color={subtitleSizeLevel === option.key ? '#fff' : Colors.textPrimary}
+                        >
+                          {t(option.labelKey)}
+                        </ScaledText>
+                      </TouchableOpacity>
+                    ))}
+                  </View>
+                </View>
+              )}
               {Platform.OS !== 'web' && (
                 <TouchableOpacity
                   style={styles.optionRow}
@@ -673,5 +721,18 @@ const styles = StyleSheet.create({
     paddingVertical: 14,
     alignItems: 'center' as const,
     justifyContent: 'center' as const,
+  },
+  subtitleSizeSection: {
+    paddingHorizontal: 18,
+    paddingBottom: 16,
+    borderTopWidth: 1,
+    borderTopColor: Colors.border,
+  },
+  subtitleSizeHeader: {
+    flexDirection: 'row' as const,
+    alignItems: 'center' as const,
+    gap: 6,
+    marginTop: 12,
+    marginBottom: 10,
   },
 });

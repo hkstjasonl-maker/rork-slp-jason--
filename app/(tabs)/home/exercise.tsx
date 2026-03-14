@@ -15,7 +15,7 @@ import {
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import * as Haptics from 'expo-haptics';
-import { ArrowLeft, CheckCircle, Clock, Repeat, AlertCircle, Tag, Camera, X, Maximize2, SplitSquareHorizontal, Headphones, VideoOff, Coffee, Play, Pause, FileText, Captions } from 'lucide-react-native';
+import { ArrowLeft, CheckCircle, Clock, Repeat, AlertCircle, Tag, Camera, X, Maximize2, SplitSquareHorizontal, Headphones, VideoOff, Coffee, Play, Pause, FileText } from 'lucide-react-native';
 import * as MediaLibrary from 'expo-media-library';
 
 
@@ -149,9 +149,18 @@ const LiveCamera = forwardRef<CameraView, { onCameraReady?: () => void; cameraMo
 LiveCamera.displayName = 'LiveCamera';
 const MemoLiveCamera = memo(LiveCamera, (prev, next) => prev.cameraMode === next.cameraMode && prev.onCameraReady === next.onCameraReady);
 
-function MirrorAudioButtonInner({ audioUrl, label, stopLabel }: { audioUrl: string; label: string; stopLabel: string }) {
+interface MirrorAudioButtonProps {
+  audioUrl: string;
+  label: string;
+  stopLabel: string;
+  onPlaybackUpdate?: (isPlaying: boolean, currentTimeSec: number) => void;
+}
+
+function MirrorAudioButtonInner({ audioUrl, label, stopLabel, onPlaybackUpdate }: MirrorAudioButtonProps) {
   const soundRef = useRef<Audio.Sound | null>(null);
   const [isPlaying, setIsPlaying] = useState(false);
+  const onPlaybackUpdateRef = useRef(onPlaybackUpdate);
+  onPlaybackUpdateRef.current = onPlaybackUpdate;
 
   useEffect(() => {
     return () => {
@@ -168,6 +177,7 @@ function MirrorAudioButtonInner({ audioUrl, label, stopLabel }: { audioUrl: stri
         log('[MirrorAudio] Pausing');
         await soundRef.current.pauseAsync();
         setIsPlaying(false);
+        onPlaybackUpdateRef.current?.(false, 0);
       } else {
         if (!soundRef.current) {
           log('[MirrorAudio] Creating sound from:', audioUrl);
@@ -179,15 +189,22 @@ function MirrorAudioButtonInner({ audioUrl, label, stopLabel }: { audioUrl: stri
           });
           const { sound } = await Audio.Sound.createAsync(
             { uri: audioUrl },
-            { shouldPlay: true }
+            { shouldPlay: true, progressUpdateIntervalMillis: 200 }
           );
           soundRef.current = sound;
           sound.setOnPlaybackStatusUpdate((status) => {
-            if (status.isLoaded && status.didJustFinish) {
-              setIsPlaying(false);
+            if (status.isLoaded) {
+              if (status.isPlaying) {
+                onPlaybackUpdateRef.current?.(true, status.positionMillis / 1000);
+              }
+              if (status.didJustFinish) {
+                setIsPlaying(false);
+                onPlaybackUpdateRef.current?.(false, 0);
+              }
             }
           });
           setIsPlaying(true);
+          onPlaybackUpdateRef.current?.(true, 0);
         } else {
           const status = await soundRef.current.getStatusAsync();
           if (status.isLoaded && status.didJustFinish) {
@@ -196,6 +213,7 @@ function MirrorAudioButtonInner({ audioUrl, label, stopLabel }: { audioUrl: stri
             await soundRef.current.playAsync();
           }
           setIsPlaying(true);
+          onPlaybackUpdateRef.current?.(true, 0);
         }
       }
     } catch (e) {
@@ -537,7 +555,7 @@ export default function ExerciseScreen() {
   }>();
   const router = useRouter();
   const queryClient = useQueryClient();
-  const { t, patientId, patientName, language, reinforcementAudioId, reinforcementAudioUrl, liveSubtitlesEnabled, mahjongGameEnabled, mahjongGameLevel, refreshPatient: refreshPatientCtx, addToDrawQueue, currentDraw, dismissCurrentDraw } = useApp();
+  const { t, patientId, patientName, language, reinforcementAudioId, reinforcementAudioUrl, liveSubtitlesEnabled, subtitleSizeLevel, mahjongGameEnabled, mahjongGameLevel, refreshPatient: refreshPatientCtx, addToDrawQueue, currentDraw, dismissCurrentDraw } = useApp();
 
   const allIds: string[] = useMemo(() => {
     if (params.allExerciseIds) {
@@ -572,9 +590,8 @@ export default function ExerciseScreen() {
   const [showTranscriptOverlay, setShowTranscriptOverlay] = useState(false);
   const [showFaceGuide, setShowFaceGuide] = useState(false);
   const [showLiveSubtitles, setShowLiveSubtitles] = useState(false);
-  const [liveSubAudioPlaying, setLiveSubAudioPlaying] = useState(false);
-  const [liveSubAudioTime, setLiveSubAudioTime] = useState(0);
-  const liveSubSoundRef = useRef<Audio.Sound | null>(null);
+  const [mirrorAudioIsPlaying, setMirrorAudioIsPlaying] = useState(false);
+  const [mirrorAudioCurrentTime, setMirrorAudioCurrentTime] = useState(0);
   const [faceGuideForRecording, setFaceGuideForRecording] = useState(false);
   const [reviewRequirement, setReviewRequirement] = useState<ExerciseReviewRequirement | null>(null);
   const [todaySubmissionCount, setTodaySubmissionCount] = useState<number>(0);
@@ -1330,73 +1347,22 @@ export default function ExerciseScreen() {
     }
   }, []);
 
-  const cleanupLiveSubAudio = useCallback(() => {
-    if (liveSubSoundRef.current) {
-      liveSubSoundRef.current.unloadAsync().catch(() => {});
-      liveSubSoundRef.current = null;
+  const handleMirrorAudioPlaybackUpdate = useCallback((playing: boolean, currentTimeSec: number) => {
+    log('[LiveSub] Mirror audio playback update: playing=', playing, 'time=', currentTimeSec.toFixed(2));
+    setMirrorAudioIsPlaying(playing);
+    setMirrorAudioCurrentTime(currentTimeSec);
+    if (liveSubtitlesEnabled) {
+      setShowLiveSubtitles(playing);
     }
-    setLiveSubAudioPlaying(false);
-    setLiveSubAudioTime(0);
-  }, []);
-
-  const handleToggleLiveSubtitles = useCallback(async () => {
-    if (Platform.OS !== 'web') {
-      void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    }
-
-    if (liveSubAudioPlaying) {
-      cleanupLiveSubAudio();
-      setShowLiveSubtitles(false);
-      return;
-    }
-
-    if (!mirrorAudioUrl) return;
-
-    try {
-      setShowLiveSubtitles(true);
-      await Audio.setAudioModeAsync({
-        allowsRecordingIOS: false,
-        playsInSilentModeIOS: true,
-        staysActiveInBackground: false,
-        shouldDuckAndroid: true,
-      });
-
-      const { sound } = await Audio.Sound.createAsync(
-        { uri: mirrorAudioUrl },
-        { shouldPlay: true, progressUpdateIntervalMillis: 200 },
-        (status) => {
-          if (status.isLoaded && status.isPlaying) {
-            setLiveSubAudioTime(status.positionMillis / 1000);
-          }
-          if (status.isLoaded && status.didJustFinish) {
-            cleanupLiveSubAudio();
-            setShowLiveSubtitles(false);
-          }
-        }
-      );
-      liveSubSoundRef.current = sound;
-      setLiveSubAudioPlaying(true);
-    } catch (e) {
-      log('[LiveSub] Error starting audio+subtitles:', e);
-      cleanupLiveSubAudio();
-      setShowLiveSubtitles(false);
-    }
-  }, [liveSubAudioPlaying, mirrorAudioUrl, cleanupLiveSubAudio]);
-
-  useEffect(() => {
-    return () => {
-      if (liveSubSoundRef.current) {
-        liveSubSoundRef.current.unloadAsync().catch(() => {});
-      }
-    };
-  }, []);
+  }, [liveSubtitlesEnabled]);
 
   useEffect(() => {
     if (mediaMode === 'video') {
-      cleanupLiveSubAudio();
       setShowLiveSubtitles(false);
+      setMirrorAudioIsPlaying(false);
+      setMirrorAudioCurrentTime(0);
     }
-  }, [mediaMode, cleanupLiveSubAudio]);
+  }, [mediaMode]);
 
   if (exerciseQuery.isLoading || !exercise) {
     return (
@@ -1562,9 +1528,10 @@ export default function ExerciseScreen() {
               {liveSubtitlesEnabled && showLiveSubtitles && !isRecording && (
                 <LiveSubtitleOverlay
                   subtitleUrl={subtitleUrl}
-                  isPlaying={liveSubAudioPlaying}
-                  audioCurrentTime={liveSubAudioTime}
+                  isPlaying={mirrorAudioIsPlaying}
+                  audioCurrentTime={mirrorAudioCurrentTime}
                   visible={showLiveSubtitles}
+                  subtitleSizeLevel={subtitleSizeLevel}
                 />
               )}
 
@@ -1580,23 +1547,9 @@ export default function ExerciseScreen() {
               {cameraReady && !isRecording && (mirrorAudioUrl || mirrorTranscript) && (
                 <View style={styles.mirrorAudioControls}>
                   {mirrorAudioUrl && (
-                    <MirrorAudioButton audioUrl={mirrorAudioUrl} label={t('playInstructions')} stopLabel={t('stopInstructions')} />
+                    <MirrorAudioButton audioUrl={mirrorAudioUrl} label={t('playInstructions')} stopLabel={t('stopInstructions')} onPlaybackUpdate={handleMirrorAudioPlaybackUpdate} />
                   )}
-                  {liveSubtitlesEnabled && mirrorAudioUrl ? (
-                    <TouchableOpacity
-                      style={[mirrorAudioStyles.iconBtn, liveSubAudioPlaying && mirrorAudioStyles.iconBtnActive]}
-                      onPress={handleToggleLiveSubtitles}
-                      activeOpacity={0.7}
-                      testID="mirror-live-subtitle-toggle"
-                    >
-                      <Captions size={16} color={Colors.white} />
-                      <ScaledText size={10} weight="600" color={Colors.white} numberOfLines={1}>
-                        {liveSubAudioPlaying
-                          ? (language === 'zh_hant' || language === 'zh_hans' ? '停止字幕' : 'Stop')
-                          : (language === 'zh_hant' || language === 'zh_hans' ? '即時字幕' : 'Live Subtitles')}
-                      </ScaledText>
-                    </TouchableOpacity>
-                  ) : mirrorTranscript ? (
+                  {mirrorTranscript ? (
                     <TouchableOpacity
                       style={[mirrorAudioStyles.iconBtn, showTranscriptOverlay && mirrorAudioStyles.iconBtnActive]}
                       onPress={handleToggleTranscript}

@@ -23,10 +23,11 @@ function parseTimestamp(timestamp: string): number {
   return hours * 3600 + minutes * 60 + seconds;
 }
 
-function detectFormat(text: string): 'vtt' | 'srt' | 'txt' {
+function detectFormat(text: string): 'vtt' | 'srt' | 'txt' | 'bracketed' {
   const clean = text.trim();
   if (clean.startsWith('WEBVTT')) return 'vtt';
   if (/^\d+\s*\n\d{2}:\d{2}/.test(clean)) return 'srt';
+  if (/^\[/.test(clean) && clean.includes('-->')) return 'bracketed';
   if (clean.includes('-->')) return 'vtt';
   if (/\d{1,2}:\d{2}/.test(clean)) return 'txt';
   return 'vtt';
@@ -155,8 +156,9 @@ export function parseVTT(vttText: string): SubtitleCue[] {
 
   let cues: SubtitleCue[];
 
-  // Try bracketed format first for txt files since they commonly use this format
-  if (format === 'txt') {
+  if (format === 'bracketed') {
+    cues = parseBracketedFormat(vttText);
+  } else if (format === 'txt') {
     cues = parseBracketedFormat(vttText);
     if (cues.length === 0) {
       console.log('[vttParser] Bracketed format returned 0 cues, trying txt timestamps');

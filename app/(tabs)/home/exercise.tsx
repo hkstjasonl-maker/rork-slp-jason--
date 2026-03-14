@@ -1531,10 +1531,7 @@ export default function ExerciseScreen() {
                   </View>
                 )}
 
-              </View>
-
-              {liveSubtitlesEnabled && !isRecording && (
-                <View style={styles.subtitleOverlayAbsolute} pointerEvents="none">
+                {liveSubtitlesEnabled && !isRecording && (
                   <LiveSubtitleOverlay
                     subtitleUrl={subtitleUrl}
                     isPlaying={mirrorAudioIsPlaying}
@@ -1543,8 +1540,9 @@ export default function ExerciseScreen() {
                     subtitleSizeLevel={subtitleSizeLevel}
                     forceOverlay={true}
                   />
-                </View>
-              )}
+                )}
+
+              </View>
 
             </View>
           )}
@@ -1651,10 +1649,7 @@ export default function ExerciseScreen() {
                 </View>
               )}
 
-            </View>
-
-            {liveSubtitlesEnabled && !isRecording && (
-              <View style={styles.subtitleOverlayAbsolute} pointerEvents="none">
+              {liveSubtitlesEnabled && !isRecording && (
                 <LiveSubtitleOverlay
                   subtitleUrl={subtitleUrl}
                   isPlaying={mirrorAudioIsPlaying}
@@ -1663,8 +1658,9 @@ export default function ExerciseScreen() {
                   subtitleSizeLevel={subtitleSizeLevel}
                   forceOverlay={true}
                 />
-              </View>
-            )}
+              )}
+
+            </View>
 
             </View>
           )}

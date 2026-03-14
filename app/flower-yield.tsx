@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useRef, useState, useCallback } from 'react';
 import {
   View,
+  Text,
   ScrollView,
   StyleSheet,
   SafeAreaView,
@@ -335,17 +336,102 @@ const CloudsLayer = React.memo(function CloudsLayer({ screenWidth }: { screenWid
   return <>{CLOUD_DATA.map((c, i) => <SingleCloud key={i} data={c} screenWidth={screenWidth} />)}</>;
 });
 
-const StaticCreatures = React.memo(function StaticCreatures({ screenWidth, gardenHeight }: { screenWidth: number; gardenHeight: number }) {
-  const cx = screenWidth / 2;
-  const bottom = gardenHeight * 0.55;
+const FlyingBirds = React.memo(function FlyingBirds({ screenWidth }: { screenWidth: number }) {
+  const bird1X = useRef(new Animated.Value(-30)).current;
+  const bird2X = useRef(new Animated.Value(-30)).current;
+
+  useEffect(() => {
+    const animateBird1 = () => {
+      bird1X.setValue(screenWidth + 30);
+      Animated.timing(bird1X, {
+        toValue: -50,
+        duration: 12000,
+        easing: Easing.linear,
+        useNativeDriver: true,
+      }).start(() => {
+        setTimeout(animateBird1, 8000 + Math.random() * 6000);
+      });
+    };
+    const animateBird2 = () => {
+      bird2X.setValue(-40);
+      Animated.timing(bird2X, {
+        toValue: screenWidth + 40,
+        duration: 16000,
+        easing: Easing.linear,
+        useNativeDriver: true,
+      }).start(() => {
+        setTimeout(animateBird2, 12000 + Math.random() * 8000);
+      });
+    };
+    const t1 = setTimeout(animateBird1, 2000);
+    const t2 = setTimeout(animateBird2, 7000);
+    return () => { clearTimeout(t1); clearTimeout(t2); };
+  }, [bird1X, bird2X, screenWidth]);
+
   return (
     <>
-      <View style={{ position: 'absolute' as const, left: cx - 60, top: bottom - 50 }}>
-        <ScaledText size={15}>🦋</ScaledText>
-      </View>
-      <View style={{ position: 'absolute' as const, left: cx + 40, top: bottom - 70 }}>
-        <ScaledText size={17}>🦋</ScaledText>
-      </View>
+      <Animated.View style={{ position: 'absolute' as const, top: 25, transform: [{ translateX: bird1X }] }} pointerEvents="none">
+        <Text style={{ fontSize: 16 }}>🕊️</Text>
+      </Animated.View>
+      <Animated.View style={{ position: 'absolute' as const, top: 55, transform: [{ translateX: bird2X }] }} pointerEvents="none">
+        <Text style={{ fontSize: 13 }}>🐦</Text>
+      </Animated.View>
+    </>
+  );
+});
+
+const FloatingInsects = React.memo(function FloatingInsects({ screenWidth, gardenHeight }: { screenWidth: number; gardenHeight: number }) {
+  const bug1X = useRef(new Animated.Value(0)).current;
+  const bug1Y = useRef(new Animated.Value(0)).current;
+  const bug2X = useRef(new Animated.Value(0)).current;
+  const bug2Y = useRef(new Animated.Value(0)).current;
+  const bug3X = useRef(new Animated.Value(0)).current;
+  const bug3Y = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    Animated.loop(Animated.sequence([
+      Animated.timing(bug1X, { toValue: 30, duration: 3000, easing: Easing.inOut(Easing.sin), useNativeDriver: true }),
+      Animated.timing(bug1X, { toValue: -20, duration: 3500, easing: Easing.inOut(Easing.sin), useNativeDriver: true }),
+      Animated.timing(bug1X, { toValue: 10, duration: 2500, easing: Easing.inOut(Easing.sin), useNativeDriver: true }),
+    ])).start();
+    Animated.loop(Animated.sequence([
+      Animated.timing(bug1Y, { toValue: -15, duration: 2500, easing: Easing.inOut(Easing.sin), useNativeDriver: true }),
+      Animated.timing(bug1Y, { toValue: 10, duration: 3000, easing: Easing.inOut(Easing.sin), useNativeDriver: true }),
+    ])).start();
+
+    Animated.loop(Animated.sequence([
+      Animated.timing(bug2X, { toValue: 20, duration: 4000, easing: Easing.inOut(Easing.sin), useNativeDriver: true }),
+      Animated.timing(bug2X, { toValue: -15, duration: 4500, easing: Easing.inOut(Easing.sin), useNativeDriver: true }),
+    ])).start();
+    Animated.loop(Animated.sequence([
+      Animated.timing(bug2Y, { toValue: -10, duration: 3500, easing: Easing.inOut(Easing.sin), useNativeDriver: true }),
+      Animated.timing(bug2Y, { toValue: 8, duration: 3000, easing: Easing.inOut(Easing.sin), useNativeDriver: true }),
+    ])).start();
+
+    Animated.loop(Animated.sequence([
+      Animated.timing(bug3X, { toValue: 18, duration: 1800, easing: Easing.inOut(Easing.sin), useNativeDriver: true }),
+      Animated.timing(bug3X, { toValue: -22, duration: 2200, easing: Easing.inOut(Easing.sin), useNativeDriver: true }),
+      Animated.timing(bug3X, { toValue: 5, duration: 1500, easing: Easing.inOut(Easing.sin), useNativeDriver: true }),
+    ])).start();
+    Animated.loop(Animated.sequence([
+      Animated.timing(bug3Y, { toValue: -12, duration: 1500, easing: Easing.inOut(Easing.sin), useNativeDriver: true }),
+      Animated.timing(bug3Y, { toValue: 8, duration: 1800, easing: Easing.inOut(Easing.sin), useNativeDriver: true }),
+      Animated.timing(bug3Y, { toValue: -5, duration: 1200, easing: Easing.inOut(Easing.sin), useNativeDriver: true }),
+    ])).start();
+  }, [bug1X, bug1Y, bug2X, bug2Y, bug3X, bug3Y]);
+
+  const gardenMid = gardenHeight * 0.55;
+  return (
+    <>
+      <Animated.View style={{ position: 'absolute' as const, top: gardenMid - 20, left: screenWidth * 0.25, transform: [{ translateX: bug1X }, { translateY: bug1Y }] }} pointerEvents="none">
+        <Text style={{ fontSize: 18 }}>🦋</Text>
+      </Animated.View>
+      <Animated.View style={{ position: 'absolute' as const, top: gardenMid + 30, left: screenWidth * 0.7, transform: [{ translateX: bug2X }, { translateY: bug2Y }] }} pointerEvents="none">
+        <Text style={{ fontSize: 14 }}>🐞</Text>
+      </Animated.View>
+      <Animated.View style={{ position: 'absolute' as const, top: gardenMid, left: screenWidth * 0.5, transform: [{ translateX: bug3X }, { translateY: bug3Y }] }} pointerEvents="none">
+        <Text style={{ fontSize: 15 }}>🐝</Text>
+      </Animated.View>
     </>
   );
 });
@@ -394,10 +480,11 @@ const TreesAndGrassDecor = React.memo(function TreesAndGrassDecor({ screenWidth,
   );
 });
 
-function PlantedFlower({ flower, flowerType, row }: {
+function PlantedFlower({ flower, flowerType, row, slot }: {
   flower: PatientFlower;
   flowerType: FlowerType;
   row: number;
+  slot: number;
 }) {
   const swayAnim = useRef(new Animated.Value(0)).current;
   const popAnim = useRef(new Animated.Value(0)).current;
@@ -424,24 +511,22 @@ function PlantedFlower({ flower, flowerType, row }: {
   const rotate = swayAnim.interpolate({ inputRange: [-1, 0, 1], outputRange: [`-${swayAmplitude}deg`, '0deg', `${swayAmplitude}deg`] });
   const translateX = swayAnim.interpolate({ inputRange: [-1, 0, 1], outputRange: [-1.5, 0, 1.5] });
 
+  const sizeVariation = ((slot % 7) * 0.12);
+  const flowerSize = 44 + (slot % 3 === 0 ? 14 : slot % 3 === 1 ? 8 : 0) + sizeVariation;
+  const shadowWidth = flowerSize * 0.7;
   const rowFrac = row / (GRID_ROWS - 1);
-  const imgSize = 52 + rowFrac * 18;
-  const stemHeight = 42 + rowFrac * 30;
-  const stemWidth = 2.5 + rowFrac * 0.8;
-  const shadowWidth = imgSize * 0.7;
   const shadowOpacity = 0.15 + rowFrac * 0.12;
   const rarity = flowerType.rarity || 'common';
   const rarityInfo = RARITY_COLORS[rarity] || RARITY_COLORS.common;
-  const glowSize = imgSize * 1.3;
+  const glowSize = flowerSize * 1.3;
 
-  const totalHeight = imgSize + stemHeight + 24;
-  const flowerTilt = -42;
-  const liftOffset = -(imgSize * 0.35 + stemHeight * 0.15);
+  const totalHeight = flowerSize + 16;
+  const liftOffset = -(flowerSize * 0.3);
 
   return (
     <View style={{
       alignItems: 'center' as const,
-      width: imgSize + 14,
+      width: flowerSize + 14,
       height: totalHeight,
       transform: [
         { translateY: liftOffset },
@@ -449,7 +534,7 @@ function PlantedFlower({ flower, flowerType, row }: {
     }}>
       <View style={{
         position: 'absolute' as const,
-        bottom: stemHeight + 6,
+        top: 0,
         width: glowSize,
         height: glowSize * 0.6,
         borderRadius: glowSize / 2,
@@ -458,22 +543,19 @@ function PlantedFlower({ flower, flowerType, row }: {
       }} />
       <Animated.View style={{
         position: 'absolute' as const,
-        bottom: stemHeight,
+        top: 2,
         alignItems: 'center' as const,
         transform: [
-          { perspective: 400 },
-          { rotateX: `${flowerTilt}deg` },
           { rotate },
           { translateX },
           { scale: popAnim },
         ],
-        zIndex: 10,
       }}>
         <Image
           source={{ uri: flowerType.image_url }}
           style={{
-            width: 48,
-            height: 48,
+            width: flowerSize,
+            height: flowerSize,
           }}
           contentFit="contain"
           cachePolicy="memory-disk"
@@ -481,48 +563,12 @@ function PlantedFlower({ flower, flowerType, row }: {
       </Animated.View>
       <View style={{
         position: 'absolute' as const,
-        bottom: 2,
-        width: stemWidth,
-        height: stemHeight,
-        backgroundColor: '#5D8A3C',
-        borderRadius: stemWidth / 2,
-        zIndex: 9,
-        shadowColor: '#2E5A1E',
-        shadowOffset: { width: 0.5, height: 0 },
-        shadowOpacity: 0.3,
-        shadowRadius: 1,
-      }} />
-      <View style={{
-        position: 'absolute' as const,
-        bottom: 2 + stemHeight * 0.45,
-        left: (imgSize + 14) / 2 + stemWidth / 2 - 1,
-        width: 6 + rowFrac * 2,
-        height: 3.5 + rowFrac,
-        borderRadius: 3,
-        backgroundColor: '#6B9E4A',
-        transform: [{ rotate: '30deg' }, { scaleY: 0.7 }],
-        zIndex: 9,
-      }} />
-      <View style={{
-        position: 'absolute' as const,
         bottom: 0,
-        left: (imgSize + 14) / 2 - stemWidth,
-        width: 6 + rowFrac * 1.5,
-        height: 3 + rowFrac * 0.8,
-        borderRadius: 3,
-        backgroundColor: '#5A9240',
-        transform: [{ rotate: '-35deg' }, { scaleY: 0.7 }],
-        zIndex: 9,
-      }} />
-      <View style={{
-        position: 'absolute' as const,
-        bottom: -1,
         width: shadowWidth,
         height: 5,
         borderRadius: shadowWidth / 2,
         backgroundColor: `rgba(40,25,10,${shadowOpacity})`,
         transform: [{ scaleX: 1.4 }, { scaleY: 0.5 }],
-        zIndex: 8,
       }} />
     </View>
   );
@@ -603,7 +649,7 @@ const SoilGrid = React.memo(function SoilGrid({ flowers, flowerTypeMap, onFlower
             )}
             {hasFlower && ft && (
               <View style={{ position: 'absolute' as const, zIndex: 10 }}>
-                <MemoPlantedFlower flower={flower} flowerType={ft} row={row} />
+                <MemoPlantedFlower flower={flower} flowerType={ft} row={row} slot={idx} />
               </View>
             )}
           </TouchableOpacity>
@@ -659,13 +705,14 @@ const MemoGardenScene = React.memo(function GardenScene({ flowers, flowerTypeMap
 
       <StaticSun />
       <CloudsLayer screenWidth={screenWidth} />
+      <FlyingBirds screenWidth={screenWidth} />
       <Mountains gardenHeight={gardenHeight} />
       <RollingHills gardenHeight={gardenHeight} />
       <TreesAndGrassDecor screenWidth={screenWidth} gardenHeight={gardenHeight} />
-      <StaticCreatures screenWidth={screenWidth} gardenHeight={gardenHeight} />
-      <StaticSparkles screenWidth={screenWidth} gardenHeight={gardenHeight} />
+      <FloatingInsects screenWidth={screenWidth} gardenHeight={gardenHeight} />
 
       <SoilGrid flowers={flowers} flowerTypeMap={flowerTypeMap} onFlowerPress={onFlowerPress} screenWidth={screenWidth} />
+      <StaticSparkles screenWidth={screenWidth} gardenHeight={gardenHeight} />
       <FenceRow screenWidth={screenWidth} />
     </View>
   );

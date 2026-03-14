@@ -1474,7 +1474,7 @@ export default function ExerciseScreen() {
                   </View>
                 )}
 
-                {splitCameraReady && !isRecording && (
+                {!isRecording && (
                   <View style={styles.mirrorAudioControls}>
                     {mirrorAudioUrl && (
                       <MirrorAudioButton audioUrl={mirrorAudioUrl} label={t('playInstructions')} stopLabel={t('stopInstructions')} onPlaybackUpdate={handleMirrorAudioPlaybackUpdate} />
@@ -1493,6 +1493,17 @@ export default function ExerciseScreen() {
                       </TouchableOpacity>
                     ) : null}
                   </View>
+                )}
+
+                {liveSubtitlesEnabled && !isRecording && (
+                  <LiveSubtitleOverlay
+                    subtitleUrl={subtitleUrl}
+                    isPlaying={mirrorAudioIsPlaying}
+                    audioCurrentTime={mirrorAudioCurrentTime}
+                    visible={showLiveSubtitles}
+                    subtitleSizeLevel={subtitleSizeLevel}
+                    forceOverlay={true}
+                  />
                 )}
 
                 {splitCameraReady && (
@@ -1577,7 +1588,7 @@ export default function ExerciseScreen() {
                 </View>
               )}
 
-              {cameraReady && !isRecording && (
+              {!isRecording && (
                 <View style={styles.mirrorAudioControls}>
                   {mirrorAudioUrl && (
                     <MirrorAudioButton audioUrl={mirrorAudioUrl} label={t('playInstructions')} stopLabel={t('stopInstructions')} onPlaybackUpdate={handleMirrorAudioPlaybackUpdate} />
@@ -1596,6 +1607,17 @@ export default function ExerciseScreen() {
                     </TouchableOpacity>
                   ) : null}
                 </View>
+              )}
+
+              {liveSubtitlesEnabled && !isRecording && (
+                <LiveSubtitleOverlay
+                  subtitleUrl={subtitleUrl}
+                  isPlaying={mirrorAudioIsPlaying}
+                  audioCurrentTime={mirrorAudioCurrentTime}
+                  visible={showLiveSubtitles}
+                  subtitleSizeLevel={subtitleSizeLevel}
+                  forceOverlay={true}
+                />
               )}
 
               {cameraReady && (
@@ -2017,16 +2039,6 @@ export default function ExerciseScreen() {
         )}
       </SafeAreaView>
 
-      {isInMirror && liveSubtitlesEnabled && !isRecording && (
-        <LiveSubtitleOverlay
-          subtitleUrl={subtitleUrl}
-          isPlaying={mirrorAudioIsPlaying}
-          audioCurrentTime={mirrorAudioCurrentTime}
-          visible={showLiveSubtitles}
-          subtitleSizeLevel={subtitleSizeLevel}
-          forceOverlay={true}
-        />
-      )}
     </View>
   );
 }

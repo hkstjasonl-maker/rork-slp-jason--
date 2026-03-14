@@ -651,7 +651,7 @@ const MemoGardenScene = React.memo(function GardenScene({ flowers, flowerTypeMap
   return (
     <View style={{ width: screenWidth, height: gardenHeight, backgroundColor: '#87CEEB' }}>
       <View style={{ position: 'absolute' as const, bottom: 0, left: 0, right: 0, height: '50%', backgroundColor: '#3E6B2E' }} />
-      <View style={{ position: 'absolute' as const, top: 0, left: 0, right: 0, bottom: 0 }} pointerEvents="box-none">
+      <View style={{ position: 'absolute' as const, top: 0, left: 0, right: 0, bottom: 0, pointerEvents: 'box-none' }}>
         <SoilGrid flowers={flowers} flowerTypeMap={flowerTypeMap} onFlowerPress={onFlowerPress} screenWidth={screenWidth} />
       </View>
       <View style={{ position: 'absolute' as const, top: 12, right: 30, width: 50, height: 50, borderRadius: 25, backgroundColor: '#FFD700' }} pointerEvents="none" />

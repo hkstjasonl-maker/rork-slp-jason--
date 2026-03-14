@@ -26,6 +26,7 @@ export default function LiveSubtitleOverlay({
   const [currentText, setCurrentText] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [loadError, setLoadError] = useState<boolean>(false);
+  const [rawPreview, setRawPreview] = useState('');
   const fadeAnim = useRef(new Animated.Value(0)).current;
   const prevTextRef = useRef<string | null>(null);
   const fetchedUrlRef = useRef<string | null>(null);
@@ -70,6 +71,7 @@ export default function LiveSubtitleOverlay({
           return;
         }
         const text = await response.text();
+        setRawPreview(JSON.stringify(text.substring(0, 100)));
         console.log('[LiveSubtitleOverlay] Fetched text length:', text.length, 'first 200 chars:', text.substring(0, 200));
         if (!cancelled) {
           const parsed = parseVTT(text);
@@ -166,6 +168,7 @@ export default function LiveSubtitleOverlay({
              `Error: ${loadError || 'none'}\n` +
              `Cues: ${cues.length}\n` +
              `Cue0: ${cues.length > 0 ? cues[0].startTime + '-' + cues[0].endTime + ' "' + cues[0].text.substring(0, 20) + '"' : 'none'}\n` +
+             `Raw: ${rawPreview}\n` +
              `Playing: ${isPlaying}\n` +
              `Time: ${audioCurrentTime.toFixed(2)}\n` +
              `Text: ${currentText || 'null'}`}

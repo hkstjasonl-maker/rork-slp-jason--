@@ -658,8 +658,11 @@ const MemoGardenScene = React.memo(function GardenScene({ flowers, flowerTypeMap
       <View style={{
         width: screenWidth / scale,
         height: GARDEN_HEIGHT,
-        transform: [{ scale }],
-        transformOrigin: 'top left',
+        transform: [
+          { translateX: -(screenWidth / scale) * (1 - scale) / 2 },
+          { translateY: -GARDEN_HEIGHT * (1 - scale) / 2 },
+          { scale },
+        ],
       }}>
         <View style={[StyleSheet.absoluteFill, { backgroundColor: '#3E6B2E' }]} />
         <View style={{ position: 'absolute' as const, top: 0, left: 0, right: 0, height: '58%', backgroundColor: '#5A8B48' }} />

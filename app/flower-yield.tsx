@@ -512,8 +512,8 @@ function PlantedFlower({ flower, flowerType, row, slot }: {
   const translateX = swayAnim.interpolate({ inputRange: [-1, 0, 1], outputRange: [-1.5, 0, 1.5] });
 
   const sizeVariation = ((slot % 7) * 0.12);
-  const flowerSize = 44 + (slot % 3 === 0 ? 14 : slot % 3 === 1 ? 8 : 0) + sizeVariation;
-  const shadowWidth = flowerSize * 0.7;
+  const flowerSize = 58 + (slot % 3 === 0 ? 16 : slot % 3 === 1 ? 10 : 0) + sizeVariation;
+  const shadowWidth = flowerSize * 0.65;
   const rowFrac = row / (GRID_ROWS - 1);
   const shadowOpacity = 0.15 + rowFrac * 0.12;
   const rarity = flowerType.rarity || 'common';
@@ -1068,14 +1068,7 @@ export default function FlowerYieldScreen() {
                     </ScaledText>
                   </View>
                 )}
-                {selectedFlower?.obtained_at && (
-                  <ScaledText size={12} color={Colors.textSecondary} style={{ marginTop: 10 }}>
-                    {isZh ? '獲得日期：' : 'Acquired: '}
-                    {new Date(selectedFlower.obtained_at).toLocaleDateString(isZh ? 'zh-TW' : 'en-US', {
-                      year: 'numeric', month: 'short', day: 'numeric',
-                    })}
-                  </ScaledText>
-                )}
+
               </>
             )}
           </View>

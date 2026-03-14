@@ -13,6 +13,7 @@ import * as Haptics from 'expo-haptics';
 import { X, Wind, Play } from 'lucide-react-native';
 import { ScaledText } from '@/components/ScaledText';
 import { useApp } from '@/contexts/AppContext';
+import { playTimerComplete } from '@/utils/soundEffects';
 
 const STORAGE_KEY_DURATION = 'rest_timer_last_duration';
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
@@ -135,6 +136,7 @@ export function RestTimer({ visible, onClose, onContinue, hasNext = false }: Res
           if (Platform.OS !== 'web') {
             void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
           }
+          void playTimerComplete();
           doneScale.setValue(0.8);
           Animated.spring(doneScale, { toValue: 1, friction: 4, useNativeDriver: true }).start();
           return 0;

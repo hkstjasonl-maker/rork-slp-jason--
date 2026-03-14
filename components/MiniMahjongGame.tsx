@@ -15,6 +15,7 @@ import { Eye } from 'lucide-react-native';
 import { useApp } from '@/contexts/AppContext';
 import { supabase } from '@/lib/supabase';
 import { log } from '@/lib/logger';
+import { playMahjongShuffle, playMahjongWin, playMahjongLose, playMahjongChoiceWaiting } from '@/utils/soundEffects';
 import {
   generateHand,
   checkResult,
@@ -193,6 +194,7 @@ export default function MiniMahjongGame({ visible, level, onClose, patientId, pr
     setGameData(data);
     setPhase('loading');
     log('[MiniMahjongGame] Game loading, level:', level);
+    void playMahjongShuffle();
 
     const allUrls = [
       ...data.hand.map(t => getTileImageUrl(t)),
@@ -206,6 +208,7 @@ export default function MiniMahjongGame({ visible, level, onClose, patientId, pr
     void Promise.all([prefetchPromise, minDelay]).then(() => {
       setPhase('game');
       log('[MiniMahjongGame] Game started, all images prefetched');
+      void playMahjongChoiceWaiting();
     });
   }, [level]);
 
@@ -267,6 +270,7 @@ export default function MiniMahjongGame({ visible, level, onClose, patientId, pr
 
     if (gameResult.won) {
       void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      void playMahjongWin();
       Animated.spring(resultBounceAnim, {
         toValue: 1,
         friction: 3,
@@ -283,6 +287,7 @@ export default function MiniMahjongGame({ visible, level, onClose, patientId, pr
       ]).start();
     } else {
       void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+      void playMahjongLose();
     }
   }, [tapsDisabled, gameData, level, flipTile, resultBounceAnim, starsFloatAnim, starsOpacityAnim, tipsUsed]);
 

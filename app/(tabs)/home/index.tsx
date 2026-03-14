@@ -37,6 +37,7 @@ import {
   getNextAllowedDay as getFeedingNextAllowedDay,
 } from '@/lib/feedingSkillReview';
 import { calculateStars, getStarsForSession } from '@/lib/stars';
+import { playAssistantOpen } from '@/utils/soundEffects';
 import {
   Play,
   Clock,
@@ -885,6 +886,7 @@ export default function HomeScreen() {
                     if (Platform.OS !== 'web') {
                       void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
                     }
+                    void playAssistantOpen();
                   }}
                   activeOpacity={0.7}
                   testID="personal-assistant-button"

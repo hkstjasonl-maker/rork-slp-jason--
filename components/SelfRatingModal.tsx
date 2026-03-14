@@ -4,7 +4,6 @@ import {
   Modal,
   StyleSheet,
   TouchableOpacity,
-  ScrollView,
   Animated,
   Platform,
 } from 'react-native';
@@ -12,6 +11,7 @@ import * as Haptics from 'expo-haptics';
 import { ScaledText } from '@/components/ScaledText';
 import { useApp } from '@/contexts/AppContext';
 import Colors from '@/constants/colors';
+import { playRatingSubmitted } from '@/utils/soundEffects';
 
 interface SelfRatingModalProps {
   visible: boolean;
@@ -55,7 +55,7 @@ function SelfRatingModalInner({ visible, onSkip, onSave }: SelfRatingModalProps)
   const handleSelect = useCallback((rating: number) => {
     setSelectedRating(rating);
     if (Platform.OS !== 'web') {
-      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+      void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     }
     Animated.sequence([
       Animated.timing(scaleAnims[rating], {
@@ -76,9 +76,10 @@ function SelfRatingModalInner({ visible, onSkip, onSave }: SelfRatingModalProps)
   const handleSave = useCallback(() => {
     if (selectedRating !== null) {
       if (Platform.OS !== 'web') {
-        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+        void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       }
       onSave(selectedRating);
+      void playRatingSubmitted();
     }
   }, [selectedRating, onSave]);
 

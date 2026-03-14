@@ -23,16 +23,6 @@ function parseTimestamp(timestamp: string): number {
   return hours * 3600 + minutes * 60 + seconds;
 }
 
-function detectFormat(text: string): 'vtt' | 'srt' | 'txt' | 'bracketed' {
-  const clean = text.trim();
-  if (clean.startsWith('WEBVTT')) return 'vtt';
-  if (/^\d+\s*\n\d{2}:\d{2}/.test(clean)) return 'srt';
-  if (/^\[/.test(clean) && clean.includes('-->')) return 'bracketed';
-  if (clean.includes('-->')) return 'vtt';
-  if (/\d{1,2}:\d{2}/.test(clean)) return 'txt';
-  return 'vtt';
-}
-
 function parseVTTOrSRT(text: string): SubtitleCue[] {
   const cues: SubtitleCue[] = [];
   const clean = text.replace(/^\uFEFF/, '').replace(/\r\n/g, '\n');
@@ -151,35 +141,43 @@ function parseBracketedFormat(text: string): SubtitleCue[] {
 }
 
 export function parseVTT(vttText: string): SubtitleCue[] {
-  console.log('[vttParser] VERSION 2 - parseVTT called');
-  const format = detectFormat(vttText);
-  console.log('[vttParser] Detected format:', format, 'text length:', vttText.length);
-
+  console.log('[vttParser] V3 parseVTT called, text length:', vttText.length);
+  
   let cues: SubtitleCue[];
-
-  if (format === 'bracketed') {
+  
+  // Always try bracketed format first for any text containing [ and -->
+  const trimmed = vttText.trim();
+  if (trimmed.includes('[') && trimmed.includes('-->')) {
     cues = parseBracketedFormat(vttText);
-  } else if (format === 'txt') {
-    cues = parseBracketedFormat(vttText);
-    if (cues.length === 0) {
-      console.log('[vttParser] Bracketed format returned 0 cues, trying txt timestamps');
-      cues = parseTxtTimestamps(vttText);
-      cues = cues.filter(c => !isNaN(c.startTime) && !isNaN(c.endTime));
-    }
-  } else {
-    cues = parseVTTOrSRT(vttText);
-    cues = cues.filter(c => !isNaN(c.startTime) && !isNaN(c.endTime));
-    if (cues.length === 0) {
-      console.log('[vttParser] VTT/SRT parse returned 0 valid cues, trying txt fallback');
-      cues = parseTxtTimestamps(vttText);
-      cues = cues.filter(c => !isNaN(c.startTime) && !isNaN(c.endTime));
-    }
-    if (cues.length === 0) {
-      console.log('[vttParser] Still 0 valid cues, trying bracketed format fallback');
-      cues = parseBracketedFormat(vttText);
+    if (cues.length > 0) {
+      console.log('[vttParser] parseBracketedFormat matched:', cues.length, 'cues');
+      cues.sort((a, b) => a.startTime - b.startTime);
+      return cues;
     }
   }
-
+  
+  // Then try standard VTT/SRT
+  if (trimmed.startsWith('WEBVTT') || /^\d+\s*\n\d{2}:\d{2}/.test(trimmed)) {
+    cues = parseVTTOrSRT(vttText);
+    cues = cues.filter(c => !isNaN(c.startTime) && !isNaN(c.endTime));
+    if (cues.length > 0) {
+      cues.sort((a, b) => a.startTime - b.startTime);
+      return cues;
+    }
+  }
+  
+  // Then try txt timestamps
+  cues = parseTxtTimestamps(vttText);
+  cues = cues.filter(c => !isNaN(c.startTime) && !isNaN(c.endTime));
+  if (cues.length > 0) {
+    cues.sort((a, b) => a.startTime - b.startTime);
+    return cues;
+  }
+  
+  // Final fallback: try all parsers
+  cues = parseVTTOrSRT(vttText);
+  if (cues.length === 0) cues = parseBracketedFormat(vttText);
+  
   cues.sort((a, b) => a.startTime - b.startTime);
   console.log('[vttParser] Parsed', cues.length, 'subtitle cues');
   return cues;

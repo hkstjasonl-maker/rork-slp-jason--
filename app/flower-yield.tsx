@@ -14,6 +14,7 @@ import {
   LayoutAnimation,
   Platform,
   UIManager,
+  Text,
 } from 'react-native';
 import { Image } from 'expo-image';
 import { Stack, useRouter } from 'expo-router';
@@ -775,7 +776,7 @@ export default function FlowerYieldScreen() {
   const router = useRouter();
   const queryClient = useQueryClient();
   const { width: screenWidth, height: screenHeight } = useWindowDimensions();
-  const gardenHeight = Math.min(GARDEN_HEIGHT, Math.max(350, screenHeight * 0.6));
+  const gardenHeight = 280;
 
   const [selectedFlower, setSelectedFlower] = useState<PatientFlower | null>(null);
   const [theftModalVisible, setTheftModalVisible] = useState<boolean>(false);
@@ -917,6 +918,11 @@ export default function FlowerYieldScreen() {
             </View>
           ) : (
             <>
+              <View style={{ backgroundColor: '#FFE0B2', padding: 8, borderRadius: 8, margin: 8 }}>
+                <Text style={{ fontSize: 11, color: '#E65100' }}>
+                  {`Flowers: ${flowers.length} | Types: ${Object.keys(flowerTypeMap).length} | Stars: ${patientData?.stars_available ?? '?'} | Loading: ${isLoading} | Screen: ${screenWidth}x${screenHeight} | Garden H: ${gardenHeight}`}
+                </Text>
+              </View>
               <MemoGardenScene flowers={flowers} flowerTypeMap={flowerTypeMap} onFlowerPress={handleFlowerPress} screenWidth={screenWidth} gardenHeight={gardenHeight} />
 
               {flowers.length === 0 && (

@@ -650,7 +650,7 @@ const MemoGardenScene = React.memo(function GardenScene({ flowers, flowerTypeMap
 }) {
   const mountainTop = gardenHeight * 0.35;
   return (
-    <View style={[gardenStyles.container, { width: screenWidth, height: gardenHeight }]}>
+    <View style={{ width: screenWidth, height: gardenHeight, position: 'relative' as const, backgroundColor: '#3E6B2E' }}>
       <View style={[StyleSheet.absoluteFill, { backgroundColor: '#3E6B2E' }]} />
       <View style={{ position: 'absolute' as const, top: 0, left: 0, right: 0, height: '58%', backgroundColor: '#5A8B48' }} />
       <View style={{ position: 'absolute' as const, top: 0, left: 0, right: 0, height: '38%', backgroundColor: '#8BBD78' }} />

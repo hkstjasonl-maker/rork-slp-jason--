@@ -149,13 +149,16 @@ export function parseVTT(vttText: string): SubtitleCue[] {
     cues = parseVTTOrSRT(vttText);
   }
 
+  cues = cues.filter(c => !isNaN(c.startTime) && !isNaN(c.endTime));
+
   if (cues.length === 0 && format !== 'txt') {
-    console.log('[vttParser] VTT/SRT parse returned 0 cues, trying txt fallback');
+    console.log('[vttParser] VTT/SRT parse returned 0 valid cues, trying txt fallback');
     cues = parseTxtTimestamps(vttText);
+    cues = cues.filter(c => !isNaN(c.startTime) && !isNaN(c.endTime));
   }
 
   if (cues.length === 0) {
-    console.log('[vttParser] Still 0 cues, trying bracketed format fallback');
+    console.log('[vttParser] Still 0 valid cues, trying bracketed format fallback');
     cues = parseBracketedFormat(vttText);
   }
 

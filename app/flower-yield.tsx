@@ -1,7 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState, useCallback } from 'react';
 import {
   View,
-  Text,
   ScrollView,
   StyleSheet,
   SafeAreaView,
@@ -210,7 +209,7 @@ const RollingHills = React.memo(function RollingHills({ gardenHeight }: { garden
   );
 });
 
-const AtmosphericHaze = React.memo(function AtmosphericHaze({ gardenHeight }: { gardenHeight: number }) {
+const _AtmosphericHaze = React.memo(function AtmosphericHaze({ gardenHeight }: { gardenHeight: number }) {
   return (
     <>
       <View style={{
@@ -336,7 +335,7 @@ const CloudsLayer = React.memo(function CloudsLayer({ screenWidth }: { screenWid
   return <>{CLOUD_DATA.map((c, i) => <SingleCloud key={i} data={c} screenWidth={screenWidth} />)}</>;
 });
 
-const StaticCreatures = React.memo(function StaticCreatures({ screenWidth, gardenHeight }: { screenWidth: number; gardenHeight: number }) {
+const _StaticCreatures = React.memo(function StaticCreatures({ screenWidth, gardenHeight }: { screenWidth: number; gardenHeight: number }) {
   const cx = screenWidth / 2;
   const bottom = gardenHeight * 0.55;
   return (
@@ -351,7 +350,7 @@ const StaticCreatures = React.memo(function StaticCreatures({ screenWidth, garde
   );
 });
 
-const StaticSparkles = React.memo(function StaticSparkles({ screenWidth, gardenHeight }: { screenWidth: number; gardenHeight: number }) {
+const _StaticSparkles = React.memo(function StaticSparkles({ screenWidth, gardenHeight }: { screenWidth: number; gardenHeight: number }) {
   const sparkleData = useMemo(() =>
     Array.from({ length: 4 }, (_, i) => ({
       x: screenWidth * 0.2 + seededRand(i * 31) * screenWidth * 0.6,
@@ -374,7 +373,7 @@ const StaticSparkles = React.memo(function StaticSparkles({ screenWidth, gardenH
   );
 });
 
-const TreesAndGrassDecor = React.memo(function TreesAndGrassDecor({ screenWidth, gardenHeight }: { screenWidth: number; gardenHeight: number }) {
+const _TreesAndGrassDecor = React.memo(function TreesAndGrassDecor({ screenWidth, gardenHeight }: { screenWidth: number; gardenHeight: number }) {
   const ratio = gardenHeight / GARDEN_HEIGHT;
   const treeData = useMemo(() => getTreeData(screenWidth, ratio), [screenWidth, ratio]);
   const grassSprites = useMemo(() => getGrassSprites(screenWidth, ratio), [screenWidth, ratio]);
@@ -650,14 +649,21 @@ const MemoGardenScene = React.memo(function GardenScene({ flowers, flowerTypeMap
   gardenHeight: number;
 }) {
   return (
-    <View style={{ width: screenWidth, height: gardenHeight, backgroundColor: '#87CEEB' }}>
-      <View style={{ position: 'absolute' as const, bottom: 0, left: 0, right: 0, height: '40%', backgroundColor: '#3E6B2E' }} />
-      <View style={{ position: 'absolute' as const, top: 20, right: 30, width: 50, height: 50, borderRadius: 25, backgroundColor: '#FFD700' }} />
-      <View style={{ position: 'absolute' as const, top: 10, left: 40, width: 70, height: 25, borderRadius: 12, backgroundColor: 'rgba(255,255,255,0.8)' }} />
-      <View style={{ position: 'absolute' as const, bottom: 60, left: screenWidth / 2 - 50, width: 100, height: 30, backgroundColor: '#8B4513', borderRadius: 4 }} />
-      <Text style={{ position: 'absolute' as const, bottom: 100, left: 20, fontSize: 14, color: '#FFF' }}>
-        {flowers.length} flowers loaded
-      </Text>
+    <View style={[gardenStyles.container, { width: screenWidth, height: gardenHeight }]}>
+      <View style={[StyleSheet.absoluteFill, { backgroundColor: '#3E6B2E' }]} />
+      <View style={{ position: 'absolute' as const, top: 0, left: 0, right: 0, height: '58%', backgroundColor: '#5A8B48' }} />
+      <View style={{ position: 'absolute' as const, top: 0, left: 0, right: 0, height: '38%', backgroundColor: '#8BBD78' }} />
+      <View style={{ position: 'absolute' as const, top: 0, left: 0, right: 0, height: '26%', backgroundColor: '#B0D6A2' }} />
+      <View style={{ position: 'absolute' as const, top: 0, left: 0, right: 0, height: '18%', backgroundColor: '#CFDEC4' }} />
+      <View style={{ position: 'absolute' as const, top: 0, left: 0, right: 0, height: '13%', backgroundColor: '#CBDADB' }} />
+      <View style={{ position: 'absolute' as const, top: 0, left: 0, right: 0, height: '8%', backgroundColor: '#ACC6E4' }} />
+      <View style={{ position: 'absolute' as const, top: 0, left: 0, right: 0, height: '3%', backgroundColor: '#94B6E4' }} />
+      <Mountains gardenHeight={gardenHeight} />
+      <RollingHills gardenHeight={gardenHeight} />
+      <StaticSun />
+      <CloudsLayer screenWidth={screenWidth} />
+      <SoilGrid flowers={flowers} flowerTypeMap={flowerTypeMap} onFlowerPress={onFlowerPress} screenWidth={screenWidth} />
+      <FenceRow screenWidth={screenWidth} />
     </View>
   );
 });

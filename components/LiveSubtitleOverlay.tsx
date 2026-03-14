@@ -156,6 +156,24 @@ export default function LiveSubtitleOverlay({
 
   console.log('[LiveSubtitleOverlay] Render state:', { visible, isLoading, loadError, isPlaying, currentText, cuesCount: cues?.length, audioCurrentTime });
 
+  if (visible) {
+    return (
+      <View style={[forceOverlay ? styles.forceOverlayContainer : styles.container]}>
+        <View style={{ backgroundColor: 'rgba(255,0,0,0.8)', padding: 10, borderRadius: 8, maxWidth: '90%' }}>
+          <ScaledText size={12} weight="600" color="#FFFFFF" style={{ textAlign: 'center' as const }}>
+            {`URL: ${subtitleUrl ? subtitleUrl.substring(0, 60) + '...' : 'NULL'}\n` +
+             `Loading: ${isLoading}\n` +
+             `Error: ${loadError || 'none'}\n` +
+             `Cues: ${cues.length}\n` +
+             `Playing: ${isPlaying}\n` +
+             `Time: ${audioCurrentTime.toFixed(2)}\n` +
+             `Text: ${currentText || 'null'}`}
+          </ScaledText>
+        </View>
+      </View>
+    );
+  }
+
   if (!visible) {
     return null;
   }

@@ -151,6 +151,7 @@ function parseBracketedFormat(text: string): SubtitleCue[] {
 }
 
 export function parseVTT(vttText: string): SubtitleCue[] {
+  console.log('[vttParser] VERSION 2 - parseVTT called');
   const format = detectFormat(vttText);
   console.log('[vttParser] Detected format:', format, 'text length:', vttText.length);
 

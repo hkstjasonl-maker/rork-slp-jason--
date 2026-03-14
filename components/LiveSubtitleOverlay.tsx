@@ -165,6 +165,7 @@ export default function LiveSubtitleOverlay({
              `Loading: ${isLoading}\n` +
              `Error: ${loadError || 'none'}\n` +
              `Cues: ${cues.length}\n` +
+             `Cue0: ${cues.length > 0 ? cues[0].startTime + '-' + cues[0].endTime + ' "' + cues[0].text.substring(0, 20) + '"' : 'none'}\n` +
              `Playing: ${isPlaying}\n` +
              `Time: ${audioCurrentTime.toFixed(2)}\n` +
              `Text: ${currentText || 'null'}`}

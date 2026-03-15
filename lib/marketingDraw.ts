@@ -11,6 +11,7 @@ export interface MarketingCampaign {
   trigger_on_app_open: boolean;
   trigger_on_exercise_count: number | null;
   trigger_on_video_submit: boolean;
+  max_draws_per_day?: number | null;
 }
 
 export interface MarketingPrize {
@@ -76,25 +77,32 @@ export async function hasDrawnToday(
   patientId: string,
   campaignId: string
 ): Promise<boolean> {
+  const count = await countDrawsToday(patientId, campaignId);
+  return count > 0;
+}
+
+export async function countDrawsToday(
+  patientId: string,
+  campaignId: string
+): Promise<number> {
   try {
     const today = new Date();
     today.setHours(0, 0, 0, 0);
-    const { data, error } = await supabase
+    const { count, error } = await supabase
       .from('marketing_draw_log')
-      .select('id')
+      .select('*', { count: 'exact', head: true })
       .eq('patient_id', patientId)
       .eq('campaign_id', campaignId)
-      .gte('drawn_at', today.toISOString())
-      .limit(1);
+      .gte('drawn_at', today.toISOString());
 
     if (error) {
-      log('[MarketingDraw] Error checking draw log:', error);
-      return true;
+      log('[MarketingDraw] Error counting draw log:', error);
+      return 999;
     }
-    return (data || []).length > 0;
+    return count || 0;
   } catch (e) {
-    log('[MarketingDraw] Exception checking draw log:', e);
-    return true;
+    log('[MarketingDraw] Exception counting draw log:', e);
+    return 999;
   }
 }
 
@@ -239,11 +247,16 @@ export async function checkAndQueueCampaigns(
         }
       }
 
-      const alreadyDrawn = await hasDrawnToday(patientId, campaign.id);
-      if (alreadyDrawn) {
-        log('[MarketingDraw] Already drawn today for campaign:', campaign.id);
+      const drawsToday = await countDrawsToday(patientId, campaign.id);
+      const maxDraws = campaign.max_draws_per_day ?? 1;
+      const remainingDraws = Math.max(0, maxDraws - drawsToday);
+
+      if (remainingDraws <= 0) {
+        log('[MarketingDraw] Max draws reached today for campaign:', campaign.id, 'draws:', drawsToday, '/', maxDraws);
         continue;
       }
+
+      log('[MarketingDraw] Remaining draws for campaign:', campaign.id, '=', remainingDraws);
 
       const prizes = await fetchAvailablePrizes(campaign.id);
       if (prizes.length === 0) {
@@ -251,10 +264,11 @@ export async function checkAndQueueCampaigns(
         continue;
       }
 
-      const selectedPrize = selectWeightedPrize(prizes);
-      if (!selectedPrize) continue;
-
-      queued.push({ campaign, prize: selectedPrize });
+      for (let i = 0; i < remainingDraws; i++) {
+        const selectedPrize = selectWeightedPrize(prizes);
+        if (!selectedPrize) break;
+        queued.push({ campaign, prize: selectedPrize });
+      }
     }
 
     log('[MarketingDraw] Queued campaigns:', queued.length);

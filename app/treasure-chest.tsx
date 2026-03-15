@@ -1,4 +1,4 @@
-import React, { useEffect, useCallback, useMemo, useRef } from 'react';
+import React, { useEffect, useCallback, useMemo, useRef, useState } from 'react';
 import {
   View,
   ScrollView,
@@ -8,10 +8,13 @@ import {
   TouchableOpacity,
   Image,
   Animated,
+  Modal,
+  Dimensions,
+  Platform,
 } from 'react-native';
 import { Stack, useRouter } from 'expo-router';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { ChevronLeft, Gift, Copy, Eye, Clock } from 'lucide-react-native';
+import { ChevronLeft, Gift, Copy, Eye, Clock, X, Tag, Ticket, Award, MessageCircle, AlertTriangle } from 'lucide-react-native';
 import * as Clipboard from 'expo-clipboard';
 import * as Haptics from 'expo-haptics';
 
@@ -21,6 +24,8 @@ import { supabase } from '@/lib/supabase';
 import Colors from '@/constants/colors';
 import { log } from '@/lib/logger';
 
+const { width: SCREEN_WIDTH } = Dimensions.get('window');
+
 interface MarketingPrize {
   id: string;
   name_en: string;
@@ -29,6 +34,13 @@ interface MarketingPrize {
   description_zh: string | null;
   voucher_image_url: string | null;
   prize_type: string;
+  redeem_code?: string | null;
+  redeem_instructions_en?: string | null;
+  redeem_instructions_zh?: string | null;
+  gift_details_en?: string | null;
+  gift_details_zh?: string | null;
+  message_en?: string | null;
+  message_zh?: string | null;
 }
 
 interface PatientPrize {
@@ -44,11 +56,301 @@ interface PatientPrize {
   marketing_prizes?: MarketingPrize;
 }
 
+const PRIZE_TYPE_CONFIG: Record<string, { labelEn: string; labelZh: string; color: string; icon: 'tag' | 'ticket' | 'award' | 'gift' | 'message' }> = {
+  discount_code: { labelEn: 'Discount Code', labelZh: '折扣碼', color: '#E67E22', icon: 'tag' },
+  voucher: { labelEn: 'Voucher', labelZh: '優惠券', color: '#2196F3', icon: 'ticket' },
+  redeem_voucher: { labelEn: 'Redeem', labelZh: '兌換券', color: '#9C27B0', icon: 'award' },
+  gift: { labelEn: 'Gift', labelZh: '禮品', color: '#E91E63', icon: 'gift' },
+  message: { labelEn: 'Message', labelZh: '訊息', color: '#4CAF50', icon: 'message' },
+};
+
+function getPrizeTypeIcon(iconName: string, size: number, color: string) {
+  switch (iconName) {
+    case 'tag': return <Tag size={size} color={color} />;
+    case 'ticket': return <Ticket size={size} color={color} />;
+    case 'award': return <Award size={size} color={color} />;
+    case 'gift': return <Gift size={size} color={color} />;
+    case 'message': return <MessageCircle size={size} color={color} />;
+    default: return <Gift size={size} color={color} />;
+  }
+}
+
 function daysUntil(dateStr: string): number {
   const now = new Date();
   const expiry = new Date(dateStr);
   const diff = expiry.getTime() - now.getTime();
   return Math.max(0, Math.ceil(diff / (1000 * 60 * 60 * 24)));
+}
+
+function formatDate(dateStr: string, isZh: boolean): string {
+  const d = new Date(dateStr);
+  if (isZh) {
+    return `${d.getFullYear()}年${d.getMonth() + 1}月${d.getDate()}日`;
+  }
+  return d.toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' });
+}
+
+function PrizeDetailModal({
+  prize,
+  visible,
+  isZh,
+  onClose,
+  onCopyCode,
+}: {
+  prize: PatientPrize | null;
+  visible: boolean;
+  isZh: boolean;
+  onClose: () => void;
+  onCopyCode: (code: string) => void;
+}) {
+  const scaleAnim = useRef(new Animated.Value(0.85)).current;
+  const opacityAnim = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    if (visible) {
+      scaleAnim.setValue(0.85);
+      opacityAnim.setValue(0);
+      Animated.parallel([
+        Animated.spring(scaleAnim, {
+          toValue: 1,
+          friction: 7,
+          tension: 80,
+          useNativeDriver: true,
+        }),
+        Animated.timing(opacityAnim, {
+          toValue: 1,
+          duration: 250,
+          useNativeDriver: true,
+        }),
+      ]).start();
+    }
+  }, [visible, scaleAnim, opacityAnim]);
+
+  if (!visible || !prize) return null;
+
+  const mp = prize.marketing_prizes;
+  const prizeName = mp ? (isZh ? (mp.name_zh || mp.name_en) : mp.name_en) : '';
+  const prizeDesc = mp ? (isZh ? (mp.description_zh || mp.description_en) : mp.description_en) : null;
+  const prizeType = mp?.prize_type || 'gift';
+  const typeConfig = PRIZE_TYPE_CONFIG[prizeType] || PRIZE_TYPE_CONFIG.gift;
+  const isExpired = prize.is_expired || (prize.expiry_date && new Date(prize.expiry_date) < new Date());
+  const remaining = prize.expiry_date ? daysUntil(prize.expiry_date) : null;
+  const isExpiringSoon = remaining !== null && remaining <= 3 && !isExpired;
+
+  return (
+    <Modal
+      visible={visible}
+      transparent
+      animationType="none"
+      onRequestClose={onClose}
+      statusBarTranslucent
+    >
+      <Animated.View style={[detailStyles.overlay, { opacity: opacityAnim }]}>
+        <Animated.View style={[detailStyles.card, { transform: [{ scale: scaleAnim }] }]}>
+          <TouchableOpacity
+            style={detailStyles.closeBtn}
+            onPress={onClose}
+            activeOpacity={0.7}
+            hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
+            testID="prize-detail-close"
+          >
+            <X size={20} color="#999" />
+          </TouchableOpacity>
+
+          <ScrollView
+            contentContainerStyle={detailStyles.scrollContent}
+            showsVerticalScrollIndicator={false}
+            bounces={false}
+          >
+            {mp?.voucher_image_url ? (
+              <View style={detailStyles.imageContainer}>
+                <Image
+                  source={{ uri: mp.voucher_image_url }}
+                  style={detailStyles.prizeImage}
+                  resizeMode="contain"
+                />
+              </View>
+            ) : (
+              <View style={detailStyles.iconContainer}>
+                <View style={[detailStyles.iconCircle, { backgroundColor: typeConfig.color + '18' }]}>
+                  {getPrizeTypeIcon(typeConfig.icon, 40, typeConfig.color)}
+                </View>
+              </View>
+            )}
+
+            <ScaledText size={20} weight="bold" color={Colors.textPrimary} style={detailStyles.prizeName}>
+              {prizeName}
+            </ScaledText>
+
+            <View style={[detailStyles.typeBadge, { backgroundColor: typeConfig.color + '18' }]}>
+              {getPrizeTypeIcon(typeConfig.icon, 14, typeConfig.color)}
+              <ScaledText size={12} weight="700" color={typeConfig.color}>
+                {isZh ? typeConfig.labelZh : typeConfig.labelEn}
+              </ScaledText>
+            </View>
+
+            {isExpired && (
+              <View style={detailStyles.expiredBanner}>
+                <AlertTriangle size={14} color="#FFF" />
+                <ScaledText size={13} weight="600" color="#FFF">
+                  {isZh ? '此獎品已過期' : 'This prize has expired'}
+                </ScaledText>
+              </View>
+            )}
+
+            {isExpiringSoon && (
+              <View style={detailStyles.expiringSoonBanner}>
+                <Clock size={14} color="#E65100" />
+                <ScaledText size={13} weight="600" color="#E65100">
+                  {remaining === 0
+                    ? (isZh ? '今天過期！' : 'Expires today!')
+                    : isZh
+                      ? `${remaining}天後過期！`
+                      : `Expires in ${remaining} day${remaining > 1 ? 's' : ''}!`}
+                </ScaledText>
+              </View>
+            )}
+
+            {prizeType === 'discount_code' && prize.discount_code && (
+              <View style={detailStyles.codeSection}>
+                <ScaledText size={12} weight="600" color={Colors.textSecondary} style={detailStyles.codeSectionLabel}>
+                  {isZh ? '你的折扣碼' : 'Your Discount Code'}
+                </ScaledText>
+                <View style={detailStyles.codeDisplay}>
+                  <ScaledText size={24} weight="bold" color="#D4A017" style={detailStyles.codeText}>
+                    {prize.discount_code}
+                  </ScaledText>
+                </View>
+                {!isExpired && (
+                  <TouchableOpacity
+                    style={detailStyles.copyButton}
+                    onPress={() => onCopyCode(prize.discount_code!)}
+                    activeOpacity={0.75}
+                    testID="prize-detail-copy"
+                  >
+                    <Copy size={16} color="#FFF" />
+                    <ScaledText size={14} weight="600" color="#FFF">
+                      {isZh ? '複製代碼' : 'Copy Code'}
+                    </ScaledText>
+                  </TouchableOpacity>
+                )}
+              </View>
+            )}
+
+            {prizeType === 'voucher' && mp?.voucher_image_url && (
+              <View style={detailStyles.voucherSection}>
+                <Image
+                  source={{ uri: mp.voucher_image_url }}
+                  style={detailStyles.voucherFullImage}
+                  resizeMode="contain"
+                />
+                <ScaledText size={11} color={Colors.textSecondary} style={detailStyles.voucherHint}>
+                  {isZh ? '長按或截圖保存優惠券圖片' : 'Long press or screenshot to save voucher image'}
+                </ScaledText>
+              </View>
+            )}
+
+            {prizeType === 'redeem_voucher' && (
+              <View style={detailStyles.redeemSection}>
+                {(prize.discount_code || mp?.redeem_code) && (
+                  <>
+                    <ScaledText size={12} weight="600" color={Colors.textSecondary} style={detailStyles.codeSectionLabel}>
+                      {isZh ? '兌換碼' : 'Redeem Code'}
+                    </ScaledText>
+                    <View style={detailStyles.codeDisplay}>
+                      <ScaledText size={22} weight="bold" color="#9C27B0" style={detailStyles.codeText}>
+                        {prize.discount_code || mp?.redeem_code || ''}
+                      </ScaledText>
+                    </View>
+                    {!isExpired && (
+                      <TouchableOpacity
+                        style={[detailStyles.copyButton, { backgroundColor: '#9C27B0' }]}
+                        onPress={() => onCopyCode(prize.discount_code || mp?.redeem_code || '')}
+                        activeOpacity={0.75}
+                      >
+                        <Copy size={16} color="#FFF" />
+                        <ScaledText size={14} weight="600" color="#FFF">
+                          {isZh ? '複製兌換碼' : 'Copy Redeem Code'}
+                        </ScaledText>
+                      </TouchableOpacity>
+                    )}
+                  </>
+                )}
+                {(mp?.redeem_instructions_en || mp?.redeem_instructions_zh) && (
+                  <View style={detailStyles.instructionsBox}>
+                    <ScaledText size={13} color={Colors.textPrimary} style={detailStyles.instructionsText}>
+                      {isZh ? (mp?.redeem_instructions_zh || mp?.redeem_instructions_en || '') : (mp?.redeem_instructions_en || '')}
+                    </ScaledText>
+                  </View>
+                )}
+                {mp?.voucher_image_url && (
+                  <Image
+                    source={{ uri: mp.voucher_image_url }}
+                    style={detailStyles.redeemVoucherImage}
+                    resizeMode="contain"
+                  />
+                )}
+              </View>
+            )}
+
+            {prizeType === 'gift' && (
+              <View style={detailStyles.giftSection}>
+                {(mp?.gift_details_en || mp?.gift_details_zh) && (
+                  <View style={detailStyles.instructionsBox}>
+                    <ScaledText size={13} color={Colors.textPrimary} style={detailStyles.instructionsText}>
+                      {isZh ? (mp?.gift_details_zh || mp?.gift_details_en || '') : (mp?.gift_details_en || '')}
+                    </ScaledText>
+                  </View>
+                )}
+              </View>
+            )}
+
+            {prizeType === 'message' && (
+              <View style={detailStyles.messageSection}>
+                <View style={detailStyles.messageBox}>
+                  <ScaledText size={15} color={Colors.textPrimary} style={detailStyles.messageText}>
+                    {isZh ? (mp?.message_zh || mp?.message_en || '') : (mp?.message_en || '')}
+                  </ScaledText>
+                </View>
+              </View>
+            )}
+
+            {prizeDesc && (
+              <View style={detailStyles.descriptionSection}>
+                <ScaledText size={12} weight="600" color={Colors.textSecondary} style={detailStyles.descLabel}>
+                  {isZh ? '說明' : 'Description'}
+                </ScaledText>
+                <ScaledText size={13} color={Colors.textPrimary} style={detailStyles.descText}>
+                  {prizeDesc}
+                </ScaledText>
+              </View>
+            )}
+
+            <View style={detailStyles.metaSection}>
+              <View style={detailStyles.metaRow}>
+                <ScaledText size={11} color={Colors.textSecondary}>
+                  {isZh ? '獲得日期' : 'Won on'}
+                </ScaledText>
+                <ScaledText size={11} weight="600" color={Colors.textPrimary}>
+                  {formatDate(prize.won_at, isZh)}
+                </ScaledText>
+              </View>
+              {prize.expiry_date && (
+                <View style={detailStyles.metaRow}>
+                  <ScaledText size={11} color={Colors.textSecondary}>
+                    {isZh ? '到期日期' : 'Expires on'}
+                  </ScaledText>
+                  <ScaledText size={11} weight="600" color={isExpired ? Colors.error : isExpiringSoon ? '#E65100' : Colors.textPrimary}>
+                    {formatDate(prize.expiry_date, isZh)}
+                  </ScaledText>
+                </View>
+              )}
+            </View>
+          </ScrollView>
+        </Animated.View>
+      </Animated.View>
+    </Modal>
+  );
 }
 
 function PrizeCard({
@@ -129,7 +431,10 @@ function PrizeCard({
               </View>
               {!isExpired && (
                 <TouchableOpacity
-                  onPress={() => onCopyCode(prize.discount_code!)}
+                  onPress={(e) => {
+                    e.stopPropagation?.();
+                    onCopyCode(prize.discount_code!);
+                  }}
                   style={styles.copyBtn}
                   hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
                   testID={`copy-code-${prize.id}`}
@@ -179,6 +484,7 @@ export default function TreasureChestScreen() {
   const { patientId, language } = useApp();
   const router = useRouter();
   const queryClient = useQueryClient();
+  const [selectedPrize, setSelectedPrize] = useState<PatientPrize | null>(null);
 
   const isZh = language === 'zh_hant' || language === 'zh_hans';
 
@@ -242,16 +548,26 @@ export default function TreasureChestScreen() {
   }, [prizesQuery.data]);
 
   const handlePrizePress = useCallback((prize: PatientPrize) => {
+    log('[TreasureChest] Prize tapped:', prize.id);
     if (!prize.is_viewed) {
       markViewedMutation.mutate(prize.id);
     }
-    void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    setSelectedPrize(prize);
+    if (Platform.OS !== 'web') {
+      void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    }
   }, [markViewedMutation]);
+
+  const handleCloseDetail = useCallback(() => {
+    setSelectedPrize(null);
+  }, []);
 
   const handleCopyCode = useCallback(async (code: string) => {
     try {
       await Clipboard.setStringAsync(code);
-      void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      if (Platform.OS !== 'web') {
+        void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      }
       log('[TreasureChest] Code copied:', code);
     } catch (e) {
       log('[TreasureChest] Failed to copy code:', e);
@@ -365,9 +681,239 @@ export default function TreasureChestScreen() {
           </ScrollView>
         )}
       </SafeAreaView>
+
+      <PrizeDetailModal
+        prize={selectedPrize}
+        visible={!!selectedPrize}
+        isZh={isZh}
+        onClose={handleCloseDetail}
+        onCopyCode={handleCopyCode}
+      />
     </View>
   );
 }
+
+const detailStyles = StyleSheet.create({
+  overlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.55)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 20,
+  },
+  card: {
+    backgroundColor: '#FFF',
+    borderRadius: 24,
+    width: SCREEN_WIDTH - 40,
+    maxWidth: 400,
+    maxHeight: '88%',
+    overflow: 'hidden',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.2,
+    shadowRadius: 24,
+    elevation: 12,
+  },
+  closeBtn: {
+    position: 'absolute',
+    top: 14,
+    right: 14,
+    zIndex: 10,
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: '#F5F5F5',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  scrollContent: {
+    padding: 24,
+    paddingTop: 28,
+    alignItems: 'center',
+  },
+  imageContainer: {
+    width: '100%',
+    height: 140,
+    borderRadius: 16,
+    overflow: 'hidden',
+    backgroundColor: '#FFF8E7',
+    marginBottom: 16,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  prizeImage: {
+    width: '100%',
+    height: 140,
+  },
+  iconContainer: {
+    marginBottom: 16,
+    alignItems: 'center',
+  },
+  iconCircle: {
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  prizeName: {
+    textAlign: 'center',
+    marginBottom: 10,
+  },
+  typeBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingHorizontal: 14,
+    paddingVertical: 6,
+    borderRadius: 20,
+    marginBottom: 14,
+  },
+  expiredBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    backgroundColor: '#F44336',
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 10,
+    width: '100%',
+    marginBottom: 12,
+  },
+  expiringSoonBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    backgroundColor: '#FFF3E0',
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 10,
+    width: '100%',
+    marginBottom: 12,
+    borderWidth: 1,
+    borderColor: '#FFB74D',
+  },
+  codeSection: {
+    width: '100%',
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  codeSectionLabel: {
+    marginBottom: 8,
+    textTransform: 'uppercase' as const,
+    letterSpacing: 0.5,
+  },
+  codeDisplay: {
+    backgroundColor: '#FFF8E1',
+    borderWidth: 2,
+    borderColor: '#FFE082',
+    borderStyle: 'dashed',
+    borderRadius: 14,
+    paddingHorizontal: 24,
+    paddingVertical: 14,
+    width: '100%',
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  codeText: {
+    textAlign: 'center',
+    letterSpacing: 2,
+  },
+  copyButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    backgroundColor: '#E67E22',
+    paddingVertical: 12,
+    paddingHorizontal: 24,
+    borderRadius: 12,
+    width: '100%',
+  },
+  voucherSection: {
+    width: '100%',
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  voucherFullImage: {
+    width: '100%',
+    height: 200,
+    borderRadius: 12,
+  },
+  voucherHint: {
+    marginTop: 8,
+    textAlign: 'center',
+    fontStyle: 'italic',
+  },
+  redeemSection: {
+    width: '100%',
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  instructionsBox: {
+    width: '100%',
+    backgroundColor: '#F5F5F5',
+    borderRadius: 12,
+    padding: 14,
+    marginTop: 10,
+  },
+  instructionsText: {
+    lineHeight: 20,
+  },
+  redeemVoucherImage: {
+    width: '100%',
+    height: 160,
+    borderRadius: 12,
+    marginTop: 12,
+  },
+  giftSection: {
+    width: '100%',
+    marginBottom: 12,
+  },
+  messageSection: {
+    width: '100%',
+    marginBottom: 12,
+  },
+  messageBox: {
+    width: '100%',
+    backgroundColor: '#E8F5E9',
+    borderRadius: 14,
+    padding: 18,
+    borderLeftWidth: 4,
+    borderLeftColor: '#4CAF50',
+  },
+  messageText: {
+    lineHeight: 22,
+  },
+  descriptionSection: {
+    width: '100%',
+    marginBottom: 12,
+    paddingTop: 12,
+    borderTopWidth: 1,
+    borderTopColor: '#F0F0F0',
+  },
+  descLabel: {
+    marginBottom: 6,
+    textTransform: 'uppercase' as const,
+    letterSpacing: 0.5,
+  },
+  descText: {
+    lineHeight: 20,
+  },
+  metaSection: {
+    width: '100%',
+    marginTop: 4,
+    paddingTop: 12,
+    borderTopWidth: 1,
+    borderTopColor: '#F0F0F0',
+    gap: 6,
+  },
+  metaRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+});
 
 const styles = StyleSheet.create({
   root: {

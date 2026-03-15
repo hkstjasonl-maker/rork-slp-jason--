@@ -1,4 +1,4 @@
-import React, { useRef, useState, useCallback } from 'react';
+import React, { useRef, useState, useCallback, useEffect } from 'react';
 import {
   View,
   Text,
@@ -7,16 +7,16 @@ import {
   Animated,
   Image,
   GestureResponderEvent,
+  Platform,
 } from 'react-native';
+import * as Haptics from 'expo-haptics';
 
 const CARD_WIDTH = 280;
 const CARD_HEIGHT = 180;
-const COLS = 14;
-const ROWS = 9;
-const CELL_W = CARD_WIDTH / COLS;
-const CELL_H = CARD_HEIGHT / ROWS;
+const COLS = 8;
+const ROWS = 6;
 const TOTAL_CELLS = COLS * ROWS;
-const REVEAL_THRESHOLD = 0.6;
+const REVEAL_THRESHOLD = 0.55;
 
 interface ScratchCardProps {
   prizeImageUrl: string | null;
@@ -35,6 +35,61 @@ interface Sparkle {
   rotation: Animated.Value;
 }
 
+const MemoCell = React.memo(function MemoCell({
+  scratched,
+  cellW,
+  cellH,
+  isOdd,
+  baseColor,
+  altColor,
+  dotColor,
+  showDot,
+  fadeAnim,
+}: {
+  scratched: boolean;
+  cellW: number;
+  cellH: number;
+  isOdd: boolean;
+  baseColor: string;
+  altColor: string;
+  dotColor: string;
+  showDot: boolean;
+  fadeAnim: Animated.Value | null;
+}) {
+  if (scratched && fadeAnim) {
+    return (
+      <Animated.View
+        style={{
+          width: cellW,
+          height: cellH,
+          backgroundColor: isOdd ? baseColor : altColor,
+          alignItems: 'center' as const,
+          justifyContent: 'center' as const,
+          opacity: fadeAnim,
+        }}
+      />
+    );
+  }
+  if (scratched) {
+    return <View style={{ width: cellW, height: cellH, backgroundColor: 'transparent' }} />;
+  }
+  return (
+    <View
+      style={{
+        width: cellW,
+        height: cellH,
+        backgroundColor: isOdd ? baseColor : altColor,
+        alignItems: 'center' as const,
+        justifyContent: 'center' as const,
+      }}
+    >
+      {showDot && (
+        <View style={{ width: 3, height: 3, borderRadius: 1.5, backgroundColor: dotColor, opacity: 0.4 }} />
+      )}
+    </View>
+  );
+});
+
 export default function ScratchCard({
   prizeImageUrl,
   prizeText,
@@ -51,6 +106,13 @@ export default function ScratchCard({
   const coatingOpacity = useRef(new Animated.Value(1)).current;
   const prizeScale = useRef(new Animated.Value(0.8)).current;
   const prizeOpacity = useRef(new Animated.Value(0)).current;
+  const lastHapticTime = useRef<number>(0);
+  const lastUpdateTime = useRef<number>(0);
+  const pendingUpdate = useRef<boolean>(false);
+
+  const cellFadeAnims = useRef<(Animated.Value | null)[]>(
+    new Array(TOTAL_CELLS).fill(null)
+  ).current;
 
   const spawnSparkles = useCallback(() => {
     const newSparkles: Sparkle[] = [];
@@ -92,9 +154,34 @@ export default function ScratchCard({
   }, []);
 
   const triggerReveal = useCallback(() => {
+    if (Platform.OS !== 'web') {
+      void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    }
+
+    const unrevealed: number[] = [];
+    cellsRef.current.forEach((scratched, idx) => {
+      if (!scratched) unrevealed.push(idx);
+    });
+
+    unrevealed.forEach((idx, i) => {
+      const fadeVal = new Animated.Value(1);
+      cellFadeAnims[idx] = fadeVal;
+      Animated.timing(fadeVal, {
+        toValue: 0,
+        duration: 200,
+        delay: i * 8,
+        useNativeDriver: true,
+      }).start();
+    });
+
+    const allTrue = new Array(TOTAL_CELLS).fill(true);
+    cellsRef.current = allTrue;
+    setCells(allTrue);
+
     Animated.timing(coatingOpacity, {
       toValue: 0,
       duration: 400,
+      delay: unrevealed.length * 4,
       useNativeDriver: true,
     }).start(() => {
       setRevealed(true);
@@ -116,7 +203,20 @@ export default function ScratchCard({
 
     spawnSparkles();
     onRevealed();
-  }, [onRevealed, coatingOpacity, prizeScale, prizeOpacity, spawnSparkles]);
+  }, [onRevealed, coatingOpacity, prizeScale, prizeOpacity, spawnSparkles, cellFadeAnims]);
+
+  const flushUpdate = useCallback(() => {
+    if (!pendingUpdate.current) return;
+    pendingUpdate.current = false;
+    const snapshot = [...cellsRef.current];
+    setCells(snapshot);
+
+    const scratched = snapshot.filter(Boolean).length;
+    if (scratched / TOTAL_CELLS >= REVEAL_THRESHOLD && !revealedRef.current) {
+      revealedRef.current = true;
+      triggerReveal();
+    }
+  }, [triggerReveal]);
 
   const handleTouch = useCallback((evt: GestureResponderEvent) => {
     if (revealedRef.current) return;
@@ -129,7 +229,7 @@ export default function ScratchCard({
     const col = Math.floor(touchX / cellW);
     const row = Math.floor(touchY / cellH);
 
-    const updated = [...cellsRef.current];
+    const updated = cellsRef.current;
     let changed = false;
 
     for (let r = row - 1; r <= row + 1; r++) {
@@ -145,16 +245,28 @@ export default function ScratchCard({
     }
 
     if (changed) {
-      cellsRef.current = updated;
-      setCells(updated);
+      const now = Date.now();
+      if (Platform.OS !== 'web' && now - lastHapticTime.current > 80) {
+        lastHapticTime.current = now;
+        void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+      }
 
-      const scratched = updated.filter(Boolean).length;
-      if (scratched / TOTAL_CELLS >= REVEAL_THRESHOLD) {
-        revealedRef.current = true;
-        triggerReveal();
+      pendingUpdate.current = true;
+      if (now - lastUpdateTime.current > 50) {
+        lastUpdateTime.current = now;
+        flushUpdate();
+      } else if (!pendingUpdate.current) {
+        requestAnimationFrame(flushUpdate);
       }
     }
-  }, [layout, triggerReveal]);
+  }, [layout, flushUpdate]);
+
+  useEffect(() => {
+    if (pendingUpdate.current) {
+      const raf = requestAnimationFrame(flushUpdate);
+      return () => cancelAnimationFrame(raf);
+    }
+  });
 
   const handleTouchRef = useRef(handleTouch);
   handleTouchRef.current = handleTouch;
@@ -169,10 +281,18 @@ export default function ScratchCard({
       onPanResponderMove: (evt: GestureResponderEvent) => {
         handleTouchRef.current(evt);
       },
+      onPanResponderRelease: () => {
+        if (pendingUpdate.current) {
+          flushUpdate();
+        }
+      },
     })
   ).current;
 
   const darkerScratch = adjustColor(scratchColor, -15);
+  const dotColor = adjustColor(scratchColor, 20);
+  const cellW = layout.width / COLS;
+  const cellH = layout.height / ROWS;
 
   return (
     <View
@@ -215,31 +335,20 @@ export default function ScratchCard({
                 {Array.from({ length: COLS }).map((_, col) => {
                   const idx = row * COLS + col;
                   const isOdd = (row + col) % 2 === 0;
+                  const showDot = !cells[idx] && (row + col) % 3 === 0;
                   return (
-                    <View
+                    <MemoCell
                       key={col}
-                      style={[
-                        styles.cell,
-                        {
-                          width: CELL_W,
-                          height: CELL_H,
-                          backgroundColor: cells[idx]
-                            ? 'transparent'
-                            : isOdd
-                            ? scratchColor
-                            : darkerScratch,
-                        },
-                      ]}
-                    >
-                      {!cells[idx] && (row + col) % 3 === 0 && (
-                        <View
-                          style={[
-                            styles.dot,
-                            { backgroundColor: adjustColor(scratchColor, 20) },
-                          ]}
-                        />
-                      )}
-                    </View>
+                      scratched={cells[idx]}
+                      cellW={cellW}
+                      cellH={cellH}
+                      isOdd={isOdd}
+                      baseColor={scratchColor}
+                      altColor={darkerScratch}
+                      dotColor={dotColor}
+                      showDot={showDot}
+                      fadeAnim={cellFadeAnims[idx]}
+                    />
                   );
                 })}
               </View>
@@ -357,16 +466,6 @@ const styles = StyleSheet.create({
   },
   cellRow: {
     flexDirection: 'row' as const,
-  },
-  cell: {
-    alignItems: 'center' as const,
-    justifyContent: 'center' as const,
-  },
-  dot: {
-    width: 3,
-    height: 3,
-    borderRadius: 1.5,
-    opacity: 0.4,
   },
   scratchTextContainer: {
     ...StyleSheet.absoluteFillObject,

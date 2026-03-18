@@ -23,6 +23,7 @@ import Colors from '@/constants/colors';
 import { TherapistImage } from '@/components/TherapistImage';
 import { Exercise, ExerciseProgram, ExerciseLog, Language, ExerciseReviewRequirement, FeedingSkillAssignment, ProgramObjective, ProgramSchedule } from '@/types';
 import { getDosageProgressText, getExerciseDosage } from '@/lib/dosage';
+import { getLocalizedField } from '@/constants/i18n';
 import { log } from '@/lib/logger';
 import {
   fetchAllReviewRequirements,
@@ -87,12 +88,7 @@ function getCategoryIcon(category: string): string {
 }
 
 function getExerciseTitle(exercise: Exercise, language: Language | null): string {
-  const lang = language || 'en';
-  switch (lang) {
-    case 'zh_hant': return exercise.title_zh_hant || exercise.title_en;
-    case 'zh_hans': return exercise.title_zh_hans || exercise.title_en;
-    default: return exercise.title_en;
-  }
+  return getLocalizedField(exercise, 'title', language || 'en');
 }
 
 function formatDate(dateStr: string): string {

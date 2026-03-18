@@ -19,6 +19,7 @@ import { CopyrightFooter } from '@/components/CopyrightFooter';
 import Colors from '@/constants/colors';
 import { JASON_PHOTO } from '@/constants/images';
 import { FontSizeLevel, SubtitleSizeLevel, Language } from '@/types';
+import { ENABLED_LANGUAGES } from '@/constants/i18n';
 import {
   Type,
   Globe,
@@ -47,11 +48,10 @@ const FONT_SIZE_OPTIONS: { key: FontSizeLevel; labelKey: string }[] = [
   { key: 'extraLarge', labelKey: 'fontExtraLarge' },
 ];
 
-const LANGUAGE_OPTIONS: { key: Language; label: string }[] = [
-  { key: 'zh_hant', label: '繁體中文' },
-  { key: 'zh_hans', label: '简体中文' },
-  { key: 'en', label: 'English' },
-];
+const LANGUAGE_OPTIONS: { key: Language; label: string }[] = ENABLED_LANGUAGES.map(l => ({
+  key: l.code as Language,
+  label: l.nativeLabel,
+}));
 
 const SUBTITLE_SIZE_OPTIONS: { key: SubtitleSizeLevel; labelKey: string }[] = [
   { key: 'small', labelKey: 'subtitleSmall' },

@@ -1,5 +1,30 @@
 import { Language } from '@/types';
 
+export const ALL_LANGUAGES = [
+  { code: 'en' as const, label: 'English', nativeLabel: 'English', enabled: true },
+  { code: 'zh_hant' as const, label: 'Traditional Chinese', nativeLabel: '繁體中文', enabled: true },
+  { code: 'zh_hans' as const, label: 'Simplified Chinese', nativeLabel: '简体中文', enabled: true },
+  { code: 'th' as const, label: 'Thai', nativeLabel: 'ไทย', enabled: false },
+  { code: 'id' as const, label: 'Indonesian', nativeLabel: 'Bahasa Indonesia', enabled: false },
+  { code: 'tl' as const, label: 'Tagalog', nativeLabel: 'Tagalog', enabled: false },
+  { code: 'fil' as const, label: 'Filipino', nativeLabel: 'Filipino', enabled: false },
+  { code: 'ja' as const, label: 'Japanese', nativeLabel: '日本語', enabled: false },
+  { code: 'ko' as const, label: 'Korean', nativeLabel: '한국어', enabled: false },
+  { code: 'es' as const, label: 'Spanish', nativeLabel: 'Español', enabled: false },
+  { code: 'vi' as const, label: 'Vietnamese', nativeLabel: 'Tiếng Việt', enabled: false },
+] as const;
+
+// TODO: Fetch enabled_languages from app_config table to allow dynamic language enabling
+export const ENABLED_LANGUAGES = ALL_LANGUAGES.filter(l => l.enabled);
+
+export function getLocalizedField(obj: any, fieldPrefix: string, lang: string): string {
+  const exact = obj?.[`${fieldPrefix}_${lang}`];
+  if (exact) return exact;
+  if (lang === 'zh_hant') return obj?.[`${fieldPrefix}_zh_hans`] || obj?.[`${fieldPrefix}_en`] || '';
+  if (lang === 'zh_hans') return obj?.[`${fieldPrefix}_zh_hant`] || obj?.[`${fieldPrefix}_en`] || '';
+  return obj?.[`${fieldPrefix}_en`] || '';
+}
+
 const translations: Record<Language, Record<string, string>> = {
   en: {
     appName: 'ST Jason',

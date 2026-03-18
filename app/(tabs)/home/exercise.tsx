@@ -38,6 +38,7 @@ import { VideoProtectionOverlay } from '@/components/VideoProtectionOverlay';
 import { supabase } from '@/lib/supabase';
 import { getStarsForSession, calculateStars, calculateStarsAndFires } from '@/lib/stars';
 import { getExerciseDosage } from '@/lib/dosage';
+import { getLocalizedField } from '@/constants/i18n';
 import Colors from '@/constants/colors';
 import { TherapistImage } from '@/components/TherapistImage';
 import { Exercise, ExerciseLog, Language, ExerciseReviewRequirement } from '@/types';
@@ -69,48 +70,19 @@ function getNarrativeAudioId(exercise: Exercise, language: Language | null): str
 }
 
 function getAudioInstructionUrl(exercise: Exercise, language: Language | null): string | null {
-  const lang = language || 'en';
-  switch (lang) {
-    case 'zh_hant':
-      return exercise.audio_instruction_url_zh_hant || exercise.audio_instruction_url_zh_hans || exercise.audio_instruction_url_en || null;
-    case 'zh_hans':
-      return exercise.audio_instruction_url_zh_hans || exercise.audio_instruction_url_zh_hant || exercise.audio_instruction_url_en || null;
-    default:
-      return exercise.audio_instruction_url_en || exercise.audio_instruction_url_zh_hant || exercise.audio_instruction_url_zh_hans || null;
-  }
+  return getLocalizedField(exercise, 'audio_instruction_url', language || 'en') || null;
 }
 
 function getSubtitleUrl(exercise: Exercise, language: Language | null): string | null {
-  const lang = language || 'en';
-  switch (lang) {
-    case 'zh_hant':
-      return exercise.subtitle_url_zh_hant || exercise.subtitle_url_zh_hans || exercise.subtitle_url_en || null;
-    case 'zh_hans':
-      return exercise.subtitle_url_zh_hans || exercise.subtitle_url_zh_hant || exercise.subtitle_url_en || null;
-    default:
-      return exercise.subtitle_url_en || exercise.subtitle_url_zh_hant || exercise.subtitle_url_zh_hans || null;
-  }
+  return getLocalizedField(exercise, 'subtitle_url', language || 'en') || null;
 }
 
 function getAudioTranscript(exercise: Exercise, language: Language | null): string | null {
-  const lang = language || 'en';
-  switch (lang) {
-    case 'zh_hant':
-      return exercise.audio_transcript_zh_hant || exercise.audio_transcript_zh_hans || exercise.audio_transcript_en || null;
-    case 'zh_hans':
-      return exercise.audio_transcript_zh_hans || exercise.audio_transcript_zh_hant || exercise.audio_transcript_en || null;
-    default:
-      return exercise.audio_transcript_en || exercise.audio_transcript_zh_hant || exercise.audio_transcript_zh_hans || null;
-  }
+  return getLocalizedField(exercise, 'audio_transcript', language || 'en') || null;
 }
 
 function getExerciseTitle(exercise: Exercise, language: Language | null): string {
-  const lang = language || 'en';
-  switch (lang) {
-    case 'zh_hant': return exercise.title_zh_hant || exercise.title_en;
-    case 'zh_hans': return exercise.title_zh_hans || exercise.title_en;
-    default: return exercise.title_en;
-  }
+  return getLocalizedField(exercise, 'title', language || 'en');
 }
 
 function formatElapsed(seconds: number): string {

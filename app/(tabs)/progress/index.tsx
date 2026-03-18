@@ -18,19 +18,15 @@ import { supabase } from '@/lib/supabase';
 import { calculateStars } from '@/lib/stars';
 import { fetchExerciseCompliance } from '@/lib/analytics';
 import Colors from '@/constants/colors';
+import { getLocalizedField } from '@/constants/i18n';
 import { useRouter } from 'expo-router';
 import { ExerciseLog, ExerciseProgram, Language } from '@/types';
 import { log } from '@/lib/logger';
 import { TrendingUp, Calendar, Award, Zap, CheckCircle2, Star, Flame, Trophy, Activity, ClipboardCheck, ThumbsUp, Gauge, Info, ChevronDown, ChevronUp, Flower2 } from 'lucide-react-native';
 
 function getLogTitle(log: ExerciseLog, language: Language | null): string {
-  const lang = language || 'en';
   if (!log.exercises) return '-';
-  switch (lang) {
-    case 'zh_hant': return log.exercises.title_zh_hant || log.exercises.title_en;
-    case 'zh_hans': return log.exercises.title_zh_hans || log.exercises.title_en;
-    default: return log.exercises.title_en;
-  }
+  return getLocalizedField(log.exercises, 'title', language || 'en');
 }
 
 function formatDateShort(dateStr: string): string {

@@ -1103,28 +1103,24 @@ export default function HomeScreen() {
                   return e.dosage_per_day ? count >= e.dosage_per_day : count > 0;
                 }).length;
                 const progObjectives = objectives.filter(o => o.program_id === prog.id);
-                const allDone = progCompletedCount === progExercises.length && progExercises.length > 0;
 
                 return (
                   <View key={prog.id} style={styles.programCardSection}>
                     <TouchableOpacity
                       style={[
                         styles.programCardHeader,
-                        allDone && styles.programCardHeaderDone,
+                        progCompletedCount === progExercises.length && progExercises.length > 0 && styles.programCardHeaderDone,
                       ]}
                       onPress={() => toggleProgramExpanded(prog.id)}
                       activeOpacity={0.7}
                       testID={`program-card-${prog.id}`}
                     >
-                      <View style={styles.programCardAccentBar}>
-                        <View style={{ width: 4, height: '100%' as unknown as number, backgroundColor: allDone ? Colors.success : Colors.primary, borderRadius: 2 }} />
-                      </View>
                       <View style={styles.programCardHeaderLeft}>
-                        <View style={[styles.programCardIcon, allDone && { backgroundColor: Colors.successLight }]}>
-                          <Layers size={16} color={allDone ? Colors.success : Colors.primary} />
+                        <View style={[styles.programCardIcon, progCompletedCount === progExercises.length && progExercises.length > 0 ? { backgroundColor: Colors.successLight } : {}]}>
+                          <Layers size={16} color={progCompletedCount === progExercises.length && progExercises.length > 0 ? Colors.success : Colors.primary} />
                         </View>
                         <View style={styles.programCardTitleBlock}>
-                          <ScaledText size={15} weight="bold" color={allDone ? Colors.success : Colors.textPrimary} numberOfLines={2}>
+                          <ScaledText size={15} weight="bold" color={progCompletedCount === progExercises.length && progExercises.length > 0 ? Colors.success : Colors.textPrimary} numberOfLines={2}>
                             {getProgramName(prog)}
                           </ScaledText>
                           <View style={styles.programCardMeta}>
@@ -2248,30 +2244,26 @@ const styles = StyleSheet.create({
   },
   programCardSection: {
     marginBottom: 12,
-    backgroundColor: Colors.card,
-    borderRadius: 16,
-    borderWidth: 1,
-    borderColor: Colors.border,
-    overflow: 'hidden' as const,
   },
   programCardHeader: {
-    borderRadius: 0,
+    backgroundColor: Colors.card,
+    borderRadius: 14,
     paddingVertical: 12,
     paddingHorizontal: 14,
-    paddingLeft: 10,
     flexDirection: 'row' as const,
     alignItems: 'center' as const,
     justifyContent: 'space-between' as const,
-    borderBottomWidth: 1,
-    borderBottomColor: Colors.border,
+    borderWidth: 1,
+    borderColor: Colors.border,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 4,
+    elevation: 2,
   },
   programCardHeaderDone: {
     borderColor: Colors.success,
     backgroundColor: Colors.successLight,
-  },
-  programCardAccentBar: {
-    marginRight: 6,
-    alignSelf: 'stretch' as const,
   },
   programCardHeaderLeft: {
     flexDirection: 'row' as const,
@@ -2326,8 +2318,6 @@ const styles = StyleSheet.create({
   programCardBody: {
     paddingTop: 8,
     paddingLeft: 8,
-    paddingRight: 4,
-    paddingBottom: 8,
   },
 
   programRemarksCard: {

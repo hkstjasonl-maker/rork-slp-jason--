@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState, useCallback } from 'react';
+import React, { useEffect, useRef, useState, useCallback, useMemo } from 'react';
 import {
   View,
   StyleSheet,
@@ -16,6 +16,7 @@ import { Stack, useRouter } from 'expo-router';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { ChevronLeft, Sparkles } from 'lucide-react-native';
 import * as Haptics from 'expo-haptics';
+import { LinearGradient } from 'expo-linear-gradient';
 
 import { useApp } from '@/contexts/AppContext';
 import { ScaledText } from '@/components/ScaledText';
@@ -23,7 +24,7 @@ import { supabase } from '@/lib/supabase';
 import Colors from '@/constants/colors';
 import { log } from '@/lib/logger';
 
-const { width: SCREEN_WIDTH } = Dimensions.get('window');
+const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 
 const RARITY_CAPSULE_COLORS: Record<string, string> = {
   common: '#F48FB1',
@@ -81,6 +82,357 @@ type DrawPhase =
   | 'done'
   | 'waiting_second'
   | 'complete';
+
+const FLAG_COLORS = ['#FF4D6D', '#4CC9F0', '#7209B7', '#F72585', '#4361EE', '#3A0CA3', '#FFD166', '#06D6A0', '#FF4D6D', '#4CC9F0'] as const;
+const CONFETTI_COLORS = ['#FF4D6D', '#4CC9F0', '#FFD166', '#7209B7', '#06D6A0', '#F72585', '#FF8E53'] as const;
+const LIGHT_COLORS = ['#FFF8E7', '#FFD166', '#FFB4C2', '#B8E0FF'] as const;
+
+interface FairyLight {
+  x: number;
+  y: number;
+  color: string;
+  opacity: Animated.Value;
+}
+
+interface ConfettiPiece {
+  startX: number;
+  width: number;
+  height: number;
+  color: string;
+  translateY: Animated.Value;
+  translateX: Animated.Value;
+  rotate: Animated.Value;
+  opacity: Animated.Value;
+}
+
+interface PennantFlag {
+  color: string;
+  rotation: Animated.Value;
+}
+
+function useCarnivalAnimations() {
+  const flagsRow1 = useRef<PennantFlag[]>(
+    FLAG_COLORS.map((color) => ({
+      color,
+      rotation: new Animated.Value(0),
+    }))
+  ).current;
+
+  const flagsRow2 = useRef<PennantFlag[]>(
+    FLAG_COLORS.slice(0, 7).map((color) => ({
+      color,
+      rotation: new Animated.Value(0),
+    }))
+  ).current;
+
+  const fairyLights = useRef<FairyLight[]>(
+    Array.from({ length: 18 }, (_, i) => {
+      const side = i < 9 ? 'left' : 'right';
+      const idx = i < 9 ? i : i - 9;
+      return {
+        x: side === 'left' ? 10 + Math.random() * 25 : 65 + Math.random() * 25,
+        y: 12 + idx * 9 + Math.random() * 5,
+        color: LIGHT_COLORS[i % LIGHT_COLORS.length],
+        opacity: new Animated.Value(0.3 + Math.random() * 0.7),
+      };
+    })
+  ).current;
+
+  const confetti = useRef<ConfettiPiece[]>(
+    Array.from({ length: 14 }, (_, i) => ({
+      startX: Math.random() * 100,
+      width: 4 + Math.random() * 4,
+      height: 8 + Math.random() * 6,
+      color: CONFETTI_COLORS[i % CONFETTI_COLORS.length],
+      translateY: new Animated.Value(-20),
+      translateX: new Animated.Value(0),
+      rotate: new Animated.Value(0),
+      opacity: new Animated.Value(0.7 + Math.random() * 0.3),
+    }))
+  ).current;
+
+  const groundGlowOpacity = useRef(new Animated.Value(0.12)).current;
+
+  useEffect(() => {
+    const animations: Animated.CompositeAnimation[] = [];
+
+    flagsRow1.forEach((flag, index) => {
+      const anim = Animated.loop(
+        Animated.sequence([
+          Animated.timing(flag.rotation, { toValue: 1, duration: 1200 + index * 100, easing: Easing.inOut(Easing.sin), useNativeDriver: true }),
+          Animated.timing(flag.rotation, { toValue: -1, duration: 1200 + index * 100, easing: Easing.inOut(Easing.sin), useNativeDriver: true }),
+        ])
+      );
+      animations.push(anim);
+      anim.start();
+    });
+
+    flagsRow2.forEach((flag, index) => {
+      const anim = Animated.loop(
+        Animated.sequence([
+          Animated.timing(flag.rotation, { toValue: -1, duration: 1300 + index * 120, easing: Easing.inOut(Easing.sin), useNativeDriver: true }),
+          Animated.timing(flag.rotation, { toValue: 1, duration: 1300 + index * 120, easing: Easing.inOut(Easing.sin), useNativeDriver: true }),
+        ])
+      );
+      animations.push(anim);
+      anim.start();
+    });
+
+    fairyLights.forEach((light) => {
+      const dur = 600 + Math.random() * 400;
+      const anim = Animated.loop(
+        Animated.sequence([
+          Animated.timing(light.opacity, { toValue: 1, duration: dur, useNativeDriver: true }),
+          Animated.timing(light.opacity, { toValue: 0.2, duration: dur, useNativeDriver: true }),
+        ])
+      );
+      animations.push(anim);
+      anim.start();
+    });
+
+    confetti.forEach((piece) => {
+      const fallDuration = 6000 + Math.random() * 4000;
+      const swayAmount = 15 + Math.random() * 20;
+      const anim = Animated.loop(
+        Animated.parallel([
+          Animated.timing(piece.translateY, { toValue: SCREEN_HEIGHT + 40, duration: fallDuration, easing: Easing.linear, useNativeDriver: true }),
+          Animated.loop(
+            Animated.sequence([
+              Animated.timing(piece.translateX, { toValue: swayAmount, duration: fallDuration / 4, easing: Easing.inOut(Easing.sin), useNativeDriver: true }),
+              Animated.timing(piece.translateX, { toValue: -swayAmount, duration: fallDuration / 4, easing: Easing.inOut(Easing.sin), useNativeDriver: true }),
+            ])
+          ),
+          Animated.timing(piece.rotate, { toValue: 1, duration: fallDuration, easing: Easing.linear, useNativeDriver: true }),
+        ])
+      );
+      animations.push(anim);
+      anim.start();
+    });
+
+    const glowAnim = Animated.loop(
+      Animated.sequence([
+        Animated.timing(groundGlowOpacity, { toValue: 0.2, duration: 3000, easing: Easing.inOut(Easing.sin), useNativeDriver: true }),
+        Animated.timing(groundGlowOpacity, { toValue: 0.1, duration: 3000, easing: Easing.inOut(Easing.sin), useNativeDriver: true }),
+      ])
+    );
+    animations.push(glowAnim);
+    glowAnim.start();
+
+    return () => {
+      animations.forEach((a) => a.stop());
+    };
+  }, [flagsRow1, flagsRow2, fairyLights, confetti, groundGlowOpacity]);
+
+  return { flagsRow1, flagsRow2, fairyLights, confetti, groundGlowOpacity };
+}
+
+const PennantFlagView = React.memo(function PennantFlagView({ flag, size }: { flag: PennantFlag; size: number }) {
+  const rotateStr = flag.rotation.interpolate({
+    inputRange: [-1, 0, 1],
+    outputRange: ['-5deg', '0deg', '5deg'],
+  });
+  return (
+    <Animated.View style={{ transform: [{ rotate: rotateStr }] }}>
+      <View
+        style={{
+          width: 0,
+          height: 0,
+          borderLeftWidth: size / 2,
+          borderRightWidth: size / 2,
+          borderTopWidth: size,
+          borderLeftColor: 'transparent',
+          borderRightColor: 'transparent',
+          borderTopColor: flag.color,
+        }}
+      />
+    </Animated.View>
+  );
+});
+
+function CarnivalBackground() {
+  const { flagsRow1, flagsRow2, fairyLights, confetti, groundGlowOpacity } = useCarnivalAnimations();
+
+  const flagSpacing1 = useMemo(() => (SCREEN_WIDTH - 20) / flagsRow1.length, [flagsRow1.length]);
+  const flagSpacing2 = useMemo(() => (SCREEN_WIDTH - 40) / flagsRow2.length, [flagsRow2.length]);
+
+  return (
+    <View style={carnivalStyles.container} pointerEvents="none">
+      <LinearGradient
+        colors={['#FF6B35', '#FF8E53', '#FFC857', '#FFE4A0', '#FFECD2']}
+        style={StyleSheet.absoluteFillObject}
+      />
+
+      {/* Ground glow */}
+      <Animated.View style={[carnivalStyles.groundGlow, { opacity: groundGlowOpacity }]} />
+
+      {/* Confetti */}
+      {confetti.map((piece, i) => {
+        const rotateStr = piece.rotate.interpolate({
+          inputRange: [0, 1],
+          outputRange: ['0deg', '360deg'],
+        });
+        return (
+          <Animated.View
+            key={`confetti-${i}`}
+            style={{
+              position: 'absolute',
+              left: `${piece.startX}%` as unknown as number,
+              top: 0,
+              width: piece.width,
+              height: piece.height,
+              borderRadius: 1,
+              backgroundColor: piece.color,
+              opacity: piece.opacity,
+              transform: [
+                { translateY: piece.translateY },
+                { translateX: piece.translateX },
+                { rotate: rotateStr },
+              ],
+            }}
+          />
+        );
+      })}
+
+      {/* Carnival poles */}
+      <View style={carnivalStyles.poleLeft}>
+        <View style={carnivalStyles.poleCap} />
+        <View style={carnivalStyles.poleBar} />
+      </View>
+      <View style={carnivalStyles.poleRight}>
+        <View style={carnivalStyles.poleCap} />
+        <View style={carnivalStyles.poleBar} />
+      </View>
+
+      {/* Fairy lights */}
+      {fairyLights.map((light, i) => (
+        <Animated.View
+          key={`light-${i}`}
+          style={{
+            position: 'absolute',
+            left: `${light.x}%` as unknown as number,
+            top: `${light.y}%` as unknown as number,
+            opacity: light.opacity,
+            alignItems: 'center',
+            justifyContent: 'center',
+          }}
+        >
+          <View style={[carnivalStyles.lightGlow, { backgroundColor: light.color }]} />
+          <View style={[carnivalStyles.lightDot, { backgroundColor: light.color }]} />
+        </Animated.View>
+      ))}
+
+      {/* Bunting row 1 */}
+      <View style={carnivalStyles.buntingRow1}>
+        <View style={carnivalStyles.buntingLine} />
+        <View style={carnivalStyles.flagsContainer}>
+          {flagsRow1.map((flag, i) => (
+            <View key={`flag1-${i}`} style={{ width: flagSpacing1, alignItems: 'center' }}>
+              <PennantFlagView flag={flag} size={18} />
+            </View>
+          ))}
+        </View>
+      </View>
+
+      {/* Bunting row 2 */}
+      <View style={carnivalStyles.buntingRow2}>
+        <View style={carnivalStyles.buntingLine2} />
+        <View style={carnivalStyles.flagsContainer}>
+          {flagsRow2.map((flag, i) => (
+            <View key={`flag2-${i}`} style={{ width: flagSpacing2, alignItems: 'center' }}>
+              <PennantFlagView flag={flag} size={13} />
+            </View>
+          ))}
+        </View>
+      </View>
+    </View>
+  );
+}
+
+const carnivalStyles = StyleSheet.create({
+  container: {
+    ...StyleSheet.absoluteFillObject,
+    overflow: 'hidden',
+  },
+  groundGlow: {
+    position: 'absolute',
+    bottom: -20,
+    left: -30,
+    right: -30,
+    height: 100,
+    backgroundColor: '#FFD166',
+    borderRadius: 100,
+  },
+  poleLeft: {
+    position: 'absolute',
+    left: 8,
+    top: 50,
+    alignItems: 'center',
+  },
+  poleRight: {
+    position: 'absolute',
+    right: 8,
+    top: 50,
+    alignItems: 'center',
+  },
+  poleCap: {
+    width: 16,
+    height: 16,
+    borderRadius: 8,
+    backgroundColor: '#FFD166',
+  },
+  poleBar: {
+    width: 6,
+    height: SCREEN_HEIGHT * 0.55,
+    backgroundColor: '#C9184A',
+    borderRadius: 3,
+  },
+  lightGlow: {
+    position: 'absolute',
+    width: 14,
+    height: 14,
+    borderRadius: 7,
+    opacity: 0.25,
+  },
+  lightDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+  },
+  buntingRow1: {
+    position: 'absolute',
+    top: 44,
+    left: 10,
+    right: 10,
+  },
+  buntingRow2: {
+    position: 'absolute',
+    top: 70,
+    left: 20,
+    right: 20,
+  },
+  buntingLine: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    height: 2,
+    backgroundColor: '#FFD166',
+    borderRadius: 1,
+  },
+  buntingLine2: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    height: 1.5,
+    backgroundColor: 'rgba(255,209,102,0.6)',
+    borderRadius: 1,
+  },
+  flagsContainer: {
+    flexDirection: 'row',
+    marginTop: 2,
+  },
+});
 
 const GRID_COLS = 4;
 const GRID_ROWS = 5;
@@ -826,6 +1178,7 @@ export default function GachaDrawScreen() {
   return (
     <View style={styles.root}>
       <Stack.Screen options={{ headerShown: false }} />
+      <CarnivalBackground />
       <SafeAreaView style={styles.safeArea}>
         <View style={styles.header}>
           <TouchableOpacity
@@ -1011,7 +1364,7 @@ export default function GachaDrawScreen() {
 const styles = StyleSheet.create({
   root: {
     flex: 1,
-    backgroundColor: '#FFF5F0',
+    backgroundColor: '#FF6B35',
   },
   safeArea: {
     flex: 1,
@@ -1021,17 +1374,18 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingHorizontal: 12,
     paddingVertical: 10,
+    zIndex: 10,
   },
   backBtn: {
     width: 40,
     height: 40,
     borderRadius: 20,
-    backgroundColor: Colors.card,
+    backgroundColor: 'rgba(255,255,255,0.9)',
     justifyContent: 'center',
     alignItems: 'center',
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.08,
+    shadowOpacity: 0.12,
     shadowRadius: 4,
     elevation: 2,
   },
@@ -1047,17 +1401,18 @@ const styles = StyleSheet.create({
     marginHorizontal: 20,
     marginTop: 4,
     marginBottom: 8,
-    backgroundColor: Colors.card,
+    backgroundColor: 'rgba(255,255,255,0.88)',
     borderRadius: 16,
     paddingVertical: 12,
     paddingHorizontal: 20,
     borderWidth: 1,
-    borderColor: Colors.border,
+    borderColor: 'rgba(255,255,255,0.4)',
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.05,
-    shadowRadius: 4,
-    elevation: 1,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 6,
+    elevation: 2,
+    zIndex: 10,
   },
   balanceItem: {
     flex: 1,
@@ -1130,6 +1485,7 @@ const styles = StyleSheet.create({
     paddingVertical: 10,
     paddingHorizontal: 16,
     alignItems: 'center',
+    zIndex: 10,
   },
   resultBannerText: {
     textAlign: 'center',
@@ -1138,6 +1494,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     paddingBottom: 16,
     gap: 10,
+    zIndex: 10,
   },
   drawBtn: {
     flexDirection: 'row',

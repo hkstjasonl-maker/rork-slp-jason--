@@ -25,7 +25,18 @@ export interface ExerciseProgram {
   remarks: string | null;
   is_active: boolean;
   created_at: string;
+  name_en?: string | null;
+  name_zh_hant?: string | null;
+  name_zh_hans?: string | null;
+  schedule_type?: string | null;
+  sort_order?: number;
   exercises?: Exercise[];
+}
+
+export interface ProgramSchedule {
+  id: string;
+  program_id: string;
+  day_of_week: number;
 }
 
 export interface ExerciseLibrary {

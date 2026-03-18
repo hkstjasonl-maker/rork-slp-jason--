@@ -21,7 +21,7 @@ import { AppTutorial } from '@/components/AppTutorial';
 import { supabase } from '@/lib/supabase';
 import Colors from '@/constants/colors';
 import { TherapistImage } from '@/components/TherapistImage';
-import { Exercise, ExerciseProgram, ExerciseLog, Language, ExerciseReviewRequirement, FeedingSkillAssignment, ProgramObjective } from '@/types';
+import { Exercise, ExerciseProgram, ExerciseLog, Language, ExerciseReviewRequirement, FeedingSkillAssignment, ProgramObjective, ProgramSchedule } from '@/types';
 import { getDosageProgressText, getExerciseDosage } from '@/lib/dosage';
 import { log } from '@/lib/logger';
 import {
@@ -292,32 +292,81 @@ export default function HomeScreen() {
   const router = useRouter();
 
   const programQuery = useQuery({
-    queryKey: ['program', patientId],
+    queryKey: ['programs', patientId],
     queryFn: async () => {
-      log('Fetching program for patient:', patientId);
+      log('Fetching all active programs for patient:', patientId);
+      const today = new Date().toISOString().split('T')[0];
       const { data, error } = await supabase
         .from('exercise_programs')
         .select('*, exercises(*)')
         .eq('patient_id', patientId!)
         .eq('is_active', true)
-        .order('created_at', { ascending: false })
-        .limit(1)
-        .single();
+        .lte('issue_date', today)
+        .gte('expiry_date', today)
+        .order('sort_order', { ascending: true });
 
       if (error) {
-        log('Program fetch error:', error);
+        log('Programs fetch error:', error);
         throw error;
       }
 
-      if (data?.exercises) {
-        data.exercises.sort((a: Exercise, b: Exercise) => a.sort_order - b.sort_order);
+      if (data) {
+        for (const p of data) {
+          if (p.exercises) {
+            p.exercises.sort((a: Exercise, b: Exercise) => a.sort_order - b.sort_order);
+          }
+        }
       }
 
-      return data as ExerciseProgram;
+      return (data || []) as ExerciseProgram[];
     },
     enabled: !!patientId,
     staleTime: 5 * 60 * 1000,
   });
+
+  const allPrograms = useMemo(() => programQuery.data || [], [programQuery.data]);
+
+  const programIdKey = useMemo(() => allPrograms.map(p => p.id).join(','), [allPrograms]);
+
+  const schedulesQuery = useQuery({
+    queryKey: ['programSchedules', programIdKey],
+    queryFn: async () => {
+      const programIds = allPrograms.map(p => p.id);
+      if (programIds.length === 0) return [];
+      log('Fetching schedules for programs:', programIds);
+      const { data, error } = await supabase
+        .from('program_schedules')
+        .select('*')
+        .in('program_id', programIds);
+      if (error) {
+        log('Schedules fetch error:', error);
+        return [];
+      }
+      return (data || []) as ProgramSchedule[];
+    },
+    enabled: allPrograms.length > 0,
+    staleTime: 5 * 60 * 1000,
+  });
+
+  const schedules = useMemo(() => schedulesQuery.data || [], [schedulesQuery.data]);
+
+  const todaysPrograms = useMemo(() => {
+    const todayDow = new Date().getDay();
+    return allPrograms.filter(p => {
+      if (p.schedule_type === 'daily' || !p.schedule_type) return true;
+      return schedules.some(s => s.program_id === p.id && s.day_of_week === todayDow);
+    });
+  }, [allPrograms, schedules]);
+
+  const [expandedPrograms, setExpandedPrograms] = useState<Record<string, boolean>>({});
+
+  const expandedInitialized = React.useRef(false);
+  useEffect(() => {
+    if (todaysPrograms.length > 0 && !expandedInitialized.current) {
+      expandedInitialized.current = true;
+      setExpandedPrograms({ [todaysPrograms[0].id]: true });
+    }
+  }, [todaysPrograms]);
 
   const todayLogsQuery = useQuery({
     queryKey: ['todayLogs', patientId],
@@ -348,8 +397,14 @@ export default function HomeScreen() {
     return counts;
   }, [todayLogsQuery.data]);
 
-  const program = programQuery.data;
-  const exercises = useMemo(() => program?.exercises || [], [program?.exercises]);
+  const program = todaysPrograms.length > 0 ? todaysPrograms[0] : null;
+  const exercises = useMemo(() => {
+    const allExercises: Exercise[] = [];
+    for (const p of todaysPrograms) {
+      if (p.exercises) allExercises.push(...p.exercises);
+    }
+    return allExercises;
+  }, [todaysPrograms]);
 
   const submissionTitleMap = useMemo(() => {
     const map: Record<string, string> = {};
@@ -364,11 +419,11 @@ export default function HomeScreen() {
   }, [exercises, language]);
   const isExpired = program ? new Date(program.expiry_date) < new Date() : false;
 
-  const categoryGroups = useMemo<CategoryGroup[]>(() => {
+  const getCategoryGroupsForProgram = useCallback((programExercises: Exercise[]): CategoryGroup[] => {
     const groupMap = new Map<string, Exercise[]>();
     const orderMap = new Map<string, number>();
 
-    exercises.forEach((exercise) => {
+    programExercises.forEach((exercise) => {
       const cat = exercise.category || t('uncategorized');
       if (!groupMap.has(cat)) {
         groupMap.set(cat, []);
@@ -389,7 +444,11 @@ export default function HomeScreen() {
     });
 
     return groups;
-  }, [exercises, t]);
+  }, [t]);
+
+  const _categoryGroups = useMemo<CategoryGroup[]>(() => {
+    return getCategoryGroupsForProgram(exercises);
+  }, [exercises, getCategoryGroupsForProgram]);
 
   const allLogsQuery = useQuery({
     queryKey: ['exerciseLogs', patientId],
@@ -494,13 +553,15 @@ export default function HomeScreen() {
   }, [router]);
 
   const objectivesQuery = useQuery({
-    queryKey: ['programObjectives', program?.id],
+    queryKey: ['programObjectives', todaysPrograms.map(p => p.id).join(',')],
     queryFn: async () => {
-      log('Fetching objectives for program:', program?.id);
+      const ids = todaysPrograms.map(p => p.id);
+      if (ids.length === 0) return [];
+      log('Fetching objectives for programs:', ids);
       const { data, error } = await supabase
         .from('program_objectives')
         .select('*')
-        .eq('program_id', program!.id)
+        .in('program_id', ids)
         .eq('is_active', true)
         .order('sort_order', { ascending: true });
       if (error) {
@@ -509,7 +570,7 @@ export default function HomeScreen() {
       }
       return (data || []) as ProgramObjective[];
     },
-    enabled: !!program?.id,
+    enabled: todaysPrograms.length > 0,
     staleTime: 5 * 60 * 1000,
   });
 
@@ -616,6 +677,7 @@ export default function HomeScreen() {
 
   const { refetch: refetchObjectives } = objectivesQuery;
   const { refetch: refetchProgram } = programQuery;
+  const { refetch: refetchSchedules } = schedulesQuery;
   const { refetch: refetchLogs } = todayLogsQuery;
   const { refetch: refetchAllLogs } = allLogsQuery;
   const { refetch: refetchSubmissions } = submissionsQuery;
@@ -628,6 +690,7 @@ export default function HomeScreen() {
 
   const onRefresh = useCallback(() => {
     void refetchProgram();
+    void refetchSchedules();
     void refetchLogs();
     void refetchAllLogs();
     void refetchSubmissions();
@@ -638,7 +701,7 @@ export default function HomeScreen() {
     void refetchFeedingTodaySubs();
     void refetchObjectives();
     void refetchRewards();
-  }, [refetchProgram, refetchLogs, refetchAllLogs, refetchSubmissions, refetchReviewReqs, refetchTodaySubs, refetchFeedingSkills, refetchFeedingReviewReqs, refetchFeedingTodaySubs, refetchObjectives, refetchRewards]);
+  }, [refetchProgram, refetchSchedules, refetchLogs, refetchAllLogs, refetchSubmissions, refetchReviewReqs, refetchTodaySubs, refetchFeedingSkills, refetchFeedingReviewReqs, refetchFeedingTodaySubs, refetchObjectives, refetchRewards]);
 
   if (programQuery.isLoading) {
     return (
@@ -653,7 +716,7 @@ export default function HomeScreen() {
     );
   }
 
-  if (programQuery.isError || !program) {
+  if (programQuery.isError) {
     return (
       <View style={styles.root}>
         <SafeAreaView style={styles.centered}>
@@ -670,6 +733,38 @@ export default function HomeScreen() {
       </View>
     );
   }
+
+  const getProgramName = (p: ExerciseProgram): string => {
+    const lang = language || 'en';
+    if (lang === 'zh_hant') return p.name_zh_hant || p.name_en || t('exercises');
+    if (lang === 'zh_hans') return p.name_zh_hans || p.name_en || t('exercises');
+    return p.name_en || t('exercises');
+  };
+
+  const getScheduleLabel = (p: ExerciseProgram): string => {
+    if (p.schedule_type === 'daily' || !p.schedule_type) return t('everyDay');
+    const programSchedules = schedules.filter(s => s.program_id === p.id);
+    const dayKeys = ['sunShort', 'monShort', 'tueShort', 'wedShort', 'thuShort', 'friShort', 'satShort'];
+    const days = programSchedules.map(s => t(dayKeys[s.day_of_week])).join(', ');
+    return days || t('customSchedule');
+  };
+
+  const toggleProgramExpanded = (programId: string) => {
+    setExpandedPrograms(prev => ({ ...prev, [programId]: !prev[programId] }));
+  };
+
+  const handleDoAllInProgram = (programExercises: Exercise[]) => {
+    if (programExercises.length === 0) return;
+    const ids = programExercises.map(e => e.id);
+    router.push({
+      pathname: '/home/exercise',
+      params: {
+        exerciseId: ids[0],
+        allExerciseIds: JSON.stringify(ids),
+        currentIndex: '0',
+      },
+    });
+  };
 
   return (
     <View style={styles.root}>
@@ -698,79 +793,6 @@ export default function HomeScreen() {
               </View>
               <TherapistImage type="cartoon" style={styles.welcomeAvatar} />
             </View>
-          </View>
-
-          <View style={styles.programCard}>
-            <View style={styles.programHeader}>
-              <CalendarDays size={18} color={Colors.primary} />
-              <ScaledText size={15} weight="600" color={Colors.primary}>
-                {t('programInfo')}
-              </ScaledText>
-            </View>
-            <View style={styles.programDates}>
-              <View style={styles.dateItem}>
-                <ScaledText size={12} color={Colors.textSecondary}>
-                  {t('issueDate')}
-                </ScaledText>
-                <ScaledText size={15} weight="600" color={Colors.textPrimary}>
-                  {formatDate(program.issue_date)}
-                </ScaledText>
-              </View>
-              <View style={styles.dateDivider} />
-              <View style={styles.dateItem}>
-                <ScaledText size={12} color={Colors.textSecondary}>
-                  {t('expiryDate')}
-                </ScaledText>
-                <ScaledText size={15} weight="600" color={isExpired ? Colors.error : Colors.textPrimary}>
-                  {formatDate(program.expiry_date)}
-                </ScaledText>
-              </View>
-            </View>
-            {objectives.length > 0 && (
-              <View style={styles.objectivesSection}>
-                <TouchableOpacity
-                  style={styles.objectivesToggle}
-                  onPress={() => setObjectivesExpanded(!objectivesExpanded)}
-                  activeOpacity={0.7}
-                >
-                  <View style={styles.objectivesToggleLeft}>
-                    <Target size={16} color="#8B5CF6" />
-                    <ScaledText size={14} weight="600" color="#8B5CF6">
-                      {t('trainingObjectives')}
-                    </ScaledText>
-                  </View>
-                  {objectivesExpanded ? (
-                    <ChevronUp size={16} color="#8B5CF6" />
-                  ) : (
-                    <ChevronDown size={16} color="#8B5CF6" />
-                  )}
-                </TouchableOpacity>
-                {objectivesExpanded && (
-                  <View style={styles.objectivesList}>
-                    {objectives.map((obj, idx) => {
-                      const lang = language || 'en';
-                      const text = lang === 'zh_hant'
-                        ? (obj.objective_zh_hant || obj.objective_en)
-                        : lang === 'zh_hans'
-                          ? (obj.objective_zh_hans || obj.objective_en)
-                          : obj.objective_en;
-                      return (
-                        <View key={obj.id} style={styles.objectiveItem}>
-                          <View style={styles.objectiveBullet}>
-                            <ScaledText size={11} weight="bold" color="#8B5CF6">
-                              {idx + 1}
-                            </ScaledText>
-                          </View>
-                          <ScaledText size={14} color={Colors.textPrimary} style={styles.objectiveText}>
-                            {text}
-                          </ScaledText>
-                        </View>
-                      );
-                    })}
-                  </View>
-                )}
-              </View>
-            )}
           </View>
 
           {(starInfo.totalStars > 0 || starInfo.currentStreak > 0) && (
@@ -816,41 +838,28 @@ export default function HomeScreen() {
             </View>
           )}
 
-          {isExpired && (
-            <View style={styles.expiredBanner}>
-              <AlertTriangle size={18} color={Colors.error} />
-              <ScaledText size={14} color={Colors.error} style={styles.expiredText}>
-                {t('programExpired')}
+          {todaysPrograms.length === 0 && allPrograms.length > 0 && (
+            <View style={styles.restDayCard}>
+              <ScaledText size={48} style={{ textAlign: 'center' as const, marginBottom: 12 }}>{'\u2615'}</ScaledText>
+              <ScaledText size={18} weight="bold" color={Colors.textPrimary} style={{ textAlign: 'center' as const, marginBottom: 8 }}>
+                {t('noExercisesToday')}
+              </ScaledText>
+              <ScaledText size={14} color={Colors.textSecondary} style={{ textAlign: 'center' as const, lineHeight: 20 }}>
+                {t('keepPracticing')}
               </ScaledText>
             </View>
           )}
 
-          {program.remarks && (
-            <TouchableOpacity
-              style={styles.remarksCard}
-              onPress={() => setRemarksExpanded(!remarksExpanded)}
-              activeOpacity={0.7}
-            >
-              <View style={styles.remarksHeader}>
-                <FileText size={18} color={Colors.secondary} />
-                <ScaledText size={15} weight="600" color={Colors.textPrimary} style={styles.remarksTitle}>
-                  {t('remarks')}
-                </ScaledText>
-                <ChevronRight
-                  size={18}
-                  color={Colors.textSecondary}
-                  style={remarksExpanded ? styles.chevronDown : undefined}
-                />
-              </View>
-              {remarksExpanded && (
-                <ScaledText size={14} color={Colors.textSecondary} style={styles.remarksBody}>
-                  {program.remarks}
-                </ScaledText>
-              )}
-            </TouchableOpacity>
+          {todaysPrograms.length === 0 && allPrograms.length === 0 && !programQuery.isLoading && (
+            <View style={styles.emptyCard}>
+              <AlertTriangle size={36} color={Colors.secondary} />
+              <ScaledText size={15} color={Colors.textSecondary} style={{ marginTop: 12 }}>
+                {t('noExercises')}
+              </ScaledText>
+            </View>
           )}
 
-          {exercises.length > 0 && !isExpired && (
+          {todaysPrograms.length > 0 && exercises.length > 0 && !isExpired && (
             <TouchableOpacity
               style={styles.doAllButton}
               onPress={handleDoAll}
@@ -865,63 +874,216 @@ export default function HomeScreen() {
             </TouchableOpacity>
           )}
 
-          <View style={styles.exercisesSection}>
-            <View style={styles.sectionDivider}>
-              <View style={[styles.sectionDividerLine, { backgroundColor: Colors.primary }]} />
-              <View style={[styles.sectionDividerDot, { backgroundColor: Colors.primary }]} />
-              <View style={[styles.sectionDividerLine, { backgroundColor: Colors.primary }]} />
-            </View>
-            <View style={[styles.sectionTitleRow, styles.exercisesSectionTitle]}>
-              <View style={[styles.sectionIconWrap, { backgroundColor: Colors.primaryLight }]}>
-                <Layers size={18} color={Colors.primary} />
+          {todaysPrograms.length > 0 && (
+            <View style={styles.exercisesSection}>
+              <View style={styles.sectionDivider}>
+                <View style={[styles.sectionDividerLine, { backgroundColor: Colors.primary }]} />
+                <View style={[styles.sectionDividerDot, { backgroundColor: Colors.primary }]} />
+                <View style={[styles.sectionDividerLine, { backgroundColor: Colors.primary }]} />
               </View>
-              <ScaledText size={18} weight="bold" color={Colors.textPrimary} style={{ flex: 1 }}>
-                {t('exercises')}
-              </ScaledText>
-              {exercises.length > 0 && !isExpired && (
-                <TouchableOpacity
-                  style={styles.assistantButton}
-                  onPress={() => {
-                    setShowRecommendation(true);
-                    if (Platform.OS !== 'web') {
-                      void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                    }
-                    void playAssistantOpen();
-                  }}
-                  activeOpacity={0.7}
-                  testID="personal-assistant-button"
-                >
-                  <Sparkles size={14} color="#F59E0B" />
-                  <ScaledText size={12} weight="600" color="#F59E0B">
-                    {t('personalAssistant')}
-                  </ScaledText>
-                </TouchableOpacity>
-              )}
-            </View>
-
-            {exercises.length === 0 ? (
-              <View style={styles.emptyCard}>
-                <ScaledText size={15} color={Colors.textSecondary}>
-                  {t('noExercises')}
+              <View style={[styles.sectionTitleRow, styles.exercisesSectionTitle]}>
+                <View style={[styles.sectionIconWrap, { backgroundColor: Colors.primaryLight }]}>
+                  <Layers size={18} color={Colors.primary} />
+                </View>
+                <ScaledText size={18} weight="bold" color={Colors.textPrimary} style={{ flex: 1 }}>
+                  {t('exercises')}
                 </ScaledText>
+                {exercises.length > 0 && !isExpired && (
+                  <TouchableOpacity
+                    style={styles.assistantButton}
+                    onPress={() => {
+                      setShowRecommendation(true);
+                      if (Platform.OS !== 'web') {
+                        void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                      }
+                      void playAssistantOpen();
+                    }}
+                    activeOpacity={0.7}
+                    testID="personal-assistant-button"
+                  >
+                    <Sparkles size={14} color="#F59E0B" />
+                    <ScaledText size={12} weight="600" color="#F59E0B">
+                      {t('personalAssistant')}
+                    </ScaledText>
+                  </TouchableOpacity>
+                )}
               </View>
-            ) : (
-              categoryGroups.map((group) => (
-                <CategorySection
-                  key={group.category}
-                  group={group}
-                  todayCounts={todayCounts}
-                  language={language}
-                  t={t}
-                  onExercisePress={handleExercisePress}
-                  onDoAllInCategory={handleDoAllInCategory}
-                  isExpired={isExpired}
-                  reviewRequirements={reviewRequirements}
-                  todaySubmissions={todaySubmissions}
-                />
-              ))
-            )}
-          </View>
+
+              {todaysPrograms.map((prog) => {
+                const progExercises = prog.exercises || [];
+                const progExpired = new Date(prog.expiry_date) < new Date();
+                const isExpanded = expandedPrograms[prog.id] ?? false;
+                const progCategoryGroups = getCategoryGroupsForProgram(progExercises);
+                const progCompletedCount = progExercises.filter(e => {
+                  const count = todayCounts[e.id] || 0;
+                  return e.dosage_per_day ? count >= e.dosage_per_day : count > 0;
+                }).length;
+                const progObjectives = objectives.filter(o => o.program_id === prog.id);
+
+                return (
+                  <View key={prog.id} style={styles.programCardSection}>
+                    <TouchableOpacity
+                      style={[
+                        styles.programCardHeader,
+                        progCompletedCount === progExercises.length && progExercises.length > 0 && styles.programCardHeaderDone,
+                      ]}
+                      onPress={() => toggleProgramExpanded(prog.id)}
+                      activeOpacity={0.7}
+                      testID={`program-card-${prog.id}`}
+                    >
+                      <View style={styles.programCardHeaderLeft}>
+                        <View style={[styles.programCardIcon, progCompletedCount === progExercises.length && progExercises.length > 0 ? { backgroundColor: Colors.successLight } : {}]}>
+                          <Layers size={16} color={progCompletedCount === progExercises.length && progExercises.length > 0 ? Colors.success : Colors.primary} />
+                        </View>
+                        <View style={styles.programCardTitleBlock}>
+                          <ScaledText size={15} weight="bold" color={progCompletedCount === progExercises.length && progExercises.length > 0 ? Colors.success : Colors.textPrimary} numberOfLines={2}>
+                            {getProgramName(prog)}
+                          </ScaledText>
+                          <View style={styles.programCardMeta}>
+                            <View style={styles.programScheduleBadge}>
+                              <CalendarDays size={11} color={Colors.textSecondary} />
+                              <ScaledText size={11} color={Colors.textSecondary}>
+                                {getScheduleLabel(prog)}
+                              </ScaledText>
+                            </View>
+                            <View style={styles.programExerciseCountBadge}>
+                              <ScaledText size={11} weight="600" color={Colors.primary}>
+                                {progCompletedCount}/{progExercises.length} {t('programExercises')}
+                              </ScaledText>
+                            </View>
+                          </View>
+                        </View>
+                      </View>
+                      <View style={styles.programCardHeaderRight}>
+                        {!progExpired && progExercises.length > 1 && (
+                          <TouchableOpacity
+                            style={styles.doAllProgramBtn}
+                            onPress={() => handleDoAllInProgram(progExercises)}
+                            activeOpacity={0.7}
+                          >
+                            <Play size={11} color={Colors.white} />
+                            <ScaledText size={10} weight="600" color={Colors.white}>
+                              {t('doAllInProgram')}
+                            </ScaledText>
+                          </TouchableOpacity>
+                        )}
+                        {isExpanded ? (
+                          <ChevronUp size={20} color={Colors.textSecondary} />
+                        ) : (
+                          <ChevronDown size={20} color={Colors.textSecondary} />
+                        )}
+                      </View>
+                    </TouchableOpacity>
+
+                    {isExpanded && (
+                      <View style={styles.programCardBody}>
+                        {prog.remarks && (
+                          <TouchableOpacity
+                            style={styles.programRemarksCard}
+                            onPress={() => setRemarksExpanded(!remarksExpanded)}
+                            activeOpacity={0.7}
+                          >
+                            <View style={styles.remarksHeader}>
+                              <FileText size={14} color={Colors.secondary} />
+                              <ScaledText size={13} weight="600" color={Colors.textPrimary} style={styles.remarksTitle}>
+                                {t('remarks')}
+                              </ScaledText>
+                              <ChevronRight
+                                size={14}
+                                color={Colors.textSecondary}
+                                style={remarksExpanded ? styles.chevronDown : undefined}
+                              />
+                            </View>
+                            {remarksExpanded && (
+                              <ScaledText size={13} color={Colors.textSecondary} style={styles.remarksBody}>
+                                {prog.remarks}
+                              </ScaledText>
+                            )}
+                          </TouchableOpacity>
+                        )}
+
+                        {progObjectives.length > 0 && (
+                          <View style={styles.programObjectivesInline}>
+                            <TouchableOpacity
+                              style={styles.objectivesToggle}
+                              onPress={() => setObjectivesExpanded(!objectivesExpanded)}
+                              activeOpacity={0.7}
+                            >
+                              <View style={styles.objectivesToggleLeft}>
+                                <Target size={14} color="#8B5CF6" />
+                                <ScaledText size={13} weight="600" color="#8B5CF6">
+                                  {t('trainingObjectives')}
+                                </ScaledText>
+                              </View>
+                              {objectivesExpanded ? (
+                                <ChevronUp size={14} color="#8B5CF6" />
+                              ) : (
+                                <ChevronDown size={14} color="#8B5CF6" />
+                              )}
+                            </TouchableOpacity>
+                            {objectivesExpanded && (
+                              <View style={styles.objectivesList}>
+                                {progObjectives.map((obj, idx) => {
+                                  const lang = language || 'en';
+                                  const text = lang === 'zh_hant'
+                                    ? (obj.objective_zh_hant || obj.objective_en)
+                                    : lang === 'zh_hans'
+                                      ? (obj.objective_zh_hans || obj.objective_en)
+                                      : obj.objective_en;
+                                  return (
+                                    <View key={obj.id} style={styles.objectiveItem}>
+                                      <View style={styles.objectiveBullet}>
+                                        <ScaledText size={10} weight="bold" color="#8B5CF6">
+                                          {idx + 1}
+                                        </ScaledText>
+                                      </View>
+                                      <ScaledText size={13} color={Colors.textPrimary} style={styles.objectiveText}>
+                                        {text}
+                                      </ScaledText>
+                                    </View>
+                                  );
+                                })}
+                              </View>
+                            )}
+                          </View>
+                        )}
+
+                        <View style={styles.programDateRow}>
+                          <ScaledText size={11} color={Colors.textSecondary}>
+                            {formatDate(prog.issue_date)} - {formatDate(prog.expiry_date)}
+                          </ScaledText>
+                        </View>
+
+                        {progExpired && (
+                          <View style={styles.expiredBannerInline}>
+                            <AlertTriangle size={14} color={Colors.error} />
+                            <ScaledText size={12} color={Colors.error}>
+                              {t('programExpired')}
+                            </ScaledText>
+                          </View>
+                        )}
+
+                        {progCategoryGroups.map((group) => (
+                          <CategorySection
+                            key={`${prog.id}-${group.category}`}
+                            group={group}
+                            todayCounts={todayCounts}
+                            language={language}
+                            t={t}
+                            onExercisePress={handleExercisePress}
+                            onDoAllInCategory={handleDoAllInCategory}
+                            isExpired={progExpired}
+                            reviewRequirements={reviewRequirements}
+                            todaySubmissions={todaySubmissions}
+                          />
+                        ))}
+                      </View>
+                    )}
+                  </View>
+                );
+              })}
+            </View>
+          )}
 
           {feedingSkills.length > 0 && (
             <View style={styles.feedingSkillsSection}>
@@ -1883,5 +2045,121 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
     alignItems: 'center' as const,
     marginTop: 12,
+  },
+  restDayCard: {
+    marginHorizontal: 20,
+    backgroundColor: '#F0FAF5',
+    borderRadius: 20,
+    padding: 32,
+    alignItems: 'center' as const,
+    borderWidth: 1.5,
+    borderColor: '#C8E6D8',
+    marginBottom: 16,
+  },
+  programCardSection: {
+    marginBottom: 12,
+  },
+  programCardHeader: {
+    backgroundColor: Colors.card,
+    borderRadius: 14,
+    paddingVertical: 12,
+    paddingHorizontal: 14,
+    flexDirection: 'row' as const,
+    alignItems: 'center' as const,
+    justifyContent: 'space-between' as const,
+    borderWidth: 1,
+    borderColor: Colors.border,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 4,
+    elevation: 2,
+  },
+  programCardHeaderDone: {
+    borderColor: Colors.success,
+    backgroundColor: Colors.successLight,
+  },
+  programCardHeaderLeft: {
+    flexDirection: 'row' as const,
+    alignItems: 'center' as const,
+    gap: 10,
+    flex: 1,
+  },
+  programCardIcon: {
+    width: 32,
+    height: 32,
+    borderRadius: 10,
+    backgroundColor: Colors.primaryLight,
+    justifyContent: 'center' as const,
+    alignItems: 'center' as const,
+  },
+  programCardTitleBlock: {
+    flex: 1,
+    gap: 4,
+  },
+  programCardMeta: {
+    flexDirection: 'row' as const,
+    alignItems: 'center' as const,
+    gap: 8,
+    flexWrap: 'wrap' as const,
+  },
+  programScheduleBadge: {
+    flexDirection: 'row' as const,
+    alignItems: 'center' as const,
+    gap: 3,
+  },
+  programExerciseCountBadge: {
+    backgroundColor: Colors.primaryLight,
+    paddingHorizontal: 7,
+    paddingVertical: 2,
+    borderRadius: 8,
+  },
+  programCardHeaderRight: {
+    flexDirection: 'row' as const,
+    alignItems: 'center' as const,
+    gap: 6,
+    marginLeft: 8,
+  },
+  doAllProgramBtn: {
+    backgroundColor: Colors.primary,
+    flexDirection: 'row' as const,
+    alignItems: 'center' as const,
+    paddingHorizontal: 8,
+    paddingVertical: 5,
+    borderRadius: 10,
+    gap: 3,
+  },
+  programCardBody: {
+    paddingTop: 8,
+    paddingLeft: 8,
+  },
+  programRemarksCard: {
+    backgroundColor: Colors.secondaryLight,
+    borderRadius: 12,
+    padding: 12,
+    marginBottom: 8,
+  },
+  programObjectivesInline: {
+    backgroundColor: '#FAFAFE',
+    borderRadius: 12,
+    padding: 12,
+    marginBottom: 8,
+    borderWidth: 1,
+    borderColor: '#F0EEFA',
+  },
+  programDateRow: {
+    flexDirection: 'row' as const,
+    alignItems: 'center' as const,
+    marginBottom: 8,
+    paddingHorizontal: 4,
+  },
+  expiredBannerInline: {
+    backgroundColor: Colors.errorLight,
+    flexDirection: 'row' as const,
+    alignItems: 'center' as const,
+    padding: 10,
+    borderRadius: 10,
+    gap: 8,
+    marginBottom: 8,
   },
 });

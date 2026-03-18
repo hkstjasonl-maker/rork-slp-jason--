@@ -63,24 +63,6 @@ import {
   X,
 } from 'lucide-react-native';
 
-interface ProgramPastel {
-  bg: string;
-  border: string;
-  header: string;
-  accent: string;
-}
-
-const PROGRAM_PASTELS: ProgramPastel[] = [
-  { bg: '#EBF5FF', border: '#B3D9FF', header: '#D6ECFF', accent: '#3B82F6' },
-  { bg: '#FFF0F5', border: '#FFB8D0', header: '#FFE0EB', accent: '#EC4899' },
-  { bg: '#F0FFF4', border: '#A7F3D0', header: '#D1FAE5', accent: '#10B981' },
-  { bg: '#F5F0FF', border: '#C4B5FD', header: '#E0D7FF', accent: '#8B5CF6' },
-  { bg: '#FFFBEB', border: '#FCD34D', header: '#FEF3C7', accent: '#F59E0B' },
-  { bg: '#FFF5F0', border: '#FDBA74', header: '#FFEDD5', accent: '#F97316' },
-  { bg: '#F0FDFF', border: '#67E8F9', header: '#CFFAFE', accent: '#06B6D4' },
-  { bg: '#FDF2F8', border: '#F9A8D4', header: '#FCE7F3', accent: '#DB2777' },
-];
-
 interface CategoryGroup {
   category: string;
   exercises: Exercise[];
@@ -125,7 +107,6 @@ function CategorySection({
   isExpired,
   reviewRequirements,
   todaySubmissions,
-  pastel,
 }: {
   group: CategoryGroup;
   todayCounts: Record<string, number>;
@@ -136,7 +117,6 @@ function CategorySection({
   isExpired: boolean;
   reviewRequirements: ExerciseReviewRequirement[];
   todaySubmissions: Record<string, number>;
-  pastel?: ProgramPastel;
 }) {
   const [expanded, setExpanded] = useState<boolean>(true);
   const icon = getCategoryIcon(group.category);
@@ -159,7 +139,7 @@ function CategorySection({
   return (
     <View style={styles.categorySection}>
       <TouchableOpacity
-        style={[styles.categoryHeader, allDone && styles.categoryHeaderDone, pastel && !allDone && { backgroundColor: pastel.bg, borderColor: pastel.border }]}
+        style={[styles.categoryHeader, allDone && styles.categoryHeaderDone]}
         onPress={() => setExpanded(!expanded)}
         activeOpacity={0.7}
       >
@@ -202,7 +182,7 @@ function CategorySection({
             return (
               <TouchableOpacity
                 key={exercise.id}
-                style={[styles.exerciseCard, pastel && { backgroundColor: pastel.bg, borderColor: pastel.border + '80' }]}
+                style={styles.exerciseCard}
                 onPress={() => onExercisePress(exercise.id)}
                 activeOpacity={0.7}
                 testID={`exercise-card-${exercise.id}`}
@@ -1113,7 +1093,7 @@ export default function HomeScreen() {
                 )}
               </View>
 
-              {todaysPrograms.map((prog, progIndex) => {
+              {todaysPrograms.map((prog) => {
                 const progExercises = prog.exercises || [];
                 const progExpired = new Date(prog.expiry_date) < new Date();
                 const isExpanded = expandedPrograms[prog.id] ?? false;
@@ -1123,27 +1103,25 @@ export default function HomeScreen() {
                   return e.dosage_per_day ? count >= e.dosage_per_day : count > 0;
                 }).length;
                 const progObjectives = objectives.filter(o => o.program_id === prog.id);
-                const pastel = PROGRAM_PASTELS[progIndex % PROGRAM_PASTELS.length];
                 const allDone = progCompletedCount === progExercises.length && progExercises.length > 0;
 
                 return (
-                  <View key={prog.id} style={[styles.programCardSection, { backgroundColor: pastel.bg, borderRadius: 16, borderWidth: 1, borderColor: pastel.border, overflow: 'hidden' as const }]}>
+                  <View key={prog.id} style={styles.programCardSection}>
                     <TouchableOpacity
                       style={[
                         styles.programCardHeader,
-                        { backgroundColor: allDone ? Colors.successLight : pastel.header, borderColor: 'transparent' },
-                        allDone && { borderColor: Colors.success },
+                        allDone && styles.programCardHeaderDone,
                       ]}
                       onPress={() => toggleProgramExpanded(prog.id)}
                       activeOpacity={0.7}
                       testID={`program-card-${prog.id}`}
                     >
                       <View style={styles.programCardAccentBar}>
-                        <View style={{ width: 4, height: '100%' as unknown as number, backgroundColor: allDone ? Colors.success : pastel.accent, borderRadius: 2 }} />
+                        <View style={{ width: 4, height: '100%' as unknown as number, backgroundColor: allDone ? Colors.success : Colors.primary, borderRadius: 2 }} />
                       </View>
                       <View style={styles.programCardHeaderLeft}>
-                        <View style={[styles.programCardIcon, { backgroundColor: allDone ? Colors.successLight : pastel.accent + '20' }]}>
-                          <Layers size={16} color={allDone ? Colors.success : pastel.accent} />
+                        <View style={[styles.programCardIcon, allDone && { backgroundColor: Colors.successLight }]}>
+                          <Layers size={16} color={allDone ? Colors.success : Colors.primary} />
                         </View>
                         <View style={styles.programCardTitleBlock}>
                           <ScaledText size={15} weight="bold" color={allDone ? Colors.success : Colors.textPrimary} numberOfLines={2}>
@@ -1156,8 +1134,8 @@ export default function HomeScreen() {
                                 {getScheduleLabel(prog)}
                               </ScaledText>
                             </View>
-                            <View style={[styles.programExerciseCountBadge, { backgroundColor: pastel.accent + '18' }]}>
-                              <ScaledText size={11} weight="600" color={pastel.accent}>
+                            <View style={styles.programExerciseCountBadge}>
+                              <ScaledText size={11} weight="600" color={Colors.primary}>
                                 {progCompletedCount}/{progExercises.length} {t('programExercises')}
                               </ScaledText>
                             </View>
@@ -1167,7 +1145,7 @@ export default function HomeScreen() {
                       <View style={styles.programCardHeaderRight}>
                         {!progExpired && progExercises.length > 1 && (
                           <TouchableOpacity
-                            style={[styles.doAllProgramBtn, { backgroundColor: pastel.accent }]}
+                            style={styles.doAllProgramBtn}
                             onPress={() => handleDoAllInProgram(progExercises)}
                             activeOpacity={0.7}
                           >
@@ -1178,15 +1156,15 @@ export default function HomeScreen() {
                           </TouchableOpacity>
                         )}
                         {isExpanded ? (
-                          <ChevronUp size={20} color={pastel.accent} />
+                          <ChevronUp size={20} color={Colors.textSecondary} />
                         ) : (
-                          <ChevronDown size={20} color={pastel.accent} />
+                          <ChevronDown size={20} color={Colors.textSecondary} />
                         )}
                       </View>
                     </TouchableOpacity>
 
                     {isExpanded && (
-                      <View style={[styles.programCardBody, { backgroundColor: pastel.bg }]}>
+                      <View style={styles.programCardBody}>
                         {prog.remarks && (
                           <TouchableOpacity
                             style={styles.programRemarksCard}
@@ -1285,7 +1263,6 @@ export default function HomeScreen() {
                             isExpired={progExpired}
                             reviewRequirements={reviewRequirements}
                             todaySubmissions={todaySubmissions}
-                            pastel={pastel}
                           />
                         ))}
 
@@ -2271,6 +2248,11 @@ const styles = StyleSheet.create({
   },
   programCardSection: {
     marginBottom: 12,
+    backgroundColor: Colors.card,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: Colors.border,
+    overflow: 'hidden' as const,
   },
   programCardHeader: {
     borderRadius: 0,
@@ -2280,9 +2262,8 @@ const styles = StyleSheet.create({
     flexDirection: 'row' as const,
     alignItems: 'center' as const,
     justifyContent: 'space-between' as const,
-    borderWidth: 0,
     borderBottomWidth: 1,
-    borderColor: 'transparent',
+    borderBottomColor: Colors.border,
   },
   programCardHeaderDone: {
     borderColor: Colors.success,

@@ -378,7 +378,7 @@ export default function MiniMahjongGame({ visible, level, onClose, patientId, pr
     return false;
   }, [gameData, pickedIndex, result, level]);
 
-  const showTipsButton = (level === 'basic' || level === 'moderate') && phase === 'game' && !tipsUsed && !tapsDisabled;
+  const showTipsButton = phase === 'game' && !tipsUsed && !tapsDisabled;
 
   const renderLoadingPhase = () => (
     <View style={styles.loadingContainer}>

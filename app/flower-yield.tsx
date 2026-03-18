@@ -14,12 +14,16 @@ import {
   LayoutAnimation,
   Platform,
   UIManager,
+  PanResponder,
+  Alert,
+  GestureResponderEvent,
 } from 'react-native';
 import * as Haptics from 'expo-haptics';
 import { Image } from 'expo-image';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Stack, useRouter } from 'expo-router';
 import { useQuery, useQueryClient, useMutation } from '@tanstack/react-query';
-import { Sparkles, Gift, X, ChevronLeft, ChevronDown, ChevronUp, SlidersHorizontal, Eye, EyeOff, Plus, ArrowUp, ArrowDown } from 'lucide-react-native';
+import { Sparkles, Gift, X, ChevronLeft, ChevronDown, ChevronUp, SlidersHorizontal, Eye, EyeOff, Plus, ArrowUp, ArrowDown, RotateCcw } from 'lucide-react-native';
 
 import { useApp } from '@/contexts/AppContext';
 import { ScaledText } from '@/components/ScaledText';
@@ -66,6 +70,8 @@ interface PatientFlower {
   grid_position: number;
   is_stolen: boolean;
   is_displayed?: boolean;
+  position_x?: number | null;
+  position_y?: number | null;
   stolen_at: string | null;
   obtained_at: string;
   flower_types?: FlowerType;
@@ -664,15 +670,21 @@ function PlantedFlower({ flower, flowerType, row, slot }: {
 
 const MemoPlantedFlower = React.memo(PlantedFlower);
 
-const SoilGrid = React.memo(function SoilGrid({ flowers, flowerTypeMap, onFlowerPress, screenWidth }: {
+const SoilGrid = React.memo(function SoilGrid({ flowers, flowerTypeMap, onFlowerPress, onFlowerLongPress, draggingFlowerId, screenWidth }: {
   flowers: PatientFlower[];
   flowerTypeMap: Record<string, FlowerType>;
   onFlowerPress: (f: PatientFlower) => void;
+  onFlowerLongPress: (f: PatientFlower, e: GestureResponderEvent) => void;
+  draggingFlowerId: string | null;
   screenWidth: number;
 }) {
   const flowerBySlot = useMemo(() => {
     const map: Record<number, PatientFlower> = {};
-    flowers.forEach((f) => { map[f.grid_position] = f; });
+    flowers.forEach((f) => {
+      if (f.position_x == null && f.position_y == null) {
+        map[f.grid_position] = f;
+      }
+    });
     return map;
   }, [flowers]);
 
@@ -694,8 +706,9 @@ const SoilGrid = React.memo(function SoilGrid({ flowers, flowerTypeMap, onFlower
         const col = idx % GRID_COLS;
         const row = Math.floor(idx / GRID_COLS);
         const flower = flowerBySlot[idx];
-        const ft = flower ? (flower.flower_types || flowerTypeMap[flower.flower_type_id]) : undefined;
-        const hasFlower = !!flower && !!ft;
+        const isBeingDragged = flower?.id === draggingFlowerId;
+        const ft = flower && !isBeingDragged ? (flower.flower_types || flowerTypeMap[flower.flower_type_id]) : undefined;
+        const hasFlower = !!flower && !!ft && !isBeingDragged;
         const isEvenRow = row % 2 === 0;
         const offsetX = isEvenRow ? -7 : 0;
         const cellGrass = CELL_GRASS[idx];
@@ -705,6 +718,8 @@ const SoilGrid = React.memo(function SoilGrid({ flowers, flowerTypeMap, onFlower
             key={idx}
             activeOpacity={hasFlower ? 0.7 : 1}
             onPress={hasFlower ? () => onFlowerPress(flower) : undefined}
+            onLongPress={hasFlower ? (e) => onFlowerLongPress(flower, e) : undefined}
+            delayLongPress={400}
             style={{
               position: 'absolute' as const,
               left: col * CELL_W + offsetX,
@@ -744,6 +759,55 @@ const SoilGrid = React.memo(function SoilGrid({ flowers, flowerTypeMap, onFlower
         );
       })}
     </View>
+  );
+});
+
+const PositionedFlowersLayer = React.memo(function PositionedFlowersLayer({
+  flowers, flowerTypeMap, onFlowerPress, onFlowerLongPress, draggingFlowerId, screenWidth, gardenHeight,
+}: {
+  flowers: PatientFlower[];
+  flowerTypeMap: Record<string, FlowerType>;
+  onFlowerPress: (f: PatientFlower) => void;
+  onFlowerLongPress: (f: PatientFlower, e: GestureResponderEvent) => void;
+  draggingFlowerId: string | null;
+  screenWidth: number;
+  gardenHeight: number;
+}) {
+  const positioned = useMemo(
+    () => flowers.filter(f => f.position_x != null && f.position_y != null && f.id !== draggingFlowerId),
+    [flowers, draggingFlowerId]
+  );
+
+  if (positioned.length === 0) return null;
+
+  return (
+    <>
+      {positioned.map((flower) => {
+        const ft = flower.flower_types || flowerTypeMap[flower.flower_type_id];
+        if (!ft) return null;
+        const left = (flower.position_x ?? 0) * screenWidth;
+        const top = (flower.position_y ?? 0) * gardenHeight;
+        const row = Math.floor(flower.grid_position / GRID_COLS);
+        const slot = flower.grid_position;
+        return (
+          <TouchableOpacity
+            key={flower.id}
+            activeOpacity={0.7}
+            onPress={() => onFlowerPress(flower)}
+            onLongPress={(e) => onFlowerLongPress(flower, e)}
+            delayLongPress={400}
+            style={{
+              position: 'absolute' as const,
+              left: left - 35,
+              top: top - 40,
+              zIndex: 15,
+            }}
+          >
+            <MemoPlantedFlower flower={flower} flowerType={ft} row={row} slot={slot} />
+          </TouchableOpacity>
+        );
+      })}
+    </>
   );
 });
 
@@ -845,10 +909,12 @@ const GentleRain = React.memo(function GentleRain({ screenWidth, gardenHeight }:
   );
 });
 
-const MemoGardenScene = React.memo(function GardenScene({ flowers, flowerTypeMap, onFlowerPress, screenWidth, gardenHeight }: {
+const MemoGardenScene = React.memo(function GardenScene({ flowers, flowerTypeMap, onFlowerPress, onFlowerLongPress, draggingFlowerId, screenWidth, gardenHeight }: {
   flowers: PatientFlower[];
   flowerTypeMap: Record<string, FlowerType>;
   onFlowerPress: (f: PatientFlower) => void;
+  onFlowerLongPress: (f: PatientFlower, e: GestureResponderEvent) => void;
+  draggingFlowerId: string | null;
   screenWidth: number;
   gardenHeight: number;
 }) {
@@ -869,7 +935,8 @@ const MemoGardenScene = React.memo(function GardenScene({ flowers, flowerTypeMap
       <TreesAndGrassDecor screenWidth={screenWidth} gardenHeight={gardenHeight} />
       <FloatingInsects screenWidth={screenWidth} gardenHeight={gardenHeight} />
 
-      <SoilGrid flowers={flowers} flowerTypeMap={flowerTypeMap} onFlowerPress={onFlowerPress} screenWidth={screenWidth} />
+      <SoilGrid flowers={flowers} flowerTypeMap={flowerTypeMap} onFlowerPress={onFlowerPress} onFlowerLongPress={onFlowerLongPress} draggingFlowerId={draggingFlowerId} screenWidth={screenWidth} />
+      <PositionedFlowersLayer flowers={flowers} flowerTypeMap={flowerTypeMap} onFlowerPress={onFlowerPress} onFlowerLongPress={onFlowerLongPress} draggingFlowerId={draggingFlowerId} screenWidth={screenWidth} gardenHeight={gardenHeight} />
       <StaticSparkles screenWidth={screenWidth} gardenHeight={gardenHeight} />
       <FenceRow screenWidth={screenWidth} />
       <GentleRain screenWidth={screenWidth} gardenHeight={gardenHeight} />
@@ -980,6 +1047,81 @@ export default function FlowerYieldScreen() {
   const [manageModalVisible, setManageModalVisible] = useState<boolean>(false);
   const manageScaleAnim = useRef(new Animated.Value(0)).current;
 
+  const [isDragging, setIsDragging] = useState<boolean>(false);
+  const [draggingFlowerId, setDraggingFlowerId] = useState<string | null>(null);
+  const isDraggingRef = useRef<boolean>(false);
+  const draggingFlowerRef = useRef<PatientFlower | null>(null);
+  const dragPosition = useRef(new Animated.ValueXY({ x: 0, y: 0 })).current;
+  const dragScale = useRef(new Animated.Value(1)).current;
+  const gardenContainerRef = useRef<View>(null);
+  const gardenLayoutRef = useRef({ x: 0, y: 0, width: 0, height: 0 });
+  const [showDragHint, setShowDragHint] = useState<boolean>(false);
+  const dragHintOpacity = useRef(new Animated.Value(0)).current;
+  const dragHintTimerRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+
+  const queryClientRef = useRef(queryClient);
+  queryClientRef.current = queryClient;
+  const patientIdRef = useRef(patientId);
+  patientIdRef.current = patientId;
+
+  const gardenPanResponder = useRef(
+    PanResponder.create({
+      onStartShouldSetPanResponder: () => false,
+      onMoveShouldSetPanResponder: () => isDraggingRef.current,
+      onStartShouldSetPanResponderCapture: () => false,
+      onMoveShouldSetPanResponderCapture: () => isDraggingRef.current,
+      onPanResponderTerminationRequest: () => !isDraggingRef.current,
+      onPanResponderGrant: () => {},
+      onPanResponderMove: (evt) => {
+        if (!isDraggingRef.current) return;
+        const gl = gardenLayoutRef.current;
+        dragPosition.setValue({
+          x: evt.nativeEvent.pageX - gl.x - 30,
+          y: evt.nativeEvent.pageY - gl.y - 40,
+        });
+      },
+      onPanResponderRelease: (evt) => {
+        if (!isDraggingRef.current || !draggingFlowerRef.current) return;
+        const gl = gardenLayoutRef.current;
+        const relX = evt.nativeEvent.pageX - gl.x;
+        const relY = evt.nativeEvent.pageY - gl.y;
+        const posX = Math.max(0.02, Math.min(0.98, relX / (gl.width || 1)));
+        const posY = Math.max(0.02, Math.min(0.98, relY / (gl.height || 1)));
+        const flowerId = draggingFlowerRef.current.id;
+        log('[FlowerYield] Dropping flower at:', posX.toFixed(3), posY.toFixed(3));
+
+        queryClientRef.current?.setQueryData<PatientFlower[]>(
+          ['patientFlowers', patientIdRef.current],
+          (old) => (old || []).map(f => f.id === flowerId ? { ...f, position_x: posX, position_y: posY } : f)
+        );
+
+        void supabase
+          .from('patient_flowers')
+          .update({ position_x: posX, position_y: posY })
+          .eq('id', flowerId)
+          .then(({ error }) => {
+            if (error) {
+              log('[FlowerYield] Error saving flower position:', error);
+              void queryClientRef.current?.invalidateQueries({ queryKey: ['patientFlowers', patientIdRef.current] });
+            }
+          });
+
+        Animated.spring(dragScale, { toValue: 1, friction: 8, useNativeDriver: false }).start();
+        isDraggingRef.current = false;
+        draggingFlowerRef.current = null;
+        setIsDragging(false);
+        setDraggingFlowerId(null);
+      },
+      onPanResponderTerminate: () => {
+        Animated.spring(dragScale, { toValue: 1, friction: 8, useNativeDriver: false }).start();
+        isDraggingRef.current = false;
+        draggingFlowerRef.current = null;
+        setIsDragging(false);
+        setDraggingFlowerId(null);
+      },
+    })
+  ).current;
+
   const isZh = language === 'zh_hant' || language === 'zh_hans';
 
   useEffect(() => {
@@ -1087,8 +1229,94 @@ export default function FlowerYieldScreen() {
     : 1;
 
   const handleFlowerPress = useCallback((flower: PatientFlower) => {
+    if (isDraggingRef.current) return;
     setSelectedFlower(flower);
   }, []);
+
+  const handleGardenLayout = useCallback(() => {
+    if (gardenContainerRef.current) {
+      gardenContainerRef.current.measureInWindow((x, y, width, height) => {
+        gardenLayoutRef.current = { x: x || 0, y: y || 0, width: width || screenWidth, height: height || gardenHeight };
+        log('[FlowerYield] Garden layout measured:', { x, y, width, height });
+      });
+    }
+  }, [screenWidth, gardenHeight]);
+
+  const handleGardenFlowerLongPress = useCallback((flower: PatientFlower, evt: GestureResponderEvent) => {
+    if (gardenContainerRef.current) {
+      gardenContainerRef.current.measureInWindow((x, y, width, height) => {
+        gardenLayoutRef.current = { x: x || 0, y: y || 0, width: width || screenWidth, height: height || gardenHeight };
+      });
+    }
+    isDraggingRef.current = true;
+    draggingFlowerRef.current = flower;
+    setDraggingFlowerId(flower.id);
+    setIsDragging(true);
+    const gl = gardenLayoutRef.current;
+    dragPosition.setValue({ x: evt.nativeEvent.pageX - gl.x - 30, y: evt.nativeEvent.pageY - gl.y - 40 });
+    Animated.spring(dragScale, { toValue: 1.2, friction: 5, tension: 80, useNativeDriver: false }).start();
+    try { void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium); } catch {}
+  }, [screenWidth, gardenHeight, dragPosition, dragScale]);
+
+  const handleResetPositions = useCallback(() => {
+    Alert.alert(
+      isZh ? '重設位置' : 'Reset Positions',
+      isZh ? '重設所有花朵位置？' : 'Reset all flower positions to default?',
+      [
+        { text: isZh ? '取消' : 'Cancel', style: 'cancel' as const },
+        {
+          text: isZh ? '確認' : 'Reset',
+          style: 'destructive' as const,
+          onPress: () => {
+            queryClient.setQueryData<PatientFlower[]>(
+              ['patientFlowers', patientId],
+              (old) => (old || []).map(f => ({ ...f, position_x: null, position_y: null }))
+            );
+            void supabase
+              .from('patient_flowers')
+              .update({ position_x: null, position_y: null })
+              .eq('patient_id', patientId!)
+              .eq('is_stolen', false)
+              .then(({ error }) => {
+                if (error) {
+                  log('[FlowerYield] Reset positions error:', error);
+                  void queryClient.invalidateQueries({ queryKey: ['patientFlowers', patientId] });
+                }
+              });
+          },
+        },
+      ]
+    );
+  }, [isZh, patientId, queryClient]);
+
+  const draggingFlowerData = useMemo(() => {
+    if (!draggingFlowerId) return null;
+    const flower = displayedFlowers.find(f => f.id === draggingFlowerId);
+    if (!flower) return null;
+    const ft = flower.flower_types || flowerTypeMap[flower.flower_type_id];
+    if (!ft) return null;
+    return { flower, flowerType: ft };
+  }, [draggingFlowerId, displayedFlowers, flowerTypeMap]);
+
+  useEffect(() => {
+    let timer: ReturnType<typeof setTimeout>;
+    if (displayedFlowers.length > 0) {
+      AsyncStorage.getItem('flower_drag_hint_shown').then((val) => {
+        if (!val) {
+          setShowDragHint(true);
+          Animated.timing(dragHintOpacity, { toValue: 1, duration: 500, useNativeDriver: true }).start();
+          timer = setTimeout(() => {
+            Animated.timing(dragHintOpacity, { toValue: 0, duration: 500, useNativeDriver: true }).start(() => {
+              setShowDragHint(false);
+            });
+            AsyncStorage.setItem('flower_drag_hint_shown', 'true').catch(() => {});
+          }, 3500);
+          dragHintTimerRef.current = timer;
+        }
+      }).catch(() => {});
+    }
+    return () => { if (timer) clearTimeout(timer); };
+  }, [displayedFlowers.length, dragHintOpacity]);
 
   const toggleCollection = useCallback(() => {
     LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
@@ -1198,8 +1426,6 @@ export default function FlowerYieldScreen() {
     },
   });
 
-
-
   return (
     <View style={styles.root}>
       <Stack.Screen options={{ headerShown: false }} />
@@ -1213,6 +1439,14 @@ export default function FlowerYieldScreen() {
               {patientName ? (isZh ? `${patientName}的花田` : `${patientName}'s Garden`) : (isZh ? '我的花田' : 'My Garden')}
             </ScaledText>
           </View>
+          <TouchableOpacity
+            style={styles.manageBtn}
+            onPress={handleResetPositions}
+            activeOpacity={0.7}
+            testID="reset-positions-btn"
+          >
+            <RotateCcw size={14} color="#5D4037" />
+          </TouchableOpacity>
           <TouchableOpacity
             style={styles.manageBtn}
             onPress={openManageModal}
@@ -1231,15 +1465,55 @@ export default function FlowerYieldScreen() {
           </View>
         </View>
 
-        <ScrollView style={styles.scrollView} contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false} contentInsetAdjustmentBehavior="never">
+        <ScrollView style={styles.scrollView} contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false} contentInsetAdjustmentBehavior="never" scrollEnabled={!isDragging}>
           {isLoading ? (
             <View style={styles.loadingContainer}>
               <ActivityIndicator size="large" color={Colors.primary} />
             </View>
           ) : (
             <>
-              <View style={{ height: gardenHeight, overflow: 'hidden' }}>
-                <MemoGardenScene flowers={displayedFlowers} flowerTypeMap={flowerTypeMap} onFlowerPress={handleFlowerPress} screenWidth={screenWidth} gardenHeight={gardenHeight} />
+              <View
+                ref={gardenContainerRef}
+                onLayout={handleGardenLayout}
+                style={{ height: gardenHeight }}
+                {...gardenPanResponder.panHandlers}
+              >
+                <MemoGardenScene
+                  flowers={displayedFlowers}
+                  flowerTypeMap={flowerTypeMap}
+                  onFlowerPress={handleFlowerPress}
+                  onFlowerLongPress={handleGardenFlowerLongPress}
+                  draggingFlowerId={draggingFlowerId}
+                  screenWidth={screenWidth}
+                  gardenHeight={gardenHeight}
+                />
+                {isDragging && draggingFlowerData && (
+                  <Animated.View
+                    style={{
+                      position: 'absolute' as const,
+                      left: dragPosition.x,
+                      top: dragPosition.y,
+                      zIndex: 999,
+                      transform: [{ scale: dragScale }],
+                    }}
+                    pointerEvents="none"
+                  >
+                    <View style={styles.dragShadow} />
+                    <Image
+                      source={{ uri: draggingFlowerData.flowerType.image_url }}
+                      style={{ width: 60, height: 60 }}
+                      contentFit="contain"
+                      cachePolicy="memory-disk"
+                    />
+                  </Animated.View>
+                )}
+                {showDragHint && (
+                  <Animated.View style={[styles.dragHint, { opacity: dragHintOpacity }]} pointerEvents="none">
+                    <ScaledText size={12} weight="600" color="#FFF">
+                      {isZh ? '✋ 長按花朵可移動！' : '✋ Long-press to move flowers!'}
+                    </ScaledText>
+                  </Animated.View>
+                )}
               </View>
 
               {displayedFlowers.length === 0 && (
@@ -1916,6 +2190,25 @@ const styles = StyleSheet.create({
     width: 10,
     height: 10,
     borderRadius: 5,
+  },
+  dragShadow: {
+    position: 'absolute',
+    bottom: -4,
+    left: 10,
+    width: 40,
+    height: 8,
+    borderRadius: 20,
+    backgroundColor: 'rgba(0,0,0,0.25)',
+  },
+  dragHint: {
+    position: 'absolute',
+    top: 12,
+    alignSelf: 'center',
+    backgroundColor: 'rgba(0,0,0,0.6)',
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 20,
+    zIndex: 100,
   },
 });
 

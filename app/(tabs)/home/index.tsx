@@ -1,4 +1,4 @@
-import React, { useMemo, useCallback, useState, useEffect } from 'react';
+import React, { useMemo, useCallback, useState, useEffect, useRef } from 'react';
 import {
   View,
   ScrollView,
@@ -9,6 +9,7 @@ import {
   RefreshControl,
   Modal,
   Platform,
+  Animated,
 } from 'react-native';
 import * as Haptics from 'expo-haptics';
 import { useRouter } from 'expo-router';
@@ -572,6 +573,63 @@ export default function HomeScreen() {
 
   const objectives = objectivesQuery.data || [];
   const [objectivesExpanded, setObjectivesExpanded] = useState<boolean>(false);
+
+  const holisticObjectivesQuery = useQuery({
+    queryKey: ['holisticObjectives', programIdKey],
+    queryFn: async () => {
+      const ids = allPrograms.map(p => p.id);
+      if (ids.length === 0) return [];
+      log('Fetching holistic objectives for all active programs:', ids);
+      const { data, error } = await supabase
+        .from('program_objectives')
+        .select('*')
+        .in('program_id', ids)
+        .order('sort_order', { ascending: true });
+      if (error) {
+        log('Holistic objectives fetch error:', error);
+        return [];
+      }
+      return (data || []) as ProgramObjective[];
+    },
+    enabled: allPrograms.length > 0,
+    staleTime: 5 * 60 * 1000,
+  });
+
+  const holisticObjectives = useMemo(
+    () => holisticObjectivesQuery.data || [],
+    [holisticObjectivesQuery.data]
+  );
+  const activeHolisticObjectives = useMemo(
+    () => holisticObjectives.filter(o => o.is_active),
+    [holisticObjectives]
+  );
+  const inactiveHolisticObjectives = useMemo(
+    () => holisticObjectives.filter(o => !o.is_active),
+    [holisticObjectives]
+  );
+  const [holisticExpanded, setHolisticExpanded] = useState<boolean>(false);
+  const holisticAnimHeight = useRef(new Animated.Value(0)).current;
+
+  const toggleHolisticExpanded = useCallback(() => {
+    const toValue = holisticExpanded ? 0 : 1;
+    setHolisticExpanded(!holisticExpanded);
+    Animated.spring(holisticAnimHeight, {
+      toValue,
+      useNativeDriver: false,
+      friction: 12,
+      tension: 80,
+    }).start();
+  }, [holisticExpanded, holisticAnimHeight]);
+
+  const getObjectiveProgramName = useCallback((programId: string): string => {
+    const prog = allPrograms.find(p => p.id === programId);
+    if (!prog) return '';
+    const lang = language || 'en';
+    if (lang === 'zh_hant') return prog.name_zh_hant || prog.name_en || '';
+    if (lang === 'zh_hans') return prog.name_zh_hans || prog.name_en || '';
+    return prog.name_en || '';
+  }, [allPrograms, language]);
+
   const [showRecommendation, setShowRecommendation] = useState(false);
   const { currentDraw, dismissCurrentDraw, refreshPatient: refreshPatientCtx } = useApp();
 
@@ -672,6 +730,7 @@ export default function HomeScreen() {
   });
 
   const { refetch: refetchObjectives } = objectivesQuery;
+  const { refetch: refetchHolisticObjectives } = holisticObjectivesQuery;
   const { refetch: refetchProgram } = programQuery;
   const { refetch: refetchSchedules } = schedulesQuery;
   const { refetch: refetchLogs } = todayLogsQuery;
@@ -696,8 +755,9 @@ export default function HomeScreen() {
     void refetchFeedingReviewReqs();
     void refetchFeedingTodaySubs();
     void refetchObjectives();
+    void refetchHolisticObjectives();
     void refetchRewards();
-  }, [refetchProgram, refetchSchedules, refetchLogs, refetchAllLogs, refetchSubmissions, refetchReviewReqs, refetchTodaySubs, refetchFeedingSkills, refetchFeedingReviewReqs, refetchFeedingTodaySubs, refetchObjectives, refetchRewards]);
+  }, [refetchProgram, refetchSchedules, refetchLogs, refetchAllLogs, refetchSubmissions, refetchReviewReqs, refetchTodaySubs, refetchFeedingSkills, refetchFeedingReviewReqs, refetchFeedingTodaySubs, refetchObjectives, refetchHolisticObjectives, refetchRewards]);
 
   if (programQuery.isLoading) {
     return (
@@ -829,6 +889,111 @@ export default function HomeScreen() {
                   <ScaledText size={12} color={Colors.textSecondary}>
                     {starInfo.uniqueToday}/{exercises.length} — {starInfo.isHalf ? t('halfExercisesStar') : t('keepPracticing')}
                   </ScaledText>
+                </View>
+              )}
+
+              {holisticObjectives.length > 0 && (
+                <View style={styles.holisticSection}>
+                  <TouchableOpacity
+                    style={styles.holisticToggle}
+                    onPress={toggleHolisticExpanded}
+                    activeOpacity={0.7}
+                    testID="holistic-objectives-toggle"
+                  >
+                    <View style={styles.holisticToggleLeft}>
+                      <Target size={15} color="#10B981" />
+                      <ScaledText size={13} weight="700" color="#10B981">
+                        {t('trainingObjectives')}
+                      </ScaledText>
+                    </View>
+                    <View style={styles.holisticToggleRight}>
+                      <View style={styles.holisticCountBadge}>
+                        <ScaledText size={10} weight="700" color="#10B981">
+                          {activeHolisticObjectives.length} {t('goalsCount')}
+                        </ScaledText>
+                      </View>
+                      {holisticExpanded ? (
+                        <ChevronUp size={16} color="#10B981" />
+                      ) : (
+                        <ChevronDown size={16} color="#10B981" />
+                      )}
+                    </View>
+                  </TouchableOpacity>
+
+                  <Animated.View
+                    style={[
+                      styles.holisticListWrap,
+                      {
+                        maxHeight: holisticAnimHeight.interpolate({
+                          inputRange: [0, 1],
+                          outputRange: [0, 220],
+                        }),
+                        opacity: holisticAnimHeight.interpolate({
+                          inputRange: [0, 0.3, 1],
+                          outputRange: [0, 0.5, 1],
+                        }),
+                      },
+                    ]}
+                  >
+                    <ScrollView
+                      style={styles.holisticScroll}
+                      showsVerticalScrollIndicator={false}
+                      nestedScrollEnabled
+                    >
+                      {activeHolisticObjectives.map((obj) => {
+                        const lang = language || 'en';
+                        const text = lang === 'zh_hant'
+                          ? (obj.objective_zh_hant || obj.objective_en)
+                          : lang === 'zh_hans'
+                            ? (obj.objective_zh_hans || obj.objective_en)
+                            : obj.objective_en;
+                        const progName = getObjectiveProgramName(obj.program_id);
+                        return (
+                          <View key={obj.id} style={styles.holisticItem}>
+                            <View style={styles.holisticCheckIcon}>
+                              <View style={styles.holisticCircle} />
+                            </View>
+                            <View style={styles.holisticItemContent}>
+                              <ScaledText size={13} color={Colors.textPrimary} style={styles.holisticItemText}>
+                                {text}
+                              </ScaledText>
+                              {progName ? (
+                                <ScaledText size={10} color={Colors.textSecondary}>
+                                  {t('fromProgram')} {progName}
+                                </ScaledText>
+                              ) : null}
+                            </View>
+                          </View>
+                        );
+                      })}
+                      {inactiveHolisticObjectives.map((obj) => {
+                        const lang = language || 'en';
+                        const text = lang === 'zh_hant'
+                          ? (obj.objective_zh_hant || obj.objective_en)
+                          : lang === 'zh_hans'
+                            ? (obj.objective_zh_hans || obj.objective_en)
+                            : obj.objective_en;
+                        const progName = getObjectiveProgramName(obj.program_id);
+                        return (
+                          <View key={obj.id} style={[styles.holisticItem, styles.holisticItemDimmed]}>
+                            <View style={styles.holisticCheckIcon}>
+                              <CheckCircle2 size={16} color={Colors.success} />
+                            </View>
+                            <View style={styles.holisticItemContent}>
+                              <ScaledText size={13} color={Colors.textSecondary} style={[styles.holisticItemText, styles.holisticItemTextDone]}>
+                                {text}
+                              </ScaledText>
+                              {progName ? (
+                                <ScaledText size={10} color={Colors.disabled}>
+                                  {t('fromProgram')} {progName}
+                                </ScaledText>
+                              ) : null}
+                            </View>
+                          </View>
+                        );
+                      })}
+                    </ScrollView>
+                  </Animated.View>
                 </View>
               )}
             </View>
@@ -2157,5 +2322,73 @@ const styles = StyleSheet.create({
     borderRadius: 10,
     gap: 8,
     marginBottom: 8,
+  },
+  holisticSection: {
+    marginTop: 14,
+    paddingTop: 14,
+    borderTopWidth: 1,
+    borderTopColor: '#E8F5E9',
+  },
+  holisticToggle: {
+    flexDirection: 'row' as const,
+    alignItems: 'center' as const,
+    justifyContent: 'space-between' as const,
+  },
+  holisticToggleLeft: {
+    flexDirection: 'row' as const,
+    alignItems: 'center' as const,
+    gap: 6,
+  },
+  holisticToggleRight: {
+    flexDirection: 'row' as const,
+    alignItems: 'center' as const,
+    gap: 6,
+  },
+  holisticCountBadge: {
+    backgroundColor: '#E8F5E9',
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 8,
+  },
+  holisticListWrap: {
+    overflow: 'hidden' as const,
+  },
+  holisticScroll: {
+    marginTop: 10,
+  },
+  holisticItem: {
+    flexDirection: 'row' as const,
+    alignItems: 'flex-start' as const,
+    gap: 10,
+    paddingVertical: 7,
+    borderBottomWidth: 1,
+    borderBottomColor: '#F5F5F0',
+  },
+  holisticItemDimmed: {
+    opacity: 0.5,
+  },
+  holisticCheckIcon: {
+    width: 20,
+    height: 20,
+    justifyContent: 'center' as const,
+    alignItems: 'center' as const,
+    marginTop: 1,
+  },
+  holisticCircle: {
+    width: 16,
+    height: 16,
+    borderRadius: 8,
+    borderWidth: 2,
+    borderColor: '#10B981',
+  },
+  holisticItemContent: {
+    flex: 1,
+    gap: 2,
+  },
+  holisticItemText: {
+    lineHeight: 20,
+  },
+  holisticItemTextDone: {
+    textDecorationLine: 'line-through' as const,
   },
 });

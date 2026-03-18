@@ -35,6 +35,7 @@ import {
   Trash2,
   Dices,
   Captions,
+  MessageSquare,
 } from 'lucide-react-native';
 import { AppTutorial } from '@/components/AppTutorial';
 import MiniMahjongGame from '@/components/MiniMahjongGame';
@@ -179,6 +180,26 @@ export default function SettingsScreen() {
                 </TouchableOpacity>
               ))}
             </View>
+          </View>
+
+          <View style={styles.section}>
+            <TouchableOpacity
+              style={styles.actionCard}
+              onPress={() => router.push('/settings/feedback' as any)}
+              activeOpacity={0.7}
+              testID="feedback-support-button"
+            >
+              <MessageSquare size={20} color={Colors.primary} />
+              <View style={styles.actionContent}>
+                <ScaledText size={15} weight="600" color={Colors.textPrimary}>
+                  {language === 'zh_hant' || language === 'zh_hans' ? '意見反饋' : 'Feedback & Support'}
+                </ScaledText>
+                <ScaledText size={13} color={Colors.textSecondary}>
+                  {language === 'zh_hant' || language === 'zh_hans' ? '告訴我們您的想法或報告問題' : 'Share your thoughts or report issues'}
+                </ScaledText>
+              </View>
+              <ChevronRight size={18} color={Colors.disabled} />
+            </TouchableOpacity>
           </View>
 
           <View style={styles.section}>

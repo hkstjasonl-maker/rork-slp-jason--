@@ -610,6 +610,38 @@ export default function HomeScreen() {
   const [holisticExpanded, setHolisticExpanded] = useState<boolean>(false);
   const holisticAnimHeight = useRef(new Animated.Value(0)).current;
 
+  const periodInfo = useMemo(() => {
+    const progs = allPrograms;
+    if (progs.length === 0) return null;
+    const issueDates = progs.map(p => p.issue_date).filter(Boolean).sort();
+    const expiryDates = progs.map(p => p.expiry_date).filter(Boolean).sort().reverse();
+    const earliestStart = issueDates[0];
+    const latestEnd = expiryDates[0];
+    if (!earliestStart || !latestEnd) return null;
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const start = new Date(earliestStart);
+    start.setHours(0, 0, 0, 0);
+    const end = new Date(latestEnd);
+    end.setHours(0, 0, 0, 0);
+    const totalDays = Math.max(1, Math.ceil((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24)));
+    const elapsedDays = Math.ceil((today.getTime() - start.getTime()) / (1000 * 60 * 60 * 24));
+    const progress = Math.max(0, Math.min(1, elapsedDays / totalDays));
+    const isExpiredPeriod = today.getTime() > end.getTime();
+    const notStarted = today.getTime() < start.getTime();
+    const daysUntilStart = notStarted ? Math.ceil((start.getTime() - today.getTime()) / (1000 * 60 * 60 * 24)) : 0;
+    return {
+      startDate: earliestStart,
+      endDate: latestEnd,
+      totalDays,
+      elapsedDays: Math.max(0, Math.min(elapsedDays, totalDays)),
+      progress,
+      isExpired: isExpiredPeriod,
+      notStarted,
+      daysUntilStart,
+    };
+  }, [allPrograms]);
+
   const toggleHolisticExpanded = useCallback(() => {
     const toValue = holisticExpanded ? 0 : 1;
     setHolisticExpanded(!holisticExpanded);
@@ -851,8 +883,48 @@ export default function HomeScreen() {
             </View>
           </View>
 
-          {(starInfo.totalStars > 0 || starInfo.currentStreak > 0) && (
+          {(starInfo.totalStars > 0 || starInfo.currentStreak > 0 || periodInfo) && (
             <View style={styles.starSummaryCard}>
+              {periodInfo && (
+                <View style={styles.periodSection}>
+                  <View style={styles.periodTopRow}>
+                    <CalendarDays size={14} color={periodInfo.isExpired ? '#DC2626' : periodInfo.notStarted ? '#F59E0B' : '#5b8a72'} />
+                    <ScaledText size={12} weight="600" color={periodInfo.isExpired ? '#DC2626' : periodInfo.notStarted ? '#F59E0B' : Colors.textPrimary}>
+                      {(() => {
+                        const fmt = (d: string) => {
+                          const date = new Date(d);
+                          const lang = language || 'en';
+                          if (lang === 'zh_hant' || lang === 'zh_hans') {
+                            return `${date.getFullYear()}/${date.getMonth() + 1}/${date.getDate()}`;
+                          }
+                          return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+                        };
+                        return `${fmt(periodInfo.startDate)} – ${fmt(periodInfo.endDate)}`;
+                      })()}
+                    </ScaledText>
+                    {periodInfo.isExpired && (
+                      <View style={styles.periodExpiredBadge}>
+                        <ScaledText size={10} weight="700" color="#DC2626">{t('periodExpired')}</ScaledText>
+                      </View>
+                    )}
+                    {periodInfo.notStarted && (
+                      <View style={styles.periodNotStartedBadge}>
+                        <ScaledText size={10} weight="700" color="#F59E0B">{t('startsInXDays')} {periodInfo.daysUntilStart} {t('daysUnit')}</ScaledText>
+                      </View>
+                    )}
+                  </View>
+                  <View style={styles.periodBarBg}>
+                    <View style={[styles.periodBarFill, { width: `${Math.round(periodInfo.progress * 100)}%`, backgroundColor: periodInfo.isExpired ? '#DC2626' : '#5b8a72' }]} />
+                  </View>
+                  {!periodInfo.notStarted && !periodInfo.isExpired && (
+                    <ScaledText size={10} color={Colors.textSecondary}>
+                      {language === 'zh_hant' || language === 'zh_hans'
+                        ? `${t('dayXofY')} ${periodInfo.elapsedDays} ${t('ofDays')} ${periodInfo.totalDays} ${t('daysUnit')}`
+                        : `${t('dayXofY')} ${periodInfo.elapsedDays} ${t('ofDays')} ${periodInfo.totalDays}`}
+                    </ScaledText>
+                  )}
+                </View>
+              )}
               <View style={styles.starSummaryRow}>
                 <View style={styles.starSummaryItem}>
                   <Star size={20} color="#FFB800" fill="#FFB800" />
@@ -2390,5 +2462,40 @@ const styles = StyleSheet.create({
   },
   holisticItemTextDone: {
     textDecorationLine: 'line-through' as const,
+  },
+  periodSection: {
+    marginBottom: 14,
+    paddingBottom: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: '#FFE082',
+    gap: 6,
+  },
+  periodTopRow: {
+    flexDirection: 'row' as const,
+    alignItems: 'center' as const,
+    gap: 6,
+    flexWrap: 'wrap' as const,
+  },
+  periodBarBg: {
+    height: 4,
+    backgroundColor: '#F0EDE5',
+    borderRadius: 2,
+    overflow: 'hidden' as const,
+  },
+  periodBarFill: {
+    height: 4,
+    borderRadius: 2,
+  },
+  periodExpiredBadge: {
+    backgroundColor: '#FEE2E2',
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 6,
+  },
+  periodNotStartedBadge: {
+    backgroundColor: '#FEF3C7',
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 6,
   },
 });

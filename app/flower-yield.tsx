@@ -17,8 +17,8 @@ import {
 } from 'react-native';
 import { Image } from 'expo-image';
 import { Stack, useRouter } from 'expo-router';
-import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { Sparkles, Gift, X, ChevronLeft, ChevronDown, ChevronUp } from 'lucide-react-native';
+import { useQuery, useQueryClient, useMutation } from '@tanstack/react-query';
+import { Sparkles, Gift, X, ChevronLeft, ChevronDown, ChevronUp, SlidersHorizontal, Eye, EyeOff } from 'lucide-react-native';
 
 import { useApp } from '@/contexts/AppContext';
 import { ScaledText } from '@/components/ScaledText';
@@ -64,6 +64,7 @@ interface PatientFlower {
   flower_type_id: string;
   grid_position: number;
   is_stolen: boolean;
+  is_displayed?: boolean;
   stolen_at: string | null;
   obtained_at: string;
   flower_types?: FlowerType;
@@ -975,6 +976,8 @@ export default function FlowerYieldScreen() {
   const [theftModalVisible, setTheftModalVisible] = useState<boolean>(false);
   const [collectionExpanded, setCollectionExpanded] = useState<boolean>(true);
   const [expandedCardId, setExpandedCardId] = useState<string | null>(null);
+  const [manageModalVisible, setManageModalVisible] = useState<boolean>(false);
+  const manageScaleAnim = useRef(new Animated.Value(0)).current;
 
   const isZh = language === 'zh_hant' || language === 'zh_hans';
 
@@ -1047,12 +1050,13 @@ export default function FlowerYieldScreen() {
   }, [flowersJustStolen, queryClient, patientId]);
 
   const patientData = patientDataQuery.data;
-  const flowers = flowersQuery.data || [];
+  const allFlowers = useMemo(() => flowersQuery.data || [], [flowersQuery.data]);
+  const displayedFlowers = useMemo(() => allFlowers.filter(f => f.is_displayed !== false), [allFlowers]);
   const isLoading = patientDataQuery.isLoading || flowersQuery.isLoading || flowerTypesQuery.isLoading;
 
   const groupedFlowers = useMemo(() => {
     const groups: Record<string, GroupedFlower> = {};
-    (flowersQuery.data || []).forEach((f) => {
+    allFlowers.forEach((f) => {
       const ft = f.flower_types || flowerTypeMap[f.flower_type_id];
       if (!ft) return;
       if (!groups[ft.id]) { groups[ft.id] = { flowerType: ft, count: 0, flowers: [] }; }
@@ -1065,7 +1069,28 @@ export default function FlowerYieldScreen() {
       if (ra !== rb) return ra - rb;
       return b.count - a.count;
     });
-  }, [flowersQuery.data, flowerTypeMap]);
+  }, [allFlowers, flowerTypeMap]);
+
+  const manageGroupedFlowers = useMemo(() => {
+    const groups: Record<string, GroupedFlower & { displayedCount: number }> = {};
+    allFlowers.forEach((f) => {
+      const ft = f.flower_types || flowerTypeMap[f.flower_type_id];
+      if (!ft) return;
+      if (!groups[ft.id]) { groups[ft.id] = { flowerType: ft, count: 0, flowers: [], displayedCount: 0 }; }
+      groups[ft.id].count += 1;
+      groups[ft.id].flowers.push(f);
+      if (f.is_displayed !== false) groups[ft.id].displayedCount += 1;
+    });
+    return Object.values(groups).sort((a, b) => {
+      const ra = RARITY_ORDER[a.flowerType.rarity] ?? 5;
+      const rb = RARITY_ORDER[b.flowerType.rarity] ?? 5;
+      if (ra !== rb) return ra - rb;
+      return b.count - a.count;
+    });
+  }, [allFlowers, flowerTypeMap]);
+
+  const displayedCount = useMemo(() => allFlowers.filter(f => f.is_displayed !== false).length, [allFlowers]);
+  const totalCount = allFlowers.length;
 
   const selectedFlowerType = selectedFlower
     ? (selectedFlower.flower_types || flowerTypeMap[selectedFlower.flower_type_id])
@@ -1089,6 +1114,75 @@ export default function FlowerYieldScreen() {
     setExpandedCardId((prev) => (prev === id ? null : id));
   }, []);
 
+  const openManageModal = useCallback(() => {
+    setManageModalVisible(true);
+    manageScaleAnim.setValue(0);
+    Animated.spring(manageScaleAnim, { toValue: 1, friction: 7, tension: 65, useNativeDriver: true }).start();
+  }, [manageScaleAnim]);
+
+  const closeManageModal = useCallback(() => {
+    Animated.timing(manageScaleAnim, { toValue: 0, duration: 150, useNativeDriver: true }).start(() => {
+      setManageModalVisible(false);
+    });
+  }, [manageScaleAnim]);
+
+  const toggleFlowerDisplayMutation = useMutation({
+    mutationFn: async ({ flowerId, newValue }: { flowerId: string; newValue: boolean }) => {
+      log('[FlowerYield] Toggling flower display:', flowerId, '->', newValue);
+      const { error } = await supabase
+        .from('patient_flowers')
+        .update({ is_displayed: newValue })
+        .eq('id', flowerId);
+      if (error) throw error;
+      return { flowerId, newValue };
+    },
+    onMutate: async ({ flowerId, newValue }) => {
+      await queryClient.cancelQueries({ queryKey: ['patientFlowers', patientId] });
+      const prev = queryClient.getQueryData<PatientFlower[]>(['patientFlowers', patientId]);
+      queryClient.setQueryData<PatientFlower[]>(['patientFlowers', patientId], (old) =>
+        (old || []).map(f => f.id === flowerId ? { ...f, is_displayed: newValue } : f)
+      );
+      return { prev };
+    },
+    onError: (_err, _vars, context) => {
+      if (context?.prev) {
+        queryClient.setQueryData(['patientFlowers', patientId], context.prev);
+      }
+    },
+  });
+
+  const toggleGroupDisplay = useCallback((group: GroupedFlower, newValue: boolean) => {
+    group.flowers.forEach(f => {
+      toggleFlowerDisplayMutation.mutate({ flowerId: f.id, newValue });
+    });
+  }, [toggleFlowerDisplayMutation]);
+
+  const bulkToggleAllMutation = useMutation({
+    mutationFn: async (newValue: boolean) => {
+      log('[FlowerYield] Bulk toggling all flowers to:', newValue);
+      const { error } = await supabase
+        .from('patient_flowers')
+        .update({ is_displayed: newValue })
+        .eq('patient_id', patientId!)
+        .eq('is_stolen', false);
+      if (error) throw error;
+      return newValue;
+    },
+    onMutate: async (newValue) => {
+      await queryClient.cancelQueries({ queryKey: ['patientFlowers', patientId] });
+      const prev = queryClient.getQueryData<PatientFlower[]>(['patientFlowers', patientId]);
+      queryClient.setQueryData<PatientFlower[]>(['patientFlowers', patientId], (old) =>
+        (old || []).map(f => ({ ...f, is_displayed: newValue }))
+      );
+      return { prev };
+    },
+    onError: (_err, _vars, context) => {
+      if (context?.prev) {
+        queryClient.setQueryData(['patientFlowers', patientId], context.prev);
+      }
+    },
+  });
+
 
 
   return (
@@ -1104,6 +1198,14 @@ export default function FlowerYieldScreen() {
               {patientName ? (isZh ? `${patientName}的花田` : `${patientName}'s Garden`) : (isZh ? '我的花田' : 'My Garden')}
             </ScaledText>
           </View>
+          <TouchableOpacity
+            style={styles.manageBtn}
+            onPress={openManageModal}
+            activeOpacity={0.7}
+            testID="manage-flowers-btn"
+          >
+            <SlidersHorizontal size={16} color="#5D4037" />
+          </TouchableOpacity>
           <View style={styles.headerChips}>
             <View style={styles.resourceChip}>
               <ScaledText size={11} weight="600" color="#B8860B">⭐ {patientData?.stars_available ?? 0}</ScaledText>
@@ -1122,10 +1224,10 @@ export default function FlowerYieldScreen() {
           ) : (
             <>
               <View style={{ height: gardenHeight, overflow: 'hidden' }}>
-                <MemoGardenScene flowers={flowers} flowerTypeMap={flowerTypeMap} onFlowerPress={handleFlowerPress} screenWidth={screenWidth} gardenHeight={gardenHeight} />
+                <MemoGardenScene flowers={displayedFlowers} flowerTypeMap={flowerTypeMap} onFlowerPress={handleFlowerPress} screenWidth={screenWidth} gardenHeight={gardenHeight} />
               </View>
 
-              {flowers.length === 0 && (
+              {displayedFlowers.length === 0 && (
                 <View style={styles.emptyHint}>
                   <ScaledText size={14} weight="600" color="#5D4037">
                     {isZh ? '快去抽花裝飾你的花田吧！🌱' : 'Draw flowers to decorate your garden! 🌱'}
@@ -1148,7 +1250,7 @@ export default function FlowerYieldScreen() {
                 </TouchableOpacity>
               </View>
 
-              <CollectionProgress count={flowers.length} total={TOTAL_SLOTS} isZh={isZh} />
+              <CollectionProgress count={totalCount} total={TOTAL_SLOTS} isZh={isZh} />
 
               {groupedFlowers.length > 0 && (
                 <View style={styles.collectionSection}>
@@ -1208,6 +1310,101 @@ export default function FlowerYieldScreen() {
             </TouchableOpacity>
           </View>
         </View>
+      </Modal>
+
+      <Modal visible={manageModalVisible} transparent animationType="none" onRequestClose={closeManageModal}>
+        <Pressable style={styles.modalOverlay} onPress={closeManageModal}>
+          <Animated.View style={[
+            styles.manageModal,
+            {
+              transform: [{ scale: manageScaleAnim.interpolate({ inputRange: [0, 1], outputRange: [0.85, 1] }) }],
+              opacity: manageScaleAnim,
+            },
+          ]}>
+            <Pressable onPress={() => {}}>
+              <View style={styles.manageHeader}>
+                <ScaledText size={17} weight="bold" color="#4E342E">
+                  {isZh ? '管理花朵' : 'Manage Flowers'}
+                </ScaledText>
+                <TouchableOpacity onPress={closeManageModal} style={styles.manageCloseBtn} testID="manage-close">
+                  <X size={18} color="#8D6E63" />
+                </TouchableOpacity>
+              </View>
+
+              <View style={styles.manageCountRow}>
+                <ScaledText size={13} weight="600" color="#795548">
+                  {isZh ? '顯示中' : 'Displayed'}: {displayedCount} / {isZh ? '總共' : 'Total'}: {totalCount}
+                </ScaledText>
+              </View>
+
+              <View style={styles.manageBulkRow}>
+                <TouchableOpacity
+                  style={styles.manageBulkBtn}
+                  onPress={() => bulkToggleAllMutation.mutate(true)}
+                  activeOpacity={0.7}
+                >
+                  <Eye size={14} color="#558B2F" />
+                  <ScaledText size={12} weight="600" color="#558B2F">{isZh ? '全部顯示' : 'Show All'}</ScaledText>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={styles.manageBulkBtn}
+                  onPress={() => bulkToggleAllMutation.mutate(false)}
+                  activeOpacity={0.7}
+                >
+                  <EyeOff size={14} color="#8D6E63" />
+                  <ScaledText size={12} weight="600" color="#8D6E63">{isZh ? '全部隱藏' : 'Hide All'}</ScaledText>
+                </TouchableOpacity>
+              </View>
+
+              <ScrollView style={styles.manageList} showsVerticalScrollIndicator={false}>
+                {manageGroupedFlowers.map((group) => {
+                  const rarity = group.flowerType.rarity || 'common';
+                  const rarityInfo = RARITY_COLORS[rarity] || RARITY_COLORS.common;
+                  const noneDisplayed = group.flowers.every(f => f.is_displayed === false);
+                  const isOn = !noneDisplayed;
+                  return (
+                    <View key={group.flowerType.id} style={styles.manageRow}>
+                      <View style={[styles.manageFlowerImgBg, { backgroundColor: rarityInfo.bg }]}>
+                        <Image source={{ uri: group.flowerType.image_url }} style={styles.manageFlowerImg} contentFit="contain" cachePolicy="memory-disk" />
+                      </View>
+                      <View style={styles.manageFlowerInfo}>
+                        <ScaledText size={13} weight="600" color="#4E342E" numberOfLines={1}>
+                          {isZh ? (group.flowerType.name_zh || group.flowerType.name_en) : group.flowerType.name_en}
+                          {group.count > 1 ? ` ×${group.count}` : ''}
+                        </ScaledText>
+                        <View style={[styles.manageRarityBadge, { backgroundColor: rarityInfo.bg }]}>
+                          <View style={[styles.manageRarityDot, { backgroundColor: rarityInfo.dot }]} />
+                          <ScaledText size={9} weight="700" color={rarityInfo.dot}>
+                            {rarity.charAt(0).toUpperCase() + rarity.slice(1)}
+                          </ScaledText>
+                        </View>
+                      </View>
+                      <TouchableOpacity
+                        style={[
+                          styles.manageToggle,
+                          isOn ? styles.manageToggleOn : styles.manageToggleOff,
+                        ]}
+                        onPress={() => toggleGroupDisplay(group, !isOn)}
+                        activeOpacity={0.7}
+                      >
+                        <Animated.View style={[
+                          styles.manageToggleThumb,
+                          isOn ? styles.manageToggleThumbOn : styles.manageToggleThumbOff,
+                        ]} />
+                      </TouchableOpacity>
+                    </View>
+                  );
+                })}
+                {manageGroupedFlowers.length === 0 && (
+                  <View style={{ paddingVertical: 30, alignItems: 'center' }}>
+                    <ScaledText size={14} color="#8D6E63">{isZh ? '還沒有花朵' : 'No flowers yet'}</ScaledText>
+                  </View>
+                )}
+                <View style={{ height: 16 }} />
+              </ScrollView>
+            </Pressable>
+          </Animated.View>
+        </Pressable>
       </Modal>
 
       <Modal visible={!!selectedFlower} transparent animationType="fade" onRequestClose={() => setSelectedFlower(null)}>
@@ -1396,6 +1593,16 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.35,
     shadowRadius: 6,
     elevation: 4,
+  },
+  manageBtn: {
+    width: 34,
+    height: 34,
+    borderRadius: 17,
+    backgroundColor: '#FFF8E7',
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 1.5,
+    borderColor: '#D7CCC8',
   },
   chestBtn: {
     flex: 1,
@@ -1589,5 +1796,129 @@ const styles = StyleSheet.create({
     width: 10,
     height: 10,
     borderRadius: 5,
+  },
+  manageModal: {
+    backgroundColor: '#FFFDF5',
+    borderRadius: 24,
+    width: '88%',
+    maxHeight: '75%',
+    overflow: 'hidden',
+    borderWidth: 2,
+    borderColor: '#F0E0C0',
+    shadowColor: '#8D6E63',
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.2,
+    shadowRadius: 16,
+    elevation: 8,
+  },
+  manageHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 20,
+    paddingTop: 18,
+    paddingBottom: 8,
+  },
+  manageCloseBtn: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: '#F5F0E8',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  manageCountRow: {
+    paddingHorizontal: 20,
+    paddingBottom: 10,
+  },
+  manageBulkRow: {
+    flexDirection: 'row',
+    paddingHorizontal: 20,
+    gap: 10,
+    paddingBottom: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: '#F0E8D8',
+  },
+  manageBulkBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderRadius: 10,
+    backgroundColor: '#F5F0E8',
+    borderWidth: 1,
+    borderColor: '#E8E0D0',
+  },
+  manageList: {
+    paddingHorizontal: 16,
+    paddingTop: 8,
+  },
+  manageRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 10,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: '#F0E8D8',
+    gap: 10,
+  },
+  manageFlowerImgBg: {
+    width: 42,
+    height: 42,
+    borderRadius: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  manageFlowerImg: {
+    width: 34,
+    height: 34,
+  },
+  manageFlowerInfo: {
+    flex: 1,
+  },
+  manageRarityBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 3,
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 6,
+    marginTop: 3,
+    alignSelf: 'flex-start',
+  },
+  manageRarityDot: {
+    width: 5,
+    height: 5,
+    borderRadius: 2.5,
+  },
+  manageToggle: {
+    width: 46,
+    height: 26,
+    borderRadius: 13,
+    justifyContent: 'center',
+    paddingHorizontal: 2,
+  },
+  manageToggleOn: {
+    backgroundColor: '#8BC34A',
+  },
+  manageToggleOff: {
+    backgroundColor: '#D7CCC8',
+  },
+  manageToggleThumb: {
+    width: 22,
+    height: 22,
+    borderRadius: 11,
+    backgroundColor: '#FFF',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.2,
+    shadowRadius: 2,
+    elevation: 2,
+  },
+  manageToggleThumbOn: {
+    alignSelf: 'flex-end' as const,
+  },
+  manageToggleThumbOff: {
+    alignSelf: 'flex-start' as const,
   },
 });

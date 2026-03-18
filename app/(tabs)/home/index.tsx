@@ -1273,21 +1273,36 @@ export default function HomeScreen() {
                           </View>
                         )}
 
-                        {progCategoryGroups.map((group) => (
-                          <CategorySection
-                            key={`${prog.id}-${group.category}`}
-                            group={group}
-                            todayCounts={todayCounts}
-                            language={language}
-                            t={t}
-                            onExercisePress={handleExercisePress}
-                            onDoAllInCategory={handleDoAllInCategory}
-                            isExpired={progExpired}
-                            reviewRequirements={reviewRequirements}
-                            todaySubmissions={todaySubmissions}
-                            pastel={pastel}
-                          />
-                        ))}
+                        <ScrollView
+                          style={styles.programExerciseListScroll}
+                          showsVerticalScrollIndicator={false}
+                          nestedScrollEnabled={true}
+                        >
+                          {progCategoryGroups.map((group) => (
+                            <CategorySection
+                              key={`${prog.id}-${group.category}`}
+                              group={group}
+                              todayCounts={todayCounts}
+                              language={language}
+                              t={t}
+                              onExercisePress={handleExercisePress}
+                              onDoAllInCategory={handleDoAllInCategory}
+                              isExpired={progExpired}
+                              reviewRequirements={reviewRequirements}
+                              todaySubmissions={todaySubmissions}
+                              pastel={pastel}
+                            />
+                          ))}
+                        </ScrollView>
+                        {progExercises.length > 3 && (
+                          <View style={[styles.scrollHintRow, { borderTopColor: pastel.border }]}>
+                            <ScaledText size={11} color={pastel.accent}>
+                              {language === 'zh_hant' || language === 'zh_hans'
+                                ? `↕ 滑動查看更多（共 ${progExercises.length} 項練習）`
+                                : `↕ Scroll for ${progExercises.length} exercises`}
+                            </ScaledText>
+                          </View>
+                        )}
                       </View>
                     )}
                   </View>
@@ -1854,10 +1869,11 @@ const styles = StyleSheet.create({
   exerciseCard: {
     backgroundColor: Colors.card,
     borderRadius: 14,
-    padding: 14,
+    paddingVertical: 10,
+    paddingHorizontal: 14,
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 8,
+    marginBottom: 6,
     borderWidth: 1,
     borderColor: Colors.border,
     shadowColor: '#000',
@@ -2345,6 +2361,15 @@ const styles = StyleSheet.create({
     paddingLeft: 8,
     paddingRight: 4,
     paddingBottom: 4,
+  },
+  programExerciseListScroll: {
+    maxHeight: 280,
+  },
+  scrollHintRow: {
+    alignItems: 'center' as const,
+    paddingVertical: 6,
+    borderTopWidth: 1,
+    marginTop: 2,
   },
   programRemarksCard: {
     backgroundColor: Colors.secondaryLight,

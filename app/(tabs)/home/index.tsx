@@ -1273,36 +1273,22 @@ export default function HomeScreen() {
                           </View>
                         )}
 
-                        <ScrollView
-                          style={styles.programExerciseListScroll}
-                          showsVerticalScrollIndicator={false}
-                          nestedScrollEnabled={true}
-                        >
                           {progCategoryGroups.map((group) => (
-                            <CategorySection
-                              key={`${prog.id}-${group.category}`}
-                              group={group}
-                              todayCounts={todayCounts}
-                              language={language}
-                              t={t}
-                              onExercisePress={handleExercisePress}
-                              onDoAllInCategory={handleDoAllInCategory}
-                              isExpired={progExpired}
-                              reviewRequirements={reviewRequirements}
-                              todaySubmissions={todaySubmissions}
-                              pastel={pastel}
-                            />
-                          ))}
-                        </ScrollView>
-                        {progExercises.length > 3 && (
-                          <View style={[styles.scrollHintRow, { borderTopColor: pastel.border }]}>
-                            <ScaledText size={11} color={pastel.accent}>
-                              {language === 'zh_hant' || language === 'zh_hans'
-                                ? `↕ 滑動查看更多（共 ${progExercises.length} 項練習）`
-                                : `↕ Scroll for ${progExercises.length} exercises`}
-                            </ScaledText>
-                          </View>
-                        )}
+                          <CategorySection
+                            key={`${prog.id}-${group.category}`}
+                            group={group}
+                            todayCounts={todayCounts}
+                            language={language}
+                            t={t}
+                            onExercisePress={handleExercisePress}
+                            onDoAllInCategory={handleDoAllInCategory}
+                            isExpired={progExpired}
+                            reviewRequirements={reviewRequirements}
+                            todaySubmissions={todaySubmissions}
+                            pastel={pastel}
+                          />
+                        ))}
+
                       </View>
                     )}
                   </View>
@@ -2360,17 +2346,9 @@ const styles = StyleSheet.create({
     paddingTop: 8,
     paddingLeft: 8,
     paddingRight: 4,
-    paddingBottom: 4,
+    paddingBottom: 8,
   },
-  programExerciseListScroll: {
-    maxHeight: 280,
-  },
-  scrollHintRow: {
-    alignItems: 'center' as const,
-    paddingVertical: 6,
-    borderTopWidth: 1,
-    marginTop: 2,
-  },
+
   programRemarksCard: {
     backgroundColor: Colors.secondaryLight,
     borderRadius: 12,

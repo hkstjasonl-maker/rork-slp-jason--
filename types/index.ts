@@ -285,6 +285,17 @@ export interface ProgramObjective {
   created_at?: string;
 }
 
+export interface HolisticObjective {
+  id: string;
+  patient_id: string;
+  objective_en: string;
+  objective_zh_hant: string | null;
+  objective_zh_hans: string | null;
+  sort_order: number;
+  is_active: boolean;
+  created_at?: string;
+}
+
 export const FONT_SCALES: Record<FontSizeLevel, number> = {
   small: 0.8,
   medium: 1.0,

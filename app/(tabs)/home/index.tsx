@@ -22,7 +22,7 @@ import { AppTutorial } from '@/components/AppTutorial';
 import { supabase } from '@/lib/supabase';
 import Colors from '@/constants/colors';
 import { TherapistImage } from '@/components/TherapistImage';
-import { Exercise, ExerciseProgram, ExerciseLog, Language, ExerciseReviewRequirement, FeedingSkillAssignment, ProgramObjective, ProgramSchedule } from '@/types';
+import { Exercise, ExerciseProgram, ExerciseLog, Language, ExerciseReviewRequirement, FeedingSkillAssignment, ProgramObjective, HolisticObjective, ProgramSchedule } from '@/types';
 import { getDosageProgressText, getExerciseDosage } from '@/lib/dosage';
 import { getLocalizedField } from '@/constants/i18n';
 import { log } from '@/lib/logger';
@@ -575,37 +575,29 @@ export default function HomeScreen() {
   const [objectivesExpanded, setObjectivesExpanded] = useState<boolean>(false);
 
   const holisticObjectivesQuery = useQuery({
-    queryKey: ['holisticObjectives', programIdKey],
+    queryKey: ['holisticObjectives', patientId],
     queryFn: async () => {
-      const ids = allPrograms.map(p => p.id);
-      if (ids.length === 0) return [];
-      log('Fetching holistic objectives for all active programs:', ids);
+      if (!patientId) return [];
+      log('Fetching holistic objectives for patient:', patientId);
       const { data, error } = await supabase
-        .from('program_objectives')
+        .from('holistic_objectives')
         .select('*')
-        .in('program_id', ids)
+        .eq('patient_id', patientId)
+        .eq('is_active', true)
         .order('sort_order', { ascending: true });
       if (error) {
         log('Holistic objectives fetch error:', error);
         return [];
       }
-      return (data || []) as ProgramObjective[];
+      return (data || []) as HolisticObjective[];
     },
-    enabled: allPrograms.length > 0,
+    enabled: !!patientId,
     staleTime: 5 * 60 * 1000,
   });
 
   const holisticObjectives = useMemo(
     () => holisticObjectivesQuery.data || [],
     [holisticObjectivesQuery.data]
-  );
-  const activeHolisticObjectives = useMemo(
-    () => holisticObjectives.filter(o => o.is_active),
-    [holisticObjectives]
-  );
-  const inactiveHolisticObjectives = useMemo(
-    () => holisticObjectives.filter(o => !o.is_active),
-    [holisticObjectives]
   );
   const [holisticExpanded, setHolisticExpanded] = useState<boolean>(false);
   const holisticAnimHeight = useRef(new Animated.Value(0)).current;
@@ -652,15 +644,6 @@ export default function HomeScreen() {
       tension: 80,
     }).start();
   }, [holisticExpanded, holisticAnimHeight]);
-
-  const getObjectiveProgramName = useCallback((programId: string): string => {
-    const prog = allPrograms.find(p => p.id === programId);
-    if (!prog) return '';
-    const lang = language || 'en';
-    if (lang === 'zh_hant') return prog.name_zh_hant || prog.name_en || '';
-    if (lang === 'zh_hans') return prog.name_zh_hans || prog.name_en || '';
-    return prog.name_en || '';
-  }, [allPrograms, language]);
 
   const [showRecommendation, setShowRecommendation] = useState(false);
   const { currentDraw, dismissCurrentDraw, refreshPatient: refreshPatientCtx } = useApp();
@@ -981,7 +964,7 @@ export default function HomeScreen() {
                     <View style={styles.holisticToggleRight}>
                       <View style={styles.holisticCountBadge}>
                         <ScaledText size={10} weight="700" color="#10B981">
-                          {activeHolisticObjectives.length} {t('goalsCount')}
+                          {holisticObjectives.length} {t('goalsCount')}
                         </ScaledText>
                       </View>
                       {holisticExpanded ? (
@@ -1012,14 +995,13 @@ export default function HomeScreen() {
                       showsVerticalScrollIndicator={false}
                       nestedScrollEnabled
                     >
-                      {activeHolisticObjectives.map((obj) => {
+                      {holisticObjectives.map((obj: HolisticObjective) => {
                         const lang = language || 'en';
                         const text = lang === 'zh_hant'
                           ? (obj.objective_zh_hant || obj.objective_en)
                           : lang === 'zh_hans'
                             ? (obj.objective_zh_hans || obj.objective_en)
                             : obj.objective_en;
-                        const progName = getObjectiveProgramName(obj.program_id);
                         return (
                           <View key={obj.id} style={styles.holisticItem}>
                             <View style={styles.holisticCheckIcon}>
@@ -1029,37 +1011,6 @@ export default function HomeScreen() {
                               <ScaledText size={13} color={Colors.textPrimary} style={styles.holisticItemText}>
                                 {text}
                               </ScaledText>
-                              {progName ? (
-                                <ScaledText size={10} color={Colors.textSecondary}>
-                                  {t('fromProgram')} {progName}
-                                </ScaledText>
-                              ) : null}
-                            </View>
-                          </View>
-                        );
-                      })}
-                      {inactiveHolisticObjectives.map((obj) => {
-                        const lang = language || 'en';
-                        const text = lang === 'zh_hant'
-                          ? (obj.objective_zh_hant || obj.objective_en)
-                          : lang === 'zh_hans'
-                            ? (obj.objective_zh_hans || obj.objective_en)
-                            : obj.objective_en;
-                        const progName = getObjectiveProgramName(obj.program_id);
-                        return (
-                          <View key={obj.id} style={[styles.holisticItem, styles.holisticItemDimmed]}>
-                            <View style={styles.holisticCheckIcon}>
-                              <CheckCircle2 size={16} color={Colors.success} />
-                            </View>
-                            <View style={styles.holisticItemContent}>
-                              <ScaledText size={13} color={Colors.textSecondary} style={[styles.holisticItemText, styles.holisticItemTextDone]}>
-                                {text}
-                              </ScaledText>
-                              {progName ? (
-                                <ScaledText size={10} color={Colors.disabled}>
-                                  {t('fromProgram')} {progName}
-                                </ScaledText>
-                              ) : null}
                             </View>
                           </View>
                         );

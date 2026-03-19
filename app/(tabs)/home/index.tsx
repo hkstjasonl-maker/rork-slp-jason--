@@ -63,6 +63,17 @@ import {
   X,
 } from 'lucide-react-native';
 
+const PROGRAM_ACCENT_COLORS = [
+  '#3B82F6',
+  '#EC4899',
+  '#10B981',
+  '#8B5CF6',
+  '#F59E0B',
+  '#F97316',
+  '#06B6D4',
+  '#DB2777',
+];
+
 interface CategoryGroup {
   category: string;
   exercises: Exercise[];
@@ -1103,12 +1114,14 @@ export default function HomeScreen() {
                   return e.dosage_per_day ? count >= e.dosage_per_day : count > 0;
                 }).length;
                 const progObjectives = objectives.filter(o => o.program_id === prog.id);
+                const progAccentColor = PROGRAM_ACCENT_COLORS[todaysPrograms.indexOf(prog) % PROGRAM_ACCENT_COLORS.length];
 
                 return (
                   <View key={prog.id} style={styles.programCardSection}>
                     <TouchableOpacity
                       style={[
                         styles.programCardHeader,
+                        { borderLeftWidth: 5, borderLeftColor: progAccentColor },
                         progCompletedCount === progExercises.length && progExercises.length > 0 && styles.programCardHeaderDone,
                       ]}
                       onPress={() => toggleProgramExpanded(prog.id)}
@@ -1116,11 +1129,11 @@ export default function HomeScreen() {
                       testID={`program-card-${prog.id}`}
                     >
                       <View style={styles.programCardHeaderLeft}>
-                        <View style={[styles.programCardIcon, progCompletedCount === progExercises.length && progExercises.length > 0 ? { backgroundColor: Colors.successLight } : {}]}>
-                          <Layers size={16} color={progCompletedCount === progExercises.length && progExercises.length > 0 ? Colors.success : Colors.primary} />
+                        <View style={[styles.programCardIcon, { backgroundColor: progCompletedCount === progExercises.length && progExercises.length > 0 ? Colors.successLight : progAccentColor + '20' }]}>
+                          <Layers size={16} color={progCompletedCount === progExercises.length && progExercises.length > 0 ? Colors.success : progAccentColor} />
                         </View>
                         <View style={styles.programCardTitleBlock}>
-                          <ScaledText size={15} weight="bold" color={progCompletedCount === progExercises.length && progExercises.length > 0 ? Colors.success : Colors.textPrimary} numberOfLines={2}>
+                          <ScaledText size={15} weight="bold" color={progCompletedCount === progExercises.length && progExercises.length > 0 ? Colors.success : progAccentColor} numberOfLines={2}>
                             {getProgramName(prog)}
                           </ScaledText>
                           <View style={styles.programCardMeta}>
@@ -1160,7 +1173,7 @@ export default function HomeScreen() {
                     </TouchableOpacity>
 
                     {isExpanded && (
-                      <View style={styles.programCardBody}>
+                      <View style={[styles.programCardBody, { borderLeftWidth: 3, borderLeftColor: progAccentColor + '30', marginLeft: 2, paddingLeft: 12 }]}>
                         {prog.remarks && (
                           <TouchableOpacity
                             style={styles.programRemarksCard}

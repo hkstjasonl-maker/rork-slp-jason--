@@ -2,8 +2,58 @@ import { Audio } from 'expo-av';
 
 let soundCache: Record<string, Audio.Sound> = {};
 
+const preloadedSounds: Record<string, Audio.Sound> = {};
+let isPreloaded = false;
+
+const SOUND_URLS: Record<string, string> = {
+  mj_shuffle: 'https://cdn.freesound.org/previews/240/240776_4107740-lq.mp3',
+  mj_win: 'https://cdn.freesound.org/previews/270/270402_5123851-lq.mp3',
+  mj_lose: 'https://cdn.freesound.org/previews/362/362205_6629901-lq.mp3',
+  mj_choice: 'https://cdn.freesound.org/previews/411/411089_5121236-lq.mp3',
+  timer_done: 'https://cdn.freesound.org/previews/320/320655_5260872-lq.mp3',
+  rating: 'https://cdn.freesound.org/previews/270/270402_5123851-lq.mp3',
+  assistant: 'https://cdn.freesound.org/previews/242/242501_4284968-lq.mp3',
+  zen_chime: 'https://cdn.freesound.org/previews/411/411089_5121236-lq.mp3',
+  cd_tick: 'https://cdn.freesound.org/previews/536/536420_11943129-lq.mp3',
+  cd_end: 'https://cdn.freesound.org/previews/320/320655_5260872-lq.mp3',
+};
+
+export async function preloadAllSounds() {
+  if (isPreloaded) return;
+  await initAudio();
+  console.log('[SoundEffects] Preloading all sounds...');
+  await Promise.allSettled(
+    Object.entries(SOUND_URLS).map(async ([name, uri]) => {
+      try {
+        const { sound } = await Audio.Sound.createAsync(
+          { uri },
+          { shouldPlay: false, volume: 0 }
+        );
+        preloadedSounds[name] = sound;
+        console.log('[SoundEffects] Preloaded:', name);
+      } catch (e) {
+        console.warn('[SoundEffects] Preload failed:', name, e);
+      }
+    })
+  );
+  isPreloaded = true;
+  console.log('[SoundEffects] Preload complete, loaded:', Object.keys(preloadedSounds).length);
+}
+
 async function playSound(name: string, uri: string, volume: number = 0.5) {
   try {
+    const preloaded = preloadedSounds[name];
+    if (preloaded) {
+      try {
+        await preloaded.setPositionAsync(0);
+        await preloaded.setVolumeAsync(volume);
+        await preloaded.playAsync();
+        return;
+      } catch (e) {
+        console.warn('[SoundEffects] Preloaded play failed, falling back:', name, e);
+      }
+    }
+
     if (soundCache[name]) {
       try { await soundCache[name].stopAsync(); } catch {}
       try { await soundCache[name].unloadAsync(); } catch {}

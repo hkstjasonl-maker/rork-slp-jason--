@@ -5,6 +5,7 @@ import * as ScreenOrientation from 'expo-screen-orientation';
 import React, { useEffect } from "react";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { AppProvider, useApp } from "@/contexts/AppContext";
+import { preloadAllSounds } from "@/utils/soundEffects";
 import { ScreenProtection } from "@/components/ScreenProtection";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { NetworkErrorBanner } from "@/components/NetworkErrorBanner";
@@ -49,6 +50,7 @@ export default function RootLayout() {
   useEffect(() => {
     void SplashScreen.hideAsync();
     ScreenOrientation.lockAsync(ScreenOrientation.OrientationLock.PORTRAIT_UP).catch(() => {});
+    preloadAllSounds().catch(() => {});
   }, []);
 
   return (

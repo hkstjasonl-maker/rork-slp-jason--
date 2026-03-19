@@ -9,7 +9,7 @@ import {
   ScrollView,
 } from 'react-native';
 import * as Haptics from 'expo-haptics';
-import { X, Gift, ChevronRight } from 'lucide-react-native';
+import { X, Gift, ChevronRight, RotateCw } from 'lucide-react-native';
 import { useRouter } from 'expo-router';
 
 import ScratchCard from '@/components/ScratchCard';
@@ -28,6 +28,7 @@ interface MarketingDrawModalProps {
   queue: QueuedCampaign[];
   patientId: string;
   onClose: () => void;
+  onDrawConsumed?: () => void;
   onPrizeClaimed?: () => void;
 }
 
@@ -52,19 +53,21 @@ export default function MarketingDrawModal({
   queue,
   patientId,
   onClose,
+  onDrawConsumed,
   onPrizeClaimed,
 }: MarketingDrawModalProps) {
   const { language, t } = useApp();
   const router = useRouter();
-  const [currentIndex, setCurrentIndex] = useState<number>(0);
   const [phase, setPhase] = useState<'scratch' | 'revealed' | 'done'>('scratch');
   const [saving, setSaving] = useState<boolean>(false);
   const fadeAnim = useRef(new Animated.Value(0)).current;
   const slideAnim = useRef(new Animated.Value(50)).current;
 
+  const currentItem = queue.length > 0 ? queue[0] : null;
+  const remainingAfterCurrent = queue.length - 1;
+
   useEffect(() => {
     if (visible) {
-      setCurrentIndex(0);
       setPhase('scratch');
       fadeAnim.setValue(0);
       slideAnim.setValue(50);
@@ -83,8 +86,6 @@ export default function MarketingDrawModal({
       ]).start();
     }
   }, [visible, fadeAnim, slideAnim]);
-
-  const currentItem = queue[currentIndex] ?? null;
 
   const handleRevealed = useCallback(async () => {
     if (!currentItem || saving) return;
@@ -114,17 +115,20 @@ export default function MarketingDrawModal({
     }
   }, [currentItem, patientId, saving, onPrizeClaimed]);
 
-  const handleNext = useCallback(() => {
-    if (currentIndex < queue.length - 1) {
-      setCurrentIndex((prev) => prev + 1);
-      setPhase('scratch');
-      if (Platform.OS !== 'web') {
-        void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-      }
-    } else {
-      setPhase('done');
+  const handleDrawAgain = useCallback(() => {
+    log('[MarketingDrawModal] Draw again pressed, remaining:', remainingAfterCurrent);
+    onDrawConsumed?.();
+    setPhase('scratch');
+    if (Platform.OS !== 'web') {
+      void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     }
-  }, [currentIndex, queue.length]);
+  }, [remainingAfterCurrent, onDrawConsumed]);
+
+  const handleFinishAllDraws = useCallback(() => {
+    log('[MarketingDrawModal] All draws finished');
+    onDrawConsumed?.();
+    setPhase('done');
+  }, [onDrawConsumed]);
 
   const handleViewTreasure = useCallback(() => {
     onClose();
@@ -175,7 +179,7 @@ export default function MarketingDrawModal({
                   {t('marketingDrawComplete')}
                 </ScaledText>
                 <ScaledText size={15} color={Colors.textSecondary} style={styles.doneSubtitle}>
-                  {t('prizeSavedToChest')}
+                  {t('noMoreDrawsToday')}
                 </ScaledText>
 
                 <TouchableOpacity
@@ -224,17 +228,10 @@ export default function MarketingDrawModal({
                 </View>
 
                 {queue.length > 1 && (
-                  <View style={styles.queueIndicator}>
-                    {queue.map((_, idx) => (
-                      <View
-                        key={idx}
-                        style={[
-                          styles.queueDot,
-                          idx === currentIndex && styles.queueDotActive,
-                          idx < currentIndex && styles.queueDotDone,
-                        ]}
-                      />
-                    ))}
+                  <View style={styles.remainingBadge}>
+                    <ScaledText size={12} weight="600" color="#E67E22">
+                      {remainingAfterCurrent} {t('drawsRemaining')}
+                    </ScaledText>
                   </View>
                 )}
 
@@ -266,37 +263,46 @@ export default function MarketingDrawModal({
                       {t('prizeSavedToChest')}
                     </ScaledText>
 
-                    {queue.length > 1 && currentIndex < queue.length - 1 ? (
+                    {remainingAfterCurrent > 0 ? (
                       <TouchableOpacity
-                        style={styles.nextBtn}
-                        onPress={handleNext}
+                        style={styles.drawAgainBtn}
+                        onPress={handleDrawAgain}
                         activeOpacity={0.8}
                       >
-                        <ScaledText size={15} weight="600" color="#fff">
-                          {t('nextDraw')}
+                        <RotateCw size={18} color="#fff" />
+                        <ScaledText size={15} weight="600" color="#fff" style={styles.drawAgainBtnText}>
+                          {t('drawAgain')} ({remainingAfterCurrent} {t('drawsRemaining')})
                         </ScaledText>
-                        <ChevronRight size={16} color="#fff" />
                       </TouchableOpacity>
                     ) : (
-                      <TouchableOpacity
-                        style={styles.treasureBtn}
-                        onPress={handleViewTreasure}
-                        activeOpacity={0.8}
-                      >
-                        <Gift size={18} color="#fff" />
-                        <ScaledText size={15} weight="600" color="#fff" style={styles.treasureBtnText}>
-                          {t('viewTreasureChest')}
+                      <>
+                        <ScaledText
+                          size={13}
+                          color={Colors.textSecondary}
+                          style={styles.noMoreDrawsText}
+                        >
+                          {t('noMoreDrawsToday')}
                         </ScaledText>
-                      </TouchableOpacity>
+                        <TouchableOpacity
+                          style={styles.treasureBtn}
+                          onPress={handleViewTreasure}
+                          activeOpacity={0.8}
+                        >
+                          <Gift size={18} color="#fff" />
+                          <ScaledText size={15} weight="600" color="#fff" style={styles.treasureBtnText}>
+                            {t('viewTreasureChest')}
+                          </ScaledText>
+                        </TouchableOpacity>
+                      </>
                     )}
 
                     <TouchableOpacity
                       style={styles.dismissBtn}
-                      onPress={currentIndex < queue.length - 1 ? handleNext : handleDismiss}
+                      onPress={remainingAfterCurrent > 0 ? handleFinishAllDraws : handleDismiss}
                       activeOpacity={0.7}
                     >
                       <ScaledText size={14} color={Colors.textSecondary}>
-                        {currentIndex < queue.length - 1 ? '' : t('maybeLater')}
+                        {remainingAfterCurrent > 0 ? t('skipRemainingDraws') : t('maybeLater')}
                       </ScaledText>
                     </TouchableOpacity>
                   </Animated.View>
@@ -382,25 +388,14 @@ const styles = StyleSheet.create({
   campaignSubtitle: {
     textAlign: 'center',
   },
-  queueIndicator: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    marginBottom: 16,
-  },
-  queueDot: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-    backgroundColor: '#E0E0E0',
-  },
-  queueDotActive: {
-    backgroundColor: '#FF6B6B',
-    width: 20,
-    borderRadius: 4,
-  },
-  queueDotDone: {
-    backgroundColor: '#4CAF50',
+  remainingBadge: {
+    backgroundColor: '#FFF8EE',
+    borderRadius: 12,
+    paddingHorizontal: 14,
+    paddingVertical: 6,
+    marginBottom: 12,
+    borderWidth: 1,
+    borderColor: '#FDEBD0',
   },
   scratchContainer: {
     marginVertical: 12,
@@ -418,7 +413,7 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     marginBottom: 16,
   },
-  nextBtn: {
+  drawAgainBtn: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
@@ -426,8 +421,16 @@ const styles = StyleSheet.create({
     paddingHorizontal: 24,
     paddingVertical: 14,
     borderRadius: 14,
-    gap: 6,
+    gap: 8,
     width: '100%',
+  },
+  drawAgainBtnText: {
+    marginLeft: 2,
+  },
+  noMoreDrawsText: {
+    textAlign: 'center',
+    marginBottom: 12,
+    fontStyle: 'italic',
   },
   treasureBtn: {
     flexDirection: 'row',

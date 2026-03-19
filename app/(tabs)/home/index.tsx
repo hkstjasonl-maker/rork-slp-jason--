@@ -664,7 +664,7 @@ export default function HomeScreen() {
   }, [holisticExpanded, holisticAnimHeight]);
 
   const [showRecommendation, setShowRecommendation] = useState(false);
-  const { currentDraw, dismissCurrentDraw, refreshPatient: refreshPatientCtx } = useApp();
+  const { drawQueue, drawModalVisible, consumeDrawFromQueue, dismissDrawModal, refreshPatient: refreshPatientCtx } = useApp();
 
   const recommendations = useMemo(() => {
     if (exercises.length === 0) return [];
@@ -1513,12 +1513,13 @@ export default function HomeScreen() {
       </SafeAreaView>
       <AppTutorial visible={showTutorial} onComplete={handleTutorialComplete} />
 
-      {currentDraw && (
+      {drawModalVisible && drawQueue.length > 0 && (
         <MarketingDrawModal
-          visible={!!currentDraw}
-          queue={currentDraw ? [currentDraw] : []}
+          visible={drawModalVisible}
+          queue={drawQueue}
           patientId={patientId || ''}
-          onClose={dismissCurrentDraw}
+          onClose={dismissDrawModal}
+          onDrawConsumed={consumeDrawFromQueue}
           onPrizeClaimed={refreshPatientCtx}
         />
       )}

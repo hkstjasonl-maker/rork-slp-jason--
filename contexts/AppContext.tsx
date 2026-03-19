@@ -46,7 +46,7 @@ export const [AppProvider, useApp] = createContextHook(() => {
 
   const [flowersJustStolen, setFlowersJustStolen] = useState<number>(0);
   const [drawQueue, setDrawQueue] = useState<QueuedCampaign[]>([]);
-  const [currentDraw, setCurrentDraw] = useState<QueuedCampaign | null>(null);
+  const [drawModalVisible, setDrawModalVisible] = useState<boolean>(false);
   const appOpenMarketingChecked = useRef<boolean>(false);
 
   useEffect(() => {
@@ -419,21 +419,28 @@ export const [AppProvider, useApp] = createContextHook(() => {
   const addToDrawQueue = useCallback((campaigns: QueuedCampaign[]) => {
     if (campaigns.length === 0) return;
     log('[AppContext] Adding', campaigns.length, 'campaigns to draw queue');
-    setDrawQueue(prev => [...prev, ...campaigns]);
+    setDrawQueue(prev => {
+      const updated = [...prev, ...campaigns];
+      return updated;
+    });
+    setDrawModalVisible(true);
   }, []);
 
-  const dismissCurrentDraw = useCallback(() => {
-    log('[AppContext] Dismissing current draw');
-    setCurrentDraw(null);
+  const consumeDrawFromQueue = useCallback(() => {
+    log('[AppContext] Consuming first draw from queue');
+    setDrawQueue(prev => prev.slice(1));
   }, []);
 
-  useEffect(() => {
-    if (!currentDraw && drawQueue.length > 0) {
-      log('[AppContext] Dequeuing next draw campaign');
-      setCurrentDraw(drawQueue[0]);
-      setDrawQueue(prev => prev.slice(1));
-    }
-  }, [currentDraw, drawQueue]);
+  const dismissDrawModal = useCallback(() => {
+    log('[AppContext] Dismissing draw modal, clearing queue');
+    setDrawModalVisible(false);
+    setDrawQueue([]);
+  }, []);
+
+  const closeDrawModalKeepQueue = useCallback(() => {
+    log('[AppContext] Closing draw modal, keeping remaining queue');
+    setDrawModalVisible(false);
+  }, []);
 
   useEffect(() => {
     if (!patientId || !isReady) return;
@@ -507,9 +514,11 @@ export const [AppProvider, useApp] = createContextHook(() => {
     clearFlowersStolen,
     refreshPatient,
     drawQueue,
-    currentDraw,
+    drawModalVisible,
     addToDrawQueue,
-    dismissCurrentDraw,
+    consumeDrawFromQueue,
+    dismissDrawModal,
+    closeDrawModalKeepQueue,
     setLanguage,
     setTermsAccepted,
     setPatient,
@@ -534,7 +543,7 @@ export const [AppProvider, useApp] = createContextHook(() => {
     flowersJustStolen,
     clearFlowersStolen,
     refreshPatient,
-    drawQueue, currentDraw, addToDrawQueue, dismissCurrentDraw,
+    drawQueue, drawModalVisible, addToDrawQueue, consumeDrawFromQueue, dismissDrawModal, closeDrawModalKeepQueue,
     setLanguage,
     setTermsAccepted, setPatient, clearPatient, setFontSizeLevel,
     setLiveSubtitlesEnabled, setSubtitleSizeLevel, setMahjongGameEnabled, setMahjongGameLevel,

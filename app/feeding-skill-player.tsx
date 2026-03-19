@@ -983,6 +983,9 @@ export default function FeedingSkillPlayerScreen() {
             setShowMarketingDraw(false);
             setMarketingQueue([]);
           }}
+          onDrawConsumed={() => {
+            setMarketingQueue(prev => prev.slice(1));
+          }}
         />
       </SafeAreaView>
     </View>

@@ -532,7 +532,7 @@ export default function ExerciseScreen() {
   }>();
   const router = useRouter();
   const queryClient = useQueryClient();
-  const { t, patientId, patientName, language, reinforcementAudioId, reinforcementAudioUrl, liveSubtitlesEnabled, subtitleSizeLevel, mahjongGameEnabled, mahjongGameLevel, refreshPatient: refreshPatientCtx, addToDrawQueue, currentDraw, dismissCurrentDraw } = useApp();
+  const { t, patientId, patientName, language, reinforcementAudioId, reinforcementAudioUrl, liveSubtitlesEnabled, subtitleSizeLevel, mahjongGameEnabled, mahjongGameLevel, refreshPatient: refreshPatientCtx, addToDrawQueue, drawQueue, drawModalVisible, consumeDrawFromQueue, dismissDrawModal } = useApp();
 
   const allIds: string[] = useMemo(() => {
     if (params.allExerciseIds) {
@@ -1995,12 +1995,13 @@ export default function ExerciseScreen() {
           patientId={patientId || ''}
         />
 
-        {currentDraw && (
+        {drawModalVisible && drawQueue.length > 0 && (
           <MarketingDrawModal
-            visible={!!currentDraw}
-            queue={currentDraw ? [currentDraw] : []}
+            visible={drawModalVisible}
+            queue={drawQueue}
             patientId={patientId || ''}
-            onClose={dismissCurrentDraw}
+            onClose={dismissDrawModal}
+            onDrawConsumed={consumeDrawFromQueue}
             onPrizeClaimed={refreshPatientCtx}
           />
         )}

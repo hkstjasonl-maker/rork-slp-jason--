@@ -414,6 +414,13 @@ export default function HomeScreen() {
     return allExercises;
   }, [todaysPrograms]);
 
+  const allExercisesDone = useMemo(() => {
+    return exercises.length > 0 && exercises.every(e => {
+      const count = todayCounts[e.id] || 0;
+      return e.dosage_per_day ? count >= e.dosage_per_day : count > 0;
+    });
+  }, [exercises, todayCounts]);
+
   const submissionTitleMap = useMemo(() => {
     const map: Record<string, string> = {};
     if (language !== 'zh_hant' && language !== 'zh_hans') return map;
@@ -1056,15 +1063,19 @@ export default function HomeScreen() {
 
           {todaysPrograms.length > 0 && exercises.length > 0 && !isExpired && (
             <TouchableOpacity
-              style={styles.doAllButton}
+              style={[styles.doAllButton, allExercisesDone && styles.doAllButtonDone]}
               onPress={handleDoAll}
               activeOpacity={0.8}
-              accessibilityLabel={t('doAllExercises')}
+              accessibilityLabel={allExercisesDone ? t('allComplete') : t('doAllExercises')}
               accessibilityRole="button"
             >
-              <Play size={22} color={Colors.white} />
+              {allExercisesDone ? (
+                <CheckCircle2 size={22} color={Colors.white} />
+              ) : (
+                <Play size={22} color={Colors.white} />
+              )}
               <ScaledText size={18} weight="bold" color={Colors.white} style={styles.doAllText}>
-                {t('doAllExercises')}
+                {allExercisesDone ? t('allComplete') : t('doAllExercises')}
               </ScaledText>
             </TouchableOpacity>
           )}
@@ -1738,6 +1749,10 @@ const styles = StyleSheet.create({
   },
   doAllText: {
     letterSpacing: 0.5,
+  },
+  doAllButtonDone: {
+    backgroundColor: Colors.success,
+    shadowColor: Colors.success,
   },
   exercisesSection: {
     paddingHorizontal: 20,

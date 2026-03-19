@@ -13,6 +13,7 @@ import { X, Gift, ChevronRight, RotateCw } from 'lucide-react-native';
 import { useRouter } from 'expo-router';
 
 import ScratchCard from '@/components/ScratchCard';
+import BalloonPopDraw from '@/components/BalloonPopDraw';
 import { ScaledText } from '@/components/ScaledText';
 import { useApp } from '@/contexts/AppContext';
 import {
@@ -59,6 +60,7 @@ export default function MarketingDrawModal({
   const { language, t } = useApp();
   const router = useRouter();
   const [phase, setPhase] = useState<'scratch' | 'revealed' | 'done'>('scratch');
+  const [drawMode, setDrawMode] = useState<'scratch' | 'balloon'>('scratch');
   const [saving, setSaving] = useState<boolean>(false);
   const fadeAnim = useRef(new Animated.Value(0)).current;
   const slideAnim = useRef(new Animated.Value(50)).current;
@@ -69,6 +71,7 @@ export default function MarketingDrawModal({
   useEffect(() => {
     if (visible) {
       setPhase('scratch');
+      setDrawMode(Math.random() < 0.5 ? 'scratch' : 'balloon');
       fadeAnim.setValue(0);
       slideAnim.setValue(50);
       Animated.parallel([
@@ -119,6 +122,7 @@ export default function MarketingDrawModal({
     log('[MarketingDrawModal] Draw again pressed, remaining:', remainingAfterCurrent);
     onDrawConsumed?.();
     setPhase('scratch');
+    setDrawMode(Math.random() < 0.5 ? 'scratch' : 'balloon');
     if (Platform.OS !== 'web') {
       void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     }
@@ -236,13 +240,22 @@ export default function MarketingDrawModal({
                 )}
 
                 <View style={styles.scratchContainer}>
-                  <ScratchCard
-                    prizeImageUrl={currentItem.prize.voucher_image_url}
-                    prizeText={getPrizeName(currentItem.prize, language)}
-                    prizeCode={currentItem.prize.discount_code}
-                    onRevealed={handleRevealed}
-                    scratchColor="#B8C4D0"
-                  />
+                  {drawMode === 'balloon' ? (
+                    <BalloonPopDraw
+                      prizeImageUrl={currentItem.prize.voucher_image_url}
+                      prizeText={getPrizeName(currentItem.prize, language)}
+                      prizeCode={currentItem.prize.discount_code}
+                      onRevealed={handleRevealed}
+                    />
+                  ) : (
+                    <ScratchCard
+                      prizeImageUrl={currentItem.prize.voucher_image_url}
+                      prizeText={getPrizeName(currentItem.prize, language)}
+                      prizeCode={currentItem.prize.discount_code}
+                      onRevealed={handleRevealed}
+                      scratchColor="#B8C4D0"
+                    />
+                  )}
                 </View>
 
                 {phase === 'revealed' && (
@@ -314,7 +327,7 @@ export default function MarketingDrawModal({
                     color={Colors.textSecondary}
                     style={styles.hintText}
                   >
-                    {t('scratchToReveal')}
+                    {drawMode === 'balloon' ? t('tapBalloon') : t('scratchToReveal')}
                   </ScaledText>
                 )}
               </View>

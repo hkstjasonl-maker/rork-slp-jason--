@@ -16,6 +16,7 @@ const SOUND_URLS: Record<string, string> = {
   zen_chime: 'https://cdn.freesound.org/previews/411/411089_5121236-lq.mp3',
   cd_tick: 'https://cdn.freesound.org/previews/536/536420_11943129-lq.mp3',
   cd_end: 'https://cdn.freesound.org/previews/320/320655_5260872-lq.mp3',
+  balloon_pop: 'https://cdn.freesound.org/previews/362/362205_6629901-lq.mp3',
 };
 
 export async function preloadAllSounds() {
@@ -150,6 +151,10 @@ export async function playCountdownTick() {
 
 export async function playCountdownEnd() {
   await playSound('cd_end', 'https://cdn.freesound.org/previews/320/320655_5260872-lq.mp3', 0.4);
+}
+
+export async function playBalloonPop() {
+  await playSound('balloon_pop', 'https://cdn.freesound.org/previews/362/362205_6629901-lq.mp3', 0.5);
 }
 
 export async function cleanupSounds() {

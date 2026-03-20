@@ -944,11 +944,10 @@ const MemoGardenScene = React.memo(function GardenScene({ flowers, flowerTypeMap
   );
 });
 
-function CollectionCard({ group, index, isZh, expanded, onToggleExpand }: {
+function CollectionCard({ group, index, isZh, onToggleExpand }: {
   group: GroupedFlower;
   index: number;
   isZh: boolean;
-  expanded: boolean;
   onToggleExpand: () => void;
 }) {
   const popAnim = useRef(new Animated.Value(0)).current;
@@ -960,7 +959,7 @@ function CollectionCard({ group, index, isZh, expanded, onToggleExpand }: {
   }, [popAnim, index]);
 
   const scale = popAnim.interpolate({ inputRange: [0, 1], outputRange: [0.5, 1] });
-  const { flowerType, count, flowers: flowerInstances } = group;
+  const { flowerType, count } = group;
   const rarity = flowerType.rarity || 'common';
   const rarityInfo = RARITY_COLORS[rarity] || RARITY_COLORS.common;
 
@@ -989,24 +988,7 @@ function CollectionCard({ group, index, isZh, expanded, onToggleExpand }: {
             </View>
           </View>
         </View>
-        {expanded && (
-          <View style={styles.cardExpandedSection}>
-            <View style={styles.cardDivider} />
-            <ScaledText size={10} weight="600" color="#8D6E63" style={{ marginBottom: 4 }}>
-              {isZh ? '獲得日期' : 'Acquired'}
-            </ScaledText>
-            {flowerInstances.slice(0, 5).map((fi) => (
-              <ScaledText key={fi.id} size={9} color={Colors.textSecondary} style={{ marginTop: 2 }}>
-                {new Date(fi.obtained_at).toLocaleDateString(isZh ? 'zh-TW' : 'en-US', { month: 'short', day: 'numeric' })}
-              </ScaledText>
-            ))}
-            {flowerInstances.length > 5 && (
-              <ScaledText size={9} color={Colors.textSecondary} style={{ marginTop: 2 }}>
-                +{flowerInstances.length - 5} more
-              </ScaledText>
-            )}
-          </View>
-        )}
+
       </TouchableOpacity>
     </Animated.View>
   );
@@ -1043,7 +1025,7 @@ export default function FlowerYieldScreen() {
   const [selectedFlower, setSelectedFlower] = useState<PatientFlower | null>(null);
   const [theftModalVisible, setTheftModalVisible] = useState<boolean>(false);
   const [collectionExpanded, setCollectionExpanded] = useState<boolean>(true);
-  const [expandedCardId, setExpandedCardId] = useState<string | null>(null);
+
   const [manageModalVisible, setManageModalVisible] = useState<boolean>(false);
   const manageScaleAnim = useRef(new Animated.Value(0)).current;
 
@@ -1323,10 +1305,7 @@ export default function FlowerYieldScreen() {
     setCollectionExpanded((prev) => !prev);
   }, []);
 
-  const toggleCardExpand = useCallback((id: string) => {
-    LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
-    setExpandedCardId((prev) => (prev === id ? null : id));
-  }, []);
+
 
   const openManageModal = useCallback(() => {
     setManageModalVisible(true);
@@ -1563,8 +1542,7 @@ export default function FlowerYieldScreen() {
                           group={group}
                           index={index}
                           isZh={isZh}
-                          expanded={expandedCardId === group.flowerType.id}
-                          onToggleExpand={() => toggleCardExpand(group.flowerType.id)}
+                          onToggleExpand={() => {}}
                         />
                       ))}
                     </View>

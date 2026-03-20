@@ -15,23 +15,33 @@ export default function IndexScreen() {
   const fadeAnim = useRef(new Animated.Value(0)).current;
   const slideAnim = useRef(new Animated.Value(20)).current;
   const orgsFadeAnim = useRef(new Animated.Value(0)).current;
+  const logoScale = useRef(new Animated.Value(0.8)).current;
+  const logoOpacity = useRef(new Animated.Value(1)).current;
   const [partners, setPartners] = useState<Organisation[]>([]);
   const [supporters, setSupporters] = useState<Organisation[]>([]);
 
   useEffect(() => {
+    Animated.timing(logoScale, {
+      toValue: 1,
+      duration: 400,
+      useNativeDriver: true,
+    }).start();
+
     Animated.parallel([
       Animated.timing(fadeAnim, {
         toValue: 1,
         duration: 600,
+        delay: 150,
         useNativeDriver: true,
       }),
       Animated.timing(slideAnim, {
         toValue: 0,
         duration: 600,
+        delay: 150,
         useNativeDriver: true,
       }),
     ]).start();
-  }, [fadeAnim, slideAnim]);
+  }, [fadeAnim, slideAnim, logoScale]);
 
   useEffect(() => {
     const fetchOrgs = async () => {
@@ -135,15 +145,11 @@ export default function IndexScreen() {
 
   return (
     <View style={styles.container}>
-      <Animated.View
-        style={[
-          styles.content,
-          { opacity: fadeAnim, transform: [{ translateY: slideAnim }] },
-        ]}
-      >
-        <View style={styles.logoContainer}>
+      <Animated.View style={styles.content}>
+        <Animated.View style={[styles.logoContainer, { opacity: logoOpacity, transform: [{ scale: logoScale }] }]}>
           <Image source={require('@/assets/images/nanohab-logo.png')} style={styles.logo} />
-        </View>
+        </Animated.View>
+        <Animated.View style={{ opacity: fadeAnim, transform: [{ translateY: slideAnim }], alignItems: 'center' as const }}>
         <ScaledText size={24} weight="bold" color={Colors.textPrimary} style={styles.title}>
           <Text>{'NanoHab 醫家動'}</Text>
         </ScaledText>
@@ -151,6 +157,7 @@ export default function IndexScreen() {
           <Text>{'By Dr. Avive Group Limited'}</Text>
         </ScaledText>
         <ActivityIndicator size="small" color={Colors.primary} style={styles.loader} />
+        </Animated.View>
       </Animated.View>
 
       {(partners.length > 0 || supporters.length > 0) && (

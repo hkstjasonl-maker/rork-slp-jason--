@@ -5,8 +5,7 @@ import { FULLSCREEN_PREVENTION_CSS, INJECTED_JS_BEFORE_LOAD } from '@/lib/fullsc
 
 interface YouTubePlayerProps {
   videoId: string;
-  height?: number;
-  flexFill?: boolean;
+  height: number;
   onEnd?: () => void;
 }
 
@@ -111,8 +110,7 @@ function onYouTubeIframeAPIReady(){
 </body></html>`;
 }
 
-function YouTubePlayerInner({ videoId, height, flexFill, onEnd }: YouTubePlayerProps) {
-  const containerStyle = flexFill ? [styles.container, styles.flexFill] : [styles.container, { height }];
+function YouTubePlayerInner({ videoId, height, onEnd }: YouTubePlayerProps) {
   const webViewRef = useRef<any>(null);
 
   const handleMessage = useCallback((event: { nativeEvent: { data: string } }) => {
@@ -128,7 +126,7 @@ function YouTubePlayerInner({ videoId, height, flexFill, onEnd }: YouTubePlayerP
 
   if (!videoId || videoId.trim() === '') {
     return (
-      <View style={containerStyle}>
+      <View style={[styles.container, { height }]}>
         <View style={styles.unavailable}>
           <Text style={styles.unavailableText}>Video unavailable</Text>
         </View>
@@ -138,7 +136,7 @@ function YouTubePlayerInner({ videoId, height, flexFill, onEnd }: YouTubePlayerP
 
   if (Platform.OS === 'web') {
     return (
-      <View style={containerStyle}>
+      <View style={[styles.container, { height }]}>
         {/* @ts-ignore - iframe is valid on web */}
         <iframe
           src={`https://www.youtube.com/embed/${videoId}?rel=0&modestbranding=1&fs=0&playsinline=1`}
@@ -158,7 +156,7 @@ function YouTubePlayerInner({ videoId, height, flexFill, onEnd }: YouTubePlayerP
   const WebView = require('react-native-webview').WebView;
 
   return (
-    <View style={containerStyle}>
+    <View style={[styles.container, { height }]}>
       <WebView
         ref={webViewRef}
         source={{ html: getYouTubeHTML(videoId) }}
@@ -188,9 +186,6 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     overflow: 'hidden',
     backgroundColor: '#000',
-  },
-  flexFill: {
-    flex: 1,
   },
   webview: {
     flex: 1,

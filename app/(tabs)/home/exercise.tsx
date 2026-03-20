@@ -286,7 +286,6 @@ const mirrorAudioStyles = StyleSheet.create({
 function SplitVideoLayerInner({ vimeoId, youtubeId }: { vimeoId: string | null; youtubeId: string | null }) {
   const [isPlaying, setIsPlaying] = useState(false);
   const webViewRef = useRef<any>(null);
-  const isIPad = Platform.OS === 'ios' && (Platform as any).isPad === true;
 
   const togglePlayPause = useCallback(() => {
     const nextPlaying = !isPlaying;
@@ -407,7 +406,7 @@ function SplitVideoLayerInner({ vimeoId, youtubeId }: { vimeoId: string | null; 
     }
     return (
       <View style={splitVideoStyles.container}>
-        <YouTubePlayer videoId={youtubeId} height={isIPad ? undefined : 200} flexFill={isIPad} />
+        <YouTubePlayer videoId={youtubeId} height={200} />
         {playPauseButton}
       </View>
     );
@@ -2084,9 +2083,9 @@ const styles = StyleSheet.create({
   },
   splitContainerTablet: {
     flex: 1,
-    flexDirection: 'row' as const,
-    gap: 8,
-    paddingHorizontal: 12,
+    flexDirection: 'column' as const,
+    gap: 6,
+    paddingHorizontal: 16,
   },
   splitVideoSectionTablet: {
     flex: 1,

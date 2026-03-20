@@ -1,11 +1,11 @@
-import React, { useEffect, useRef } from 'react';
+import React from 'react';
 import {
   View,
   StyleSheet,
   TouchableOpacity,
   Modal,
-  Animated,
   Pressable,
+  Platform,
 } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { ScaledText as Text } from '@/components/ScaledText';
@@ -44,40 +44,29 @@ interface Props {
 }
 
 export default function AssessmentModePicker({ visible, onSelectMode, onClose, t }: Props) {
-  const slideAnim = useRef(new Animated.Value(300)).current;
-  const backdropAnim = useRef(new Animated.Value(0)).current;
-
-  useEffect(() => {
-    if (visible) {
-      Animated.parallel([
-        Animated.timing(backdropAnim, { toValue: 1, duration: 250, useNativeDriver: true }),
-        Animated.spring(slideAnim, { toValue: 0, friction: 8, useNativeDriver: true }),
-      ]).start();
-    } else {
-      Animated.parallel([
-        Animated.timing(backdropAnim, { toValue: 0, duration: 200, useNativeDriver: true }),
-        Animated.timing(slideAnim, { toValue: 300, duration: 200, useNativeDriver: true }),
-      ]).start();
-    }
-  }, [visible, slideAnim, backdropAnim]);
-
   const handleSelect = (mode: AssessmentViewMode) => {
+    log('[AssessmentModePicker] Mode selected:', mode);
     void saveViewMode(mode);
     onSelectMode(mode);
   };
 
-  return (
-    <Modal visible={visible} transparent animationType="none" onRequestClose={onClose}>
-      <View style={styles.modalRoot}>
-        <Animated.View style={[styles.backdrop, { opacity: backdropAnim }]}>
-          <Pressable style={StyleSheet.absoluteFill} onPress={onClose} />
-        </Animated.View>
+  if (!visible) return null;
 
-        <Animated.View style={[styles.sheet, { transform: [{ translateY: slideAnim }] }]}>
+  return (
+    <Modal
+      visible={visible}
+      transparent
+      animationType={Platform.OS === 'web' ? 'fade' : 'slide'}
+      onRequestClose={onClose}
+      statusBarTranslucent
+    >
+      <Pressable style={styles.modalRoot} onPress={onClose}>
+        <View style={styles.backdrop} />
+        <Pressable style={styles.sheet} onPress={(e) => e.stopPropagation()}>
           <View style={styles.handle} />
 
           <Text size={18} weight="bold" color={Colors.textPrimary} style={styles.sheetTitle}>
-            {t('wizardModeTitle')}
+            {t('wizardModeTitle') || 'How would you like to complete this assessment?'}
           </Text>
 
           <View style={styles.cardsRow}>
@@ -86,17 +75,17 @@ export default function AssessmentModePicker({ visible, onSelectMode, onClose, t
               onPress={() => handleSelect('checklist')}
               activeOpacity={0.7}
               testID="mode-checklist"
-              accessibilityLabel={t('wizardChecklist')}
+              accessibilityLabel={t('wizardChecklist') || 'Checklist'}
               accessibilityRole="button"
             >
               <View style={[styles.modeIconWrap, { backgroundColor: '#EBF3FE' }]}>
                 <List size={28} color="#3B7DD8" />
               </View>
               <Text size={16} weight="600" color={Colors.textPrimary} style={styles.modeLabel}>
-                {t('wizardChecklist')}
+                {t('wizardChecklist') || 'Checklist'}
               </Text>
               <Text size={13} color={Colors.textSecondary} style={styles.modeDesc}>
-                {t('wizardChecklistDesc')}
+                {t('wizardChecklistDesc') || 'See all questions at once'}
               </Text>
             </TouchableOpacity>
 
@@ -105,22 +94,22 @@ export default function AssessmentModePicker({ visible, onSelectMode, onClose, t
               onPress={() => handleSelect('guided')}
               activeOpacity={0.7}
               testID="mode-guided"
-              accessibilityLabel={t('wizardGuided')}
+              accessibilityLabel={t('wizardGuided') || 'Guided'}
               accessibilityRole="button"
             >
               <View style={[styles.modeIconWrap, { backgroundColor: '#E1F5EE' }]}>
                 <Wand2 size={28} color="#1D9E75" />
               </View>
               <Text size={16} weight="600" color={Colors.textPrimary} style={styles.modeLabel}>
-                {t('wizardGuided')}
+                {t('wizardGuided') || 'Guided'}
               </Text>
               <Text size={13} color={Colors.textSecondary} style={styles.modeDesc}>
-                {t('wizardGuidedDesc')}
+                {t('wizardGuidedDesc') || 'One question at a time'}
               </Text>
             </TouchableOpacity>
           </View>
-        </Animated.View>
-      </View>
+        </Pressable>
+      </Pressable>
     </Modal>
   );
 }

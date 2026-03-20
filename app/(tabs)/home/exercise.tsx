@@ -1395,7 +1395,7 @@ export default function ExerciseScreen() {
 
         <View style={{ flex: 1 }}>
           {mediaMode === 'split' && (
-            <View style={isTablet ? styles.splitContainerTablet : styles.splitContainerPhone}>
+            <View style={isTablet ? styles.splitContainerTablet : { flex: 1 }}>
               <View style={isTablet ? styles.splitVideoSectionTablet : styles.splitVideoSection}>
                 <SplitVideoLayer vimeoId={vimeoId} youtubeId={youtubeId} />
               </View>
@@ -2081,10 +2081,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     backgroundColor: 'rgba(0,0,0,0.6)',
   },
-  splitContainerPhone: {
-    flex: 1,
-    flexDirection: 'column' as const,
-  },
   splitContainerTablet: {
     flex: 1,
     flexDirection: 'column' as const,
@@ -2106,7 +2102,7 @@ const styles = StyleSheet.create({
     position: 'relative' as const,
   },
   splitVideoSection: {
-    flex: 1,
+    height: 200,
     marginHorizontal: 16,
     borderRadius: 12,
     overflow: 'hidden',

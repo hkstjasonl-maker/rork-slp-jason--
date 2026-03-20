@@ -5,7 +5,8 @@ import { FULLSCREEN_PREVENTION_CSS, INJECTED_JS_BEFORE_LOAD } from '@/lib/fullsc
 
 interface YouTubePlayerProps {
   videoId: string;
-  height: number;
+  height?: number;
+  flexFill?: boolean;
   onEnd?: () => void;
 }
 
@@ -110,7 +111,8 @@ function onYouTubeIframeAPIReady(){
 </body></html>`;
 }
 
-function YouTubePlayerInner({ videoId, height, onEnd }: YouTubePlayerProps) {
+function YouTubePlayerInner({ videoId, height, flexFill, onEnd }: YouTubePlayerProps) {
+  const containerStyle = flexFill ? [styles.container, styles.flexFill] : [styles.container, { height }];
   const webViewRef = useRef<any>(null);
 
   const handleMessage = useCallback((event: { nativeEvent: { data: string } }) => {
@@ -126,7 +128,7 @@ function YouTubePlayerInner({ videoId, height, onEnd }: YouTubePlayerProps) {
 
   if (!videoId || videoId.trim() === '') {
     return (
-      <View style={[styles.container, { height }]}>
+      <View style={containerStyle}>
         <View style={styles.unavailable}>
           <Text style={styles.unavailableText}>Video unavailable</Text>
         </View>
@@ -136,7 +138,7 @@ function YouTubePlayerInner({ videoId, height, onEnd }: YouTubePlayerProps) {
 
   if (Platform.OS === 'web') {
     return (
-      <View style={[styles.container, { height }]}>
+      <View style={containerStyle}>
         {/* @ts-ignore - iframe is valid on web */}
         <iframe
           src={`https://www.youtube.com/embed/${videoId}?rel=0&modestbranding=1&fs=0&playsinline=1`}
@@ -156,7 +158,7 @@ function YouTubePlayerInner({ videoId, height, onEnd }: YouTubePlayerProps) {
   const WebView = require('react-native-webview').WebView;
 
   return (
-    <View style={[styles.container, { height }]}>
+    <View style={containerStyle}>
       <WebView
         ref={webViewRef}
         source={{ html: getYouTubeHTML(videoId) }}
@@ -186,6 +188,9 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     overflow: 'hidden',
     backgroundColor: '#000',
+  },
+  flexFill: {
+    flex: 1,
   },
   webview: {
     flex: 1,

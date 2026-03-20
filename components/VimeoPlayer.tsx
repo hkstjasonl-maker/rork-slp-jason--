@@ -8,12 +8,14 @@ import { FULLSCREEN_PREVENTION_CSS, INJECTED_JS_BEFORE_LOAD } from '@/lib/fullsc
 
 interface VimeoPlayerProps {
   videoId: string;
-  height: number;
+  height?: number;
+  flexFill?: boolean;
   onEnd?: () => void;
   lowQuality?: boolean;
 }
 
-function VimeoPlayerInner({ videoId, height, onEnd, lowQuality }: VimeoPlayerProps) {
+function VimeoPlayerInner({ videoId, height, flexFill, onEnd, lowQuality }: VimeoPlayerProps) {
+  const containerStyle = flexFill ? [styles.container, styles.flexFill] : [styles.container, { height }];
   const [loading, setLoading] = useState(true);
   const webViewRef = useRef<any>(null);
 
@@ -39,7 +41,7 @@ function VimeoPlayerInner({ videoId, height, onEnd, lowQuality }: VimeoPlayerPro
 
   if (!videoId || videoId.trim() === '') {
     return (
-      <View style={[styles.container, { height }]}>
+      <View style={containerStyle}>
         <View style={styles.unavailable}>
           <VideoOff size={32} color="#666" />
           <ScaledText size={14} color="#999" style={styles.unavailableLabel}>{String('Video unavailable')}</ScaledText>
@@ -50,7 +52,7 @@ function VimeoPlayerInner({ videoId, height, onEnd, lowQuality }: VimeoPlayerPro
 
   if (loading) {
     return (
-      <View style={[styles.container, { height }]}>
+      <View style={containerStyle}>
         <View style={styles.unavailable}>
           <ActivityIndicator size="large" color={Colors.primary} />
         </View>
@@ -63,7 +65,7 @@ function VimeoPlayerInner({ videoId, height, onEnd, lowQuality }: VimeoPlayerPro
 
   if (Platform.OS === 'web') {
     return (
-      <View style={[styles.container, { height }]}>
+      <View style={containerStyle}>
         {/* @ts-ignore - iframe is valid on web */}
         <iframe
           src={embedUrl}
@@ -182,7 +184,7 @@ window.addEventListener('message',function(e){
 </body></html>`;
 
   return (
-    <View style={[styles.container, { height }]}>
+    <View style={containerStyle}>
       <WebView
         ref={webViewRef}
         source={{ html }}
@@ -212,6 +214,9 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     overflow: 'hidden',
     backgroundColor: '#000',
+  },
+  flexFill: {
+    flex: 1,
   },
   video: {
     flex: 1,

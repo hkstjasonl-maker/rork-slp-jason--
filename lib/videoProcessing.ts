@@ -84,23 +84,21 @@ export async function burnWatermarkIntoVideo(
     log('[VideoProcessing] Input file size:', (inputInfo as any).size);
 
     const dateTime = formatDateTime();
-    const watermarkLine1 = escapeFFmpegText(options.exerciseName);
+    const watermarkLine1 = escapeFFmpegText(
+      `${options.exerciseName} · ${dateTime}`
+    );
     const watermarkLine2 = escapeFFmpegText(
       options.patientName
-        ? `${options.patientName} | ${dateTime}`
-        : dateTime
+        ? `${options.patientName} · Recorded with NanoHab`
+        : 'Recorded with NanoHab'
     );
-    const watermarkLine3 = escapeFFmpegText('Recorded using NanoHab 醫家動');
-    const watermarkLine4 = escapeFFmpegText('www.dravive.com/nanohab');
 
     const outputUri = `${LegacyFileSystem.cacheDirectory}watermarked_${Date.now()}.mp4`;
 
-    const drawtext1 = `drawtext=text='${watermarkLine1}':fontsize=26:fontcolor=white:borderw=2:bordercolor=black:box=1:boxcolor=black@0.4:boxborderw=6:x=(w-text_w)/2:y=h-120`;
-    const drawtext2 = `drawtext=text='${watermarkLine2}':fontsize=26:fontcolor=white:borderw=2:bordercolor=black:box=1:boxcolor=black@0.4:boxborderw=6:x=(w-text_w)/2:y=h-88`;
-    const drawtext3 = `drawtext=text='${watermarkLine3}':fontsize=26:fontcolor=white:borderw=2:bordercolor=black:box=1:boxcolor=black@0.4:boxborderw=6:x=(w-text_w)/2:y=h-56`;
-    const drawtext4 = `drawtext=text='${watermarkLine4}':fontsize=26:fontcolor=white:borderw=2:bordercolor=black:box=1:boxcolor=black@0.4:boxborderw=6:x=(w-text_w)/2:y=h-24`;
+    const drawtext1 = `drawtext=text='${watermarkLine1}':fontsize=14:fontcolor=white:box=1:boxcolor=black@0.65:boxborderw=5:x=12:y=32`;
+    const drawtext2 = `drawtext=text='${watermarkLine2}':fontsize=12:fontcolor=white:box=1:boxcolor=black@0.65:boxborderw=4:x=12:y=58`;
 
-    const cmd = `-i "${inputUri}" -c:v libx264 -preset ultrafast -crf 28 -c:a aac -movflags +faststart -vf "${drawtext1},${drawtext2},${drawtext3},${drawtext4}" "${outputUri}"`;
+    const cmd = `-i "${inputUri}" -c:v libx264 -preset ultrafast -crf 28 -c:a aac -movflags +faststart -vf "${drawtext1},${drawtext2}" "${outputUri}"`;
 
     console.log('WATERMARK: Executing command:', cmd);
     log('[VideoProcessing] Running FFmpeg command');

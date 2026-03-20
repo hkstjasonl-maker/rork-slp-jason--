@@ -6,7 +6,7 @@ import { supabase } from '@/lib/supabase';
 import { Organisation } from '@/types';
 import Colors from '@/constants/colors';
 import { ScaledText } from '@/components/ScaledText';
-import { JASON_PHOTO } from '@/constants/images';
+
 import { log } from '@/lib/logger';
 
 export default function IndexScreen() {
@@ -141,8 +141,8 @@ export default function IndexScreen() {
           { opacity: fadeAnim, transform: [{ translateY: slideAnim }] },
         ]}
       >
-        <View style={styles.photoContainer}>
-          <Image source={JASON_PHOTO} style={styles.photo} />
+        <View style={styles.logoContainer}>
+          <Image source={require('@/assets/images/nanohab-logo.png')} style={styles.logo} />
         </View>
         <ScaledText size={24} weight="bold" color={Colors.textPrimary} style={styles.title}>
           <Text>{'NanoHab 醫家動'}</Text>
@@ -234,24 +234,23 @@ const styles = StyleSheet.create({
   content: {
     alignItems: 'center',
   },
-  photoContainer: {
-    width: 100,
-    height: 100,
-    borderRadius: 50,
+  logoContainer: {
+    width: 140,
+    height: 140,
+    borderRadius: 28,
     overflow: 'hidden',
     marginBottom: 20,
-    borderWidth: 3,
-    borderColor: Colors.primary,
-    shadowColor: Colors.primary,
+    backgroundColor: '#FFFFFF',
+    shadowColor: '#000',
     shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.2,
+    shadowOpacity: 0.1,
     shadowRadius: 12,
     elevation: 6,
   },
-  photo: {
+  logo: {
     width: '100%',
     height: '100%',
-    resizeMode: 'cover',
+    resizeMode: 'contain',
   },
   title: {
     marginBottom: 4,

@@ -1,4 +1,4 @@
-import React, { useCallback, useMemo } from 'react';
+import React, { useCallback, useMemo, useState } from 'react';
 import {
   View,
   ScrollView,
@@ -19,6 +19,7 @@ import { ASSESSMENT_TOOLS } from '@/constants/assessments';
 import { router } from 'expo-router';
 import { ClipboardCheck, Clock, CheckCircle, ChevronRight, FileText, Stethoscope, User } from 'lucide-react-native';
 import { log } from '@/lib/logger';
+import AssessmentModePicker, { AssessmentViewMode } from '@/components/AssessmentModePicker';
 
 interface QuestionnaireTemplate {
   name: string;
@@ -146,8 +147,15 @@ function getAssessmentReference(submission: ClinicalAssessmentSubmission): strin
   return submission.assessment_library?.reference || '';
 }
 
+interface PendingNavigation {
+  type: 'clinical' | 'questionnaire';
+  params: Record<string, string>;
+}
+
 export default function AssessmentsScreen() {
   const { t, patientId, language } = useApp();
+  const [modePickerVisible, setModePickerVisible] = useState<boolean>(false);
+  const [pendingNav, setPendingNav] = useState<PendingNavigation | null>(null);
 
   const questionnaireQuery = useQuery({
     queryKey: ['assessments', 'all', patientId],
@@ -383,15 +391,16 @@ export default function AssessmentsScreen() {
                           testID={`start-clinical-${submission.id}`}
                           onPress={() => {
                             const toolKey = resolveToolKey(submission);
-                            log('[Assessments] Starting clinical assessment:', submission.assessment_id, 'toolKey:', toolKey);
-                            router.push({
-                              pathname: '/clinical-assessment',
+                            log('[Assessments] Opening mode picker for clinical:', submission.assessment_id);
+                            setPendingNav({
+                              type: 'clinical',
                               params: {
                                 assessmentId: submission.assessment_id,
                                 submissionId: submission.id,
                                 toolKey: toolKey || '',
                               },
                             });
+                            setModePickerVisible(true);
                           }}
                         >
                           <Text size={15} weight="bold" color={Colors.white}>
@@ -459,14 +468,15 @@ export default function AssessmentsScreen() {
                           activeOpacity={0.8}
                           testID={`start-assessment-${assignment.id}`}
                           onPress={() => {
-                            log('[Assessments] Starting assessment:', assignment.id, 'template:', assignment.questionnaire_template_id);
-                            router.push({
-                              pathname: '/questionnaire',
+                            log('[Assessments] Opening mode picker for questionnaire:', assignment.id);
+                            setPendingNav({
+                              type: 'questionnaire',
                               params: {
                                 assignmentId: assignment.id,
                                 templateId: assignment.questionnaire_template_id,
                               },
                             });
+                            setModePickerVisible(true);
                           }}
                         >
                           <Text size={15} weight="bold" color={Colors.white}>
@@ -569,6 +579,32 @@ export default function AssessmentsScreen() {
 
           <CopyrightFooter />
         </ScrollView>
+
+        <AssessmentModePicker
+          visible={modePickerVisible}
+          onClose={() => {
+            setModePickerVisible(false);
+            setPendingNav(null);
+          }}
+          onSelectMode={(mode: AssessmentViewMode) => {
+            setModePickerVisible(false);
+            if (!pendingNav) return;
+            log('[Assessments] Mode selected:', mode, 'nav:', pendingNav.type);
+            if (pendingNav.type === 'clinical') {
+              router.push({
+                pathname: '/clinical-assessment',
+                params: { ...pendingNav.params, mode },
+              });
+            } else {
+              router.push({
+                pathname: '/questionnaire',
+                params: { ...pendingNav.params, mode },
+              });
+            }
+            setPendingNav(null);
+          }}
+          t={t}
+        />
       </SafeAreaView>
     </View>
   );

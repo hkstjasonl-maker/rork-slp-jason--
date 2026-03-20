@@ -1,4 +1,5 @@
 import React, { useState, useMemo, useCallback, useRef } from 'react';
+import AssessmentWizard, { WizardQuestion, WizardAnswerValue } from '@/components/AssessmentWizard';
 import {
   View,
   ScrollView,
@@ -420,8 +421,95 @@ function buildDynamicTool(record: AssessmentLibraryRow): AssessmentTool | null {
   return { ...base, items: [] };
 }
 
+function buildWizardQuestions(tool: AssessmentTool, language: Language | null): WizardQuestion[] {
+  const isZh = language === 'zh_hant' || language === 'zh_hans';
+  const questions: WizardQuestion[] = [];
+  let num = 1;
+
+  if (tool.items && tool.items.length > 0) {
+    for (const item of tool.items) {
+      questions.push({
+        id: String(item.item_number),
+        number: num++,
+        text: isZh ? item.text_zh : item.text_en,
+        helperText: item.subscale ? item.subscale : undefined,
+      });
+    }
+  } else if (tool.domains && tool.domains.length > 0) {
+    for (const domain of tool.domains) {
+      for (const item of domain.items) {
+        questions.push({
+          id: String(item.item_number),
+          number: num++,
+          text: isZh ? item.text_zh : item.text_en,
+          helperText: isZh ? domain.name_zh : domain.name_en,
+          category: domain.name_en,
+        });
+      }
+    }
+  } else if (tool.fois_items && tool.fois_items.length > 0) {
+    for (const item of tool.fois_items) {
+      questions.push({
+        id: String(item.level),
+        number: num++,
+        text: isZh ? item.text_zh : item.text_en,
+        helperText: isZh ? item.category_zh : item.category_en,
+      });
+    }
+  } else if (tool.ohat_items && tool.ohat_items.length > 0) {
+    for (const item of tool.ohat_items) {
+      questions.push({
+        id: String(item.item_number),
+        number: num++,
+        text: isZh ? item.category_zh : item.category_en,
+      });
+    }
+  }
+
+  if (tool.severity_question) {
+    questions.push({
+      id: 'severity',
+      number: num,
+      text: isZh ? tool.severity_question.text_zh : tool.severity_question.text_en,
+      helperText: `${tool.severity_question.scale_min} - ${tool.severity_question.scale_max}`,
+    });
+  }
+
+  return questions;
+}
+
+function mapClinicalWizardAnswer(
+  tool: AssessmentTool,
+  questionId: string,
+  answer: WizardAnswerValue
+): number | string {
+  if (questionId === 'severity' && tool.severity_question) {
+    const min = tool.severity_question.scale_min;
+    const max = tool.severity_question.scale_max;
+    const mid = Math.round((min + max) / 2);
+    switch (answer) {
+      case 'yes': return max;
+      case 'sometimes': return mid;
+      case 'no': return min;
+      case 'skipped': return min;
+      default: return min;
+    }
+  }
+
+  const scaleMin = tool.scale_min ?? 0;
+  const scaleMax = tool.scale_max ?? 4;
+  const mid = Math.round((scaleMin + scaleMax) / 2);
+  switch (answer) {
+    case 'yes': return scaleMax;
+    case 'sometimes': return mid;
+    case 'no': return scaleMin;
+    case 'skipped': return scaleMin;
+    default: return scaleMin;
+  }
+}
+
 export default function ClinicalAssessmentScreen() {
-  const { assessmentId, submissionId, toolKey } = useLocalSearchParams<{ assessmentId: string; submissionId: string; toolKey?: string }>();
+  const { assessmentId, submissionId, toolKey, mode } = useLocalSearchParams<{ assessmentId: string; submissionId: string; toolKey?: string; mode?: string }>();
   const { t, language, patientId } = useApp();
   const queryClient = useQueryClient();
   const [answers, setAnswers] = useState<Record<string, number | string>>({});
@@ -586,6 +674,89 @@ export default function ClinicalAssessmentScreen() {
     );
   }
 
+  const wizardQuestions = useMemo<WizardQuestion[]>(() => {
+    if (mode !== 'guided' || !tool) return [];
+    return buildWizardQuestions(tool, language);
+  }, [mode, tool, language]);
+
+  const mapWizardAnswer = useCallback((questionId: string, answer: WizardAnswerValue): number | string => {
+    if (!tool) return 0;
+    return mapClinicalWizardAnswer(tool, questionId, answer);
+  }, [tool]);
+
+  const wizardSubmitMutation = useMutation({
+    mutationFn: async (wizardAnswers: Record<string, number | string>) => {
+      if (!tool || !patientId) throw new Error('Missing data');
+      const scores = calculateScores(tool, wizardAnswers);
+      log('[ClinicalAssessment] Wizard submitting. Scores:', scores);
+
+      const langCode = language === 'zh_hant' || language === 'zh_hans' ? 'zh' : 'en';
+
+      if (submissionId) {
+        const { error } = await supabase
+          .from('assessment_submissions')
+          .update({
+            responses: wizardAnswers,
+            subscale_scores: scores.subscale_scores,
+            total_score: scores.total_score,
+            severity_rating: scores.severity_rating ?? null,
+            language: langCode,
+            status: 'completed',
+            completed_at: new Date().toISOString(),
+            updated_at: new Date().toISOString(),
+          })
+          .eq('id', submissionId);
+
+        if (error) {
+          log('[ClinicalAssessment] Wizard update error:', error);
+          throw error;
+        }
+      } else {
+        const { error } = await supabase
+          .from('assessment_submissions')
+          .insert({
+            patient_id: patientId,
+            assessment_id: assessmentId,
+            language: langCode,
+            responses: wizardAnswers,
+            subscale_scores: scores.subscale_scores,
+            total_score: scores.total_score,
+            severity_rating: scores.severity_rating ?? null,
+            status: 'completed',
+            completed_at: new Date().toISOString(),
+          });
+
+        if (error) {
+          log('[ClinicalAssessment] Wizard insert error:', error);
+          throw error;
+        }
+      }
+
+      return scores;
+    },
+    onSuccess: (scores) => {
+      log('[ClinicalAssessment] Wizard success:', scores);
+      setScoreResult(scores);
+      setShowCompletion(true);
+      Animated.parallel([
+        Animated.timing(fadeAnim, { toValue: 1, duration: 500, useNativeDriver: true }),
+        Animated.spring(scaleAnim, { toValue: 1, friction: 6, useNativeDriver: true }),
+      ]).start();
+      void queryClient.invalidateQueries({ queryKey: ['clinical_assessments'] });
+      void queryClient.invalidateQueries({ queryKey: ['assessments'] });
+    },
+    onError: (error) => {
+      log('[ClinicalAssessment] Wizard submit error:', error);
+      Alert.alert('Error', 'Failed to submit assessment. Please try again.');
+    },
+  });
+
+  const handleWizardSubmit = useCallback((mapped: Record<string, number | string>) => {
+    log('[ClinicalAssessment] Wizard final submit:', mapped);
+    setAnswers(mapped);
+    wizardSubmitMutation.mutate(mapped);
+  }, [wizardSubmitMutation]);
+
   if (showCompletion && scoreResult) {
     return (
       <CompletionScreen
@@ -602,6 +773,24 @@ export default function ClinicalAssessmentScreen() {
   }
 
   const toolName = txt(tool.name_en, tool.name_zh, language);
+
+  if (mode === 'guided' && wizardQuestions.length > 0) {
+    return (
+      <View style={styles.root}>
+        <SafeAreaView style={styles.container}>
+          <AssessmentWizard
+            title={toolName}
+            questions={wizardQuestions}
+            onSubmit={handleWizardSubmit}
+            onCancel={() => router.back()}
+            mapAnswer={mapWizardAnswer}
+            t={t}
+            isSubmitting={wizardSubmitMutation.isPending}
+          />
+        </SafeAreaView>
+      </View>
+    );
+  }
 
   return (
     <View style={styles.root}>

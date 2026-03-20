@@ -18,6 +18,7 @@ import Colors from '@/constants/colors';
 import { Language } from '@/types';
 import { ArrowLeft, CheckCircle2 } from 'lucide-react-native';
 import { log } from '@/lib/logger';
+import AssessmentWizard, { WizardQuestion, WizardAnswerValue } from '@/components/AssessmentWizard';
 
 interface QuestionChoice {
   value: number;
@@ -94,7 +95,7 @@ function calculateScore(questions: QuestionItem[], answers: Record<string, numbe
 }
 
 export default function QuestionnaireScreen() {
-  const { assignmentId, templateId } = useLocalSearchParams<{ assignmentId: string; templateId: string }>();
+  const { assignmentId, templateId, mode } = useLocalSearchParams<{ assignmentId: string; templateId: string; mode?: string }>();
   const { t, language, patientId } = useApp();
   const queryClient = useQueryClient();
   const [answers, setAnswers] = useState<Record<string, number>>({});
@@ -174,7 +175,7 @@ export default function QuestionnaireScreen() {
         Animated.timing(fadeAnim, { toValue: 1, duration: 500, useNativeDriver: true }),
         Animated.spring(scaleAnim, { toValue: 1, friction: 6, useNativeDriver: true }),
       ]).start();
-      queryClient.invalidateQueries({ queryKey: ['assessments'] });
+      void queryClient.invalidateQueries({ queryKey: ['assessments'] });
     },
     onError: (error) => {
       log('[Questionnaire] Submit error:', error);
@@ -200,6 +201,94 @@ export default function QuestionnaireScreen() {
   const handleDone = useCallback(() => {
     router.back();
   }, []);
+
+  const wizardQuestions = useMemo<WizardQuestion[]>(() => {
+    if (mode !== 'guided' || questions.length === 0) return [];
+    return questions.map((q, i) => ({
+      id: q.id,
+      number: i + 1,
+      text: getTranslatedText(q, language),
+      helperText: q.type === 'single_choice' && q.choices
+        ? q.choices.map(c => getTranslatedText(c, language)).join(' / ')
+        : undefined,
+    }));
+  }, [mode, questions, language]);
+
+  const mapWizardAnswer = useCallback((_questionId: string, answer: WizardAnswerValue): number => {
+    const q = questions.find(item => item.id === _questionId);
+    const min = q?.min ?? 0;
+    const max = q?.max ?? 10;
+    const mid = Math.round((min + max) / 2);
+    switch (answer) {
+      case 'yes': return max;
+      case 'sometimes': return mid;
+      case 'no': return min;
+      case 'skipped': return min;
+      default: return min;
+    }
+  }, [questions]);
+
+  const wizardSubmitMutation = useMutation({
+    mutationFn: async (wizardAnswers: Record<string, number>) => {
+      const score = calculateScore(questions, wizardAnswers, template?.scoring_method);
+      log('[Questionnaire] Wizard submitting. Score:', score);
+
+      const { error: responseError } = await supabase
+        .from('questionnaire_responses')
+        .insert({
+          assignment_id: assignmentId,
+          patient_id: patientId,
+          questionnaire_template_id: templateId,
+          answers: wizardAnswers,
+          total_score: score,
+          completed_at: new Date().toISOString(),
+        });
+
+      if (responseError) {
+        log('[Questionnaire] Wizard response insert error:', responseError);
+        throw responseError;
+      }
+
+      const { error: updateError } = await supabase
+        .from('questionnaire_assignments')
+        .update({
+          status: 'completed',
+          completed_date: new Date().toISOString(),
+          score,
+        })
+        .eq('id', assignmentId!);
+
+      if (updateError) {
+        log('[Questionnaire] Wizard assignment update error:', updateError);
+        throw updateError;
+      }
+
+      return score;
+    },
+    onSuccess: (score) => {
+      log('[Questionnaire] Wizard submission success. Score:', score);
+      setFinalScore(score);
+      setShowCompletion(true);
+      Animated.parallel([
+        Animated.timing(fadeAnim, { toValue: 1, duration: 500, useNativeDriver: true }),
+        Animated.spring(scaleAnim, { toValue: 1, friction: 6, useNativeDriver: true }),
+      ]).start();
+      void queryClient.invalidateQueries({ queryKey: ['assessments'] });
+    },
+    onError: (error) => {
+      log('[Questionnaire] Wizard submit error:', error);
+      Alert.alert('Error', 'Failed to submit assessment. Please try again.');
+    },
+  });
+
+  const handleWizardSubmit = useCallback((mapped: Record<string, number | string>) => {
+    const numericAnswers: Record<string, number> = {};
+    for (const [k, v] of Object.entries(mapped)) {
+      numericAnswers[k] = typeof v === 'number' ? v : Number(v) || 0;
+    }
+    log('[Questionnaire] Wizard final submit:', numericAnswers);
+    wizardSubmitMutation.mutate(numericAnswers);
+  }, [wizardSubmitMutation]);
 
   if (showCompletion) {
     return (
@@ -238,6 +327,24 @@ export default function QuestionnaireScreen() {
           <View style={styles.loadingContainer}>
             <ActivityIndicator size="large" color={Colors.primary} />
           </View>
+        </SafeAreaView>
+      </View>
+    );
+  }
+
+  if (mode === 'guided' && wizardQuestions.length > 0) {
+    return (
+      <View style={styles.root}>
+        <SafeAreaView style={styles.container}>
+          <AssessmentWizard
+            title={template?.name || ''}
+            questions={wizardQuestions}
+            onSubmit={handleWizardSubmit}
+            onCancel={() => router.back()}
+            mapAnswer={mapWizardAnswer}
+            t={t}
+            isSubmitting={wizardSubmitMutation.isPending}
+          />
         </SafeAreaView>
       </View>
     );
@@ -327,7 +434,7 @@ interface QuestionCardProps {
 const QuestionCard = React.memo(function QuestionCard({
   question,
   index,
-  total,
+  total: _total,
   language,
   selectedValue,
   onSelect,

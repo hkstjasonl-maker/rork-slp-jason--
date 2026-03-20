@@ -147,13 +147,10 @@ export default function IndexScreen() {
   return (
     <View style={styles.container}>
       <Animated.View style={styles.content}>
-        <Animated.View style={[styles.logoContainer, { opacity: logoOpacity, transform: [{ scale: logoScale }] }]}>
-          <ExpoImage source={require('@/assets/images/nanohab-logo-small.png')} style={styles.logo} contentFit="contain" cachePolicy="memory-disk" priority="high" />
+        <Animated.View style={[styles.splashImageContainer, { opacity: logoOpacity, transform: [{ scale: logoScale }] }]}>
+          <ExpoImage source={require('@/assets/images/nanohab-splash.png')} style={styles.splashImage} contentFit="contain" cachePolicy="memory-disk" priority="high" />
         </Animated.View>
         <Animated.View style={{ opacity: fadeAnim, transform: [{ translateY: slideAnim }], alignItems: 'center' as const }}>
-        <ScaledText size={24} weight="bold" color={Colors.textPrimary} style={styles.title}>
-          <Text>{'NanoHab 醫家動'}</Text>
-        </ScaledText>
         <ScaledText size={14} color={Colors.textSecondary} style={styles.subtitle}>
           <Text>{'By Dr. Avive Group Limited'}</Text>
         </ScaledText>
@@ -242,25 +239,16 @@ const styles = StyleSheet.create({
   content: {
     alignItems: 'center',
   },
-  logoContainer: {
-    width: 140,
-    height: 140,
-    borderRadius: 28,
-    overflow: 'hidden',
-    marginBottom: 20,
-    backgroundColor: '#FFFFFF',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.1,
-    shadowRadius: 12,
-    elevation: 6,
+  splashImageContainer: {
+    width: '80%',
+    aspectRatio: 1,
+    marginBottom: 16,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
-  logo: {
+  splashImage: {
     width: '100%',
     height: '100%',
-  },
-  title: {
-    marginBottom: 4,
   },
   subtitle: {
     marginBottom: 24,

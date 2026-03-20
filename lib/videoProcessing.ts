@@ -11,13 +11,16 @@ let FFmpegKit: any = null;
 let ReturnCode: any = null;
 let isFFmpegAvailable = false;
 
+console.log('WATERMARK: Checking FFmpeg availability');
 try {
   const ffmpegModule = require('ffmpeg-kit-react-native');
   FFmpegKit = ffmpegModule.FFmpegKit;
   ReturnCode = ffmpegModule.ReturnCode;
   isFFmpegAvailable = true;
+  console.log('WATERMARK: FFmpeg is available');
   log('[VideoProcessing] ffmpeg-kit-react-native loaded successfully');
-} catch {
+} catch (error: any) {
+  console.log('WATERMARK: FFmpeg NOT available -', error?.message ?? 'unknown error');
   log('[VideoProcessing] ffmpeg-kit-react-native not available (expected in Expo Go)');
 }
 
@@ -58,6 +61,10 @@ export async function burnWatermarkIntoVideo(
   inputUri: string,
   options: WatermarkOptions
 ): Promise<ProcessingResult> {
+  console.log('WATERMARK: Starting burnWatermarkIntoVideo');
+  console.log('WATERMARK: isFFmpegAvailable =', isFFmpegAvailable, '| FFmpegKit =', !!FFmpegKit, '| ReturnCode =', !!ReturnCode);
+  console.log('WATERMARK: inputUri =', inputUri);
+  console.log('WATERMARK: options =', JSON.stringify(options));
   if (Platform.OS === 'web') {
     log('[VideoProcessing] Web platform — skipping watermark burn');
     return { uri: inputUri, wasProcessed: false };
@@ -93,11 +100,13 @@ export async function burnWatermarkIntoVideo(
 
     const cmd = `-i "${inputUri}" -c:v libx264 -preset ultrafast -crf 28 -c:a aac -movflags +faststart -vf "${drawtext1},${drawtext2}" "${outputUri}"`;
 
+    console.log('WATERMARK: Executing command:', cmd);
     log('[VideoProcessing] Running FFmpeg command');
 
     const session = await FFmpegKit.execute(cmd);
     const returnCode = await session.getReturnCode();
 
+    console.log('WATERMARK: FFmpeg result - returnCode:', returnCode);
     if (ReturnCode.isSuccess(returnCode)) {
       const outputInfo = await LegacyFileSystem.getInfoAsync(outputUri);
       if (outputInfo.exists && (outputInfo as any).size > 0) {
@@ -109,6 +118,7 @@ export async function burnWatermarkIntoVideo(
       }
     } else {
       const output = await session.getOutput();
+      console.log('WATERMARK: FFmpeg execution failed -', output);
       log('[VideoProcessing] FFmpeg failed, return code:', returnCode, 'output:', output);
       return { uri: inputUri, wasProcessed: false };
     }

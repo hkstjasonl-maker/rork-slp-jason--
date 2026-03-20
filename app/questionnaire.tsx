@@ -336,22 +336,26 @@ export default function QuestionnaireScreen() {
     );
   }
 
-  if (mode === 'guided' && wizardQuestions.length > 0) {
-    return (
-      <View style={styles.root}>
-        <SafeAreaView style={styles.container}>
-          <AssessmentWizard
-            title={template?.name || ''}
-            questions={wizardQuestions}
-            onSubmit={handleWizardSubmit}
-            onCancel={() => router.back()}
-            mapAnswer={mapWizardAnswer}
-            t={t}
-            isSubmitting={wizardSubmitMutation.isPending}
-          />
-        </SafeAreaView>
-      </View>
-    );
+  if (mode === 'guided') {
+    log('[Questionnaire] Guided mode active. wizardQuestions.length:', wizardQuestions.length, 'questions.length:', questions.length);
+    if (wizardQuestions.length > 0) {
+      return (
+        <View style={styles.root}>
+          <SafeAreaView style={styles.container}>
+            <AssessmentWizard
+              title={template?.name || ''}
+              questions={wizardQuestions}
+              onSubmit={handleWizardSubmit}
+              onCancel={() => router.back()}
+              mapAnswer={mapWizardAnswer}
+              t={t}
+              isSubmitting={wizardSubmitMutation.isPending}
+            />
+          </SafeAreaView>
+        </View>
+      );
+    }
+    log('[Questionnaire] Guided mode: no wizard questions generated, falling back to checklist');
   }
 
   return (

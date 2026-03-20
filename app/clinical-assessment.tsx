@@ -464,6 +464,53 @@ function buildWizardQuestions(tool: AssessmentTool, language: Language | null): 
         text: isZh ? item.category_zh : item.category_en,
       });
     }
+  } else if (tool.mca_sections && tool.mca_sections.length > 0) {
+    for (const section of tool.mca_sections) {
+      for (const item of section.items) {
+        questions.push({
+          id: item.item_id,
+          number: num++,
+          text: isZh ? (item.text_zh || item.text_en || item.item_id) : (item.text_en || item.item_id),
+          helperText: isZh ? section.name_zh : section.name_en,
+          category: section.name_en,
+        });
+      }
+    }
+  } else if (tool.beckman_structures && tool.beckman_structures.length > 0) {
+    for (const structure of tool.beckman_structures) {
+      for (const area of structure.assessment_areas) {
+        for (const item of area.items) {
+          questions.push({
+            id: item.item_id,
+            number: num++,
+            text: isZh ? item.text_zh : item.text_en,
+            helperText: isZh ? `${structure.name_zh} - ${area.name_zh}` : `${structure.name_en} - ${area.name_en}`,
+            category: structure.name_en,
+          });
+        }
+      }
+    }
+  } else if (tool.fda2_sections && tool.fda2_sections.length > 0) {
+    for (const section of tool.fda2_sections) {
+      for (const item of section.items) {
+        questions.push({
+          id: item.item_id,
+          number: num++,
+          text: isZh ? item.text_zh : item.text_en,
+          helperText: isZh ? section.name_zh : section.name_en,
+          category: section.name_en,
+        });
+      }
+    }
+  } else if (tool.dtoms_dimensions && tool.dtoms_dimensions.length > 0) {
+    for (const dim of tool.dtoms_dimensions) {
+      questions.push({
+        id: dim.dimension_id,
+        number: num++,
+        text: isZh ? dim.name_zh : dim.name_en,
+        helperText: isZh ? dim.description_zh : dim.description_en,
+      });
+    }
   }
 
   if (tool.severity_question) {
@@ -475,6 +522,7 @@ function buildWizardQuestions(tool: AssessmentTool, language: Language | null): 
     });
   }
 
+  log('[ClinicalAssessment] buildWizardQuestions produced', questions.length, 'questions for tool:', tool.id);
   return questions;
 }
 
@@ -779,22 +827,26 @@ export default function ClinicalAssessmentScreen() {
 
   const toolName = txt(tool.name_en, tool.name_zh, language);
 
-  if (mode === 'guided' && wizardQuestions.length > 0) {
-    return (
-      <View style={styles.root}>
-        <SafeAreaView style={styles.container}>
-          <AssessmentWizard
-            title={toolName}
-            questions={wizardQuestions}
-            onSubmit={handleWizardSubmit}
-            onCancel={() => router.back()}
-            mapAnswer={mapWizardAnswer}
-            t={t}
-            isSubmitting={wizardSubmitMutation.isPending}
-          />
-        </SafeAreaView>
-      </View>
-    );
+  if (mode === 'guided') {
+    log('[ClinicalAssessment] Guided mode active. wizardQuestions.length:', wizardQuestions.length, 'tool.id:', tool.id);
+    if (wizardQuestions.length > 0) {
+      return (
+        <View style={styles.root}>
+          <SafeAreaView style={styles.container}>
+            <AssessmentWizard
+              title={toolName}
+              questions={wizardQuestions}
+              onSubmit={handleWizardSubmit}
+              onCancel={() => router.back()}
+              mapAnswer={mapWizardAnswer}
+              t={t}
+              isSubmitting={wizardSubmitMutation.isPending}
+            />
+          </SafeAreaView>
+        </View>
+      );
+    }
+    log('[ClinicalAssessment] Guided mode: no wizard questions generated, falling back to checklist');
   }
 
   return (

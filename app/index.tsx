@@ -1,5 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { View, ActivityIndicator, StyleSheet, Image, Animated, Text } from 'react-native';
+import { Image as ExpoImage } from 'expo-image';
 import { useRouter } from 'expo-router';
 import { useApp } from '@/contexts/AppContext';
 import { supabase } from '@/lib/supabase';
@@ -147,7 +148,7 @@ export default function IndexScreen() {
     <View style={styles.container}>
       <Animated.View style={styles.content}>
         <Animated.View style={[styles.logoContainer, { opacity: logoOpacity, transform: [{ scale: logoScale }] }]}>
-          <Image source={require('@/assets/images/nanohab-logo.png')} style={styles.logo} />
+          <ExpoImage source={require('@/assets/images/nanohab-logo-small.png')} style={styles.logo} contentFit="contain" cachePolicy="memory-disk" priority="high" />
         </Animated.View>
         <Animated.View style={{ opacity: fadeAnim, transform: [{ translateY: slideAnim }], alignItems: 'center' as const }}>
         <ScaledText size={24} weight="bold" color={Colors.textPrimary} style={styles.title}>
@@ -257,7 +258,6 @@ const styles = StyleSheet.create({
   logo: {
     width: '100%',
     height: '100%',
-    resizeMode: 'contain',
   },
   title: {
     marginBottom: 4,

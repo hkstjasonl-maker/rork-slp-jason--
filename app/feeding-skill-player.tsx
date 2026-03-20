@@ -412,10 +412,7 @@ export default function FeedingSkillPlayerScreen() {
         return;
       }
       log('[FeedingSkillPlayer] Attempting watermark burn, title:', title);
-      const { uri: processedUri, wasProcessed } = await burnWatermarkIntoVideo(uri, {
-        exerciseName: title,
-        patientName: patientName ?? undefined,
-      });
+      const { uri: processedUri, wasProcessed } = await burnWatermarkIntoVideo(uri, title, patientName ?? undefined);
       log('[FeedingSkillPlayer] Watermark result — processed:', wasProcessed, 'uri:', processedUri);
 
       let stableUri = processedUri;

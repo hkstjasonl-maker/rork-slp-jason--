@@ -11,31 +11,19 @@ let FFmpegKit: any = null;
 let ReturnCode: any = null;
 let isFFmpegAvailable = false;
 
-console.log('WATERMARK: Checking FFmpeg availability');
 try {
-  const ffmpegModule = require('ffmpeg-kit-react-native');
-  FFmpegKit = ffmpegModule.FFmpegKit;
-  ReturnCode = ffmpegModule.ReturnCode;
+  const FFmpegModule = require('ffmpeg-kit-react-native');
+  FFmpegKit = FFmpegModule.FFmpegKit;
+  ReturnCode = FFmpegModule.ReturnCode;
   isFFmpegAvailable = true;
-  console.log('WATERMARK: FFmpeg is available');
-  log('[VideoProcessing] ffmpeg-kit-react-native loaded successfully');
-} catch (error: any) {
-  console.log('WATERMARK: FFmpeg NOT available -', error?.message ?? 'unknown error');
-  log('[VideoProcessing] ffmpeg-kit-react-native not available (expected in Expo Go)');
+  console.log('WATERMARK: FFmpeg loaded successfully');
+} catch (e: any) {
+  isFFmpegAvailable = false;
+  console.log('WATERMARK: FFmpeg not available -', e?.message ?? 'unknown error');
 }
 
 export function getFFmpegAvailability(): boolean {
   return isFFmpegAvailable;
-}
-
-function formatDateTime(): string {
-  const now = new Date();
-  const yyyy = now.getFullYear();
-  const mm = String(now.getMonth() + 1).padStart(2, '0');
-  const dd = String(now.getDate()).padStart(2, '0');
-  const hh = String(now.getHours()).padStart(2, '0');
-  const min = String(now.getMinutes()).padStart(2, '0');
-  return `${yyyy}-${mm}-${dd} ${hh}:${min}`;
 }
 
 function escapeFFmpegText(text: string): string {
@@ -59,12 +47,14 @@ export interface ProcessingResult {
 
 export async function burnWatermarkIntoVideo(
   inputUri: string,
-  options: WatermarkOptions
+  exerciseName: string,
+  patientName?: string
 ): Promise<ProcessingResult> {
   console.log('WATERMARK: Starting burnWatermarkIntoVideo');
-  console.log('WATERMARK: isFFmpegAvailable =', isFFmpegAvailable, '| FFmpegKit =', !!FFmpegKit, '| ReturnCode =', !!ReturnCode);
+  console.log('WATERMARK: isFFmpegAvailable =', isFFmpegAvailable);
   console.log('WATERMARK: inputUri =', inputUri);
-  console.log('WATERMARK: options =', JSON.stringify(options));
+  console.log('WATERMARK: exerciseName =', exerciseName, '| patientName =', patientName);
+
   if (Platform.OS === 'web') {
     log('[VideoProcessing] Web platform — skipping watermark burn');
     return { uri: inputUri, wasProcessed: false };
@@ -83,22 +73,18 @@ export async function burnWatermarkIntoVideo(
     }
     log('[VideoProcessing] Input file size:', (inputInfo as any).size);
 
-    const dateTime = formatDateTime();
-    const watermarkLine1 = escapeFFmpegText(
-      `${options.exerciseName} · ${dateTime}`
-    );
-    const watermarkLine2 = escapeFFmpegText(
-      options.patientName
-        ? `${options.patientName} · Recorded with NanoHab`
-        : 'Recorded with NanoHab'
-    );
+    const timestamp = new Date().toLocaleString('en-HK');
+    const line1 = escapeFFmpegText(exerciseName || 'Exercise');
+    const line2 = escapeFFmpegText(`${patientName || 'Patient'} | ${timestamp}`);
+    const line3 = escapeFFmpegText('Recorded via NanoHab 醫家動');
+    const line4 = escapeFFmpegText('www.dravive.com/nanohab');
 
     const outputUri = `${LegacyFileSystem.cacheDirectory}watermarked_${Date.now()}.mp4`;
 
-    const drawtext1 = `drawtext=text='${watermarkLine1}':fontsize=14:fontcolor=white:box=1:boxcolor=black@0.65:boxborderw=5:x=12:y=32`;
-    const drawtext2 = `drawtext=text='${watermarkLine2}':fontsize=12:fontcolor=white:box=1:boxcolor=black@0.65:boxborderw=4:x=12:y=58`;
+    const inputPath = `"${inputUri}"`;
+    const outputPath = `"${outputUri}"`;
 
-    const cmd = `-i "${inputUri}" -c:v libx264 -preset ultrafast -crf 28 -c:a aac -movflags +faststart -vf "${drawtext1},${drawtext2}" "${outputUri}"`;
+    const cmd = `-i ${inputPath} -vf "drawtext=text='${line1}':fontsize=24:fontcolor=white:borderw=2:bordercolor=black:box=1:boxcolor=black@0.35:boxborderw=5:x=(w-text_w)/2:y=h-160,drawtext=text='${line2}':fontsize=20:fontcolor=white:borderw=2:bordercolor=black:box=1:boxcolor=black@0.35:boxborderw=5:x=(w-text_w)/2:y=h-125,drawtext=text='${line3}':fontsize=18:fontcolor=white:borderw=1:bordercolor=black:box=1:boxcolor=black@0.35:boxborderw=4:x=(w-text_w)/2:y=h-90,drawtext=text='${line4}':fontsize=16:fontcolor=white@0.85:borderw=1:bordercolor=black:x=(w-text_w)/2:y=h-60" -codec:a copy -y ${outputPath}`;
 
     console.log('WATERMARK: Executing command:', cmd);
     log('[VideoProcessing] Running FFmpeg command');

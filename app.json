@@ -65,7 +65,13 @@
           "savePhotosPermission": "This app saves your exercise practice videos to your photo album so you can show them to your therapist"
         }
       ],
-      "expo-screen-orientation"
+      "expo-screen-orientation",
+      [
+        "ffmpeg-kit-react-native",
+        {
+          "package": "min-gpl"
+        }
+      ]
     ],
     "experiments": {
       "typedRoutes": true

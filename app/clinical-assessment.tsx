@@ -509,7 +509,12 @@ function mapClinicalWizardAnswer(
 }
 
 export default function ClinicalAssessmentScreen() {
-  const { assessmentId, submissionId, toolKey, mode } = useLocalSearchParams<{ assessmentId: string; submissionId: string; toolKey?: string; mode?: string }>();
+  const params = useLocalSearchParams<{ assessmentId: string; submissionId: string; toolKey?: string; mode?: string }>();
+  const assessmentId = Array.isArray(params.assessmentId) ? params.assessmentId[0] : params.assessmentId;
+  const submissionId = Array.isArray(params.submissionId) ? params.submissionId[0] : params.submissionId;
+  const toolKey = Array.isArray(params.toolKey) ? params.toolKey[0] : params.toolKey;
+  const mode = Array.isArray(params.mode) ? params.mode[0] : params.mode;
+  log('[ClinicalAssessment] Params received - mode:', mode, 'assessmentId:', assessmentId, 'toolKey:', toolKey);
   const { t, language, patientId } = useApp();
   const queryClient = useQueryClient();
   const [answers, setAnswers] = useState<Record<string, number | string>>({});

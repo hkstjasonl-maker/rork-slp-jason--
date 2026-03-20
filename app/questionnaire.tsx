@@ -95,7 +95,11 @@ function calculateScore(questions: QuestionItem[], answers: Record<string, numbe
 }
 
 export default function QuestionnaireScreen() {
-  const { assignmentId, templateId, mode } = useLocalSearchParams<{ assignmentId: string; templateId: string; mode?: string }>();
+  const params = useLocalSearchParams<{ assignmentId: string; templateId: string; mode?: string }>();
+  const assignmentId = Array.isArray(params.assignmentId) ? params.assignmentId[0] : params.assignmentId;
+  const templateId = Array.isArray(params.templateId) ? params.templateId[0] : params.templateId;
+  const mode = Array.isArray(params.mode) ? params.mode[0] : params.mode;
+  log('[Questionnaire] Params received - mode:', mode, 'assignmentId:', assignmentId, 'templateId:', templateId);
   const { t, language, patientId } = useApp();
   const queryClient = useQueryClient();
   const [answers, setAnswers] = useState<Record<string, number>>({});

@@ -10,7 +10,7 @@ import { JASON_PHOTO } from '@/constants/images';
 import { log } from '@/lib/logger';
 
 export default function IndexScreen() {
-  const { isReady, language, termsAccepted, patientId, t } = useApp();
+  const { isReady, language, consentAccepted, termsAccepted, patientId, t } = useApp();
   const router = useRouter();
   const fadeAnim = useRef(new Animated.Value(0)).current;
   const slideAnim = useRef(new Animated.Value(20)).current;
@@ -69,7 +69,9 @@ export default function IndexScreen() {
 
     const checkSplashAd = async () => {
       let nextRoute = '/';
-      if (!language) {
+      if (!consentAccepted) {
+        nextRoute = '/consent';
+      } else if (!language) {
         nextRoute = '/language';
       } else if (!termsAccepted) {
         nextRoute = '/terms';
@@ -127,7 +129,7 @@ export default function IndexScreen() {
 
     void checkSplashAd();
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isReady, language, termsAccepted, patientId]);
+  }, [isReady, language, consentAccepted, termsAccepted, patientId]);
 
   const isZh = language === 'zh_hant' || language === 'zh_hans';
 

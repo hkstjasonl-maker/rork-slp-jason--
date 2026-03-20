@@ -18,10 +18,12 @@ const STORAGE_KEYS = {
   FONT_SIZE_LEVEL: 'app_font_size_level',
   TUTORIAL_COMPLETED: 'app_tutorial_completed',
   SUBTITLE_SIZE_LEVEL: 'app_subtitle_size_level',
+  CONSENT_ACCEPTED: 'nanohab_consent_accepted',
 };
 
 export const [AppProvider, useApp] = createContextHook(() => {
   const [language, setLanguageState] = useState<Language | null>(null);
+  const [consentAccepted, setConsentAcceptedState] = useState<boolean>(false);
   const [termsAccepted, setTermsAcceptedState] = useState<boolean>(false);
   const [patientId, setPatientIdState] = useState<string | null>(null);
   const [patientName, setPatientNameState] = useState<string | null>(null);
@@ -55,8 +57,9 @@ export const [AppProvider, useApp] = createContextHook(() => {
 
   const loadPersistedState = async () => {
     try {
-      const [lang, terms, pid, pname, code, fsize, tutorialVal, subSize] = await Promise.all([
+      const [lang, consent, terms, pid, pname, code, fsize, tutorialVal, subSize] = await Promise.all([
         AsyncStorage.getItem(STORAGE_KEYS.LANGUAGE),
+        AsyncStorage.getItem(STORAGE_KEYS.CONSENT_ACCEPTED),
         AsyncStorage.getItem(STORAGE_KEYS.TERMS_ACCEPTED),
         AsyncStorage.getItem(STORAGE_KEYS.PATIENT_ID),
         AsyncStorage.getItem(STORAGE_KEYS.PATIENT_NAME),
@@ -66,6 +69,7 @@ export const [AppProvider, useApp] = createContextHook(() => {
         AsyncStorage.getItem(STORAGE_KEYS.SUBTITLE_SIZE_LEVEL),
       ]);
       if (lang) setLanguageState(lang as Language);
+      if (consent) setConsentAcceptedState(true);
       if (terms === 'true') setTermsAcceptedState(true);
       if (pid) setPatientIdState(pid);
       if (pname) setPatientNameState(pname);
@@ -83,6 +87,11 @@ export const [AppProvider, useApp] = createContextHook(() => {
   const setLanguage = useCallback(async (lang: Language) => {
     setLanguageState(lang);
     await AsyncStorage.setItem(STORAGE_KEYS.LANGUAGE, lang);
+  }, []);
+
+  const setConsentAccepted = useCallback(async () => {
+    setConsentAcceptedState(true);
+    await AsyncStorage.setItem(STORAGE_KEYS.CONSENT_ACCEPTED, new Date().toISOString());
   }, []);
 
   const setTermsAccepted = useCallback(async () => {
@@ -488,6 +497,7 @@ export const [AppProvider, useApp] = createContextHook(() => {
 
   return useMemo(() => ({
     language,
+    consentAccepted,
     termsAccepted,
     patientId,
     patientName,
@@ -520,6 +530,7 @@ export const [AppProvider, useApp] = createContextHook(() => {
     dismissDrawModal,
     closeDrawModalKeepQueue,
     setLanguage,
+    setConsentAccepted,
     setTermsAccepted,
     setPatient,
     clearPatient,
@@ -532,7 +543,7 @@ export const [AppProvider, useApp] = createContextHook(() => {
     resetTutorial,
     t,
   }), [
-    language, termsAccepted, patientId, patientName, accessCode,
+    language, consentAccepted, termsAccepted, patientId, patientName, accessCode,
     fontSizeLevel, fontScale, isReady, reinforcementAudioId,
     reinforcementAudioUrl, tutorialCompleted,
     therapistPhotoUrl, therapistCartoonUrl, therapistNameEn, therapistNameZh,
@@ -544,8 +555,7 @@ export const [AppProvider, useApp] = createContextHook(() => {
     clearFlowersStolen,
     refreshPatient,
     drawQueue, drawModalVisible, addToDrawQueue, consumeDrawFromQueue, dismissDrawModal, closeDrawModalKeepQueue,
-    setLanguage,
-    setTermsAccepted, setPatient, clearPatient, setFontSizeLevel,
+    setLanguage, setConsentAccepted, setTermsAccepted, setPatient, clearPatient, setFontSizeLevel,
     setLiveSubtitlesEnabled, setSubtitleSizeLevel, setMahjongGameEnabled, setMahjongGameLevel,
     setTutorialCompleted, resetTutorial, t,
   ]);

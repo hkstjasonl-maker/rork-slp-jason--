@@ -1,4 +1,4 @@
-# SLP Jason Lai
+# NanoHab 醫家動
 
 Speech therapy rehabilitation app for iOS.
 

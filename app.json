@@ -1,7 +1,7 @@
 {
   "expo": {
     "name": "NanoHab 醫家動",
-    "slug": "slp-jason",
+    "slug": "nanohab",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",

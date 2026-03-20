@@ -82,8 +82,8 @@ export async function burnWatermarkIntoVideo(
     );
     const watermarkLine2 = escapeFFmpegText(
       options.patientName
-        ? `${options.patientName} · Recorded with SLP Jason`
-        : 'Recorded with SLP Jason'
+        ? `${options.patientName} · Recorded with NanoHab`
+        : 'Recorded with NanoHab'
     );
 
     const outputUri = `${LegacyFileSystem.cacheDirectory}watermarked_${Date.now()}.mp4`;

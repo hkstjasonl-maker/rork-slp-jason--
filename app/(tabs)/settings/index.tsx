@@ -226,7 +226,7 @@ export default function SettingsScreen() {
               style={styles.actionCard}
               onPress={() => {
                 const subject = encodeURIComponent('Data Deletion Request / 資料刪除要求');
-                const body = encodeURIComponent('I would like to request deletion of my personal data from the SLP Jason app.\n\n我希望要求刪除我在SLP Jason應用程式中的個人資料。');
+                const body = encodeURIComponent('I would like to request deletion of my personal data from the NanoHab app.\n\n我希望要求刪除我在NanoHab醫家動應用程式中的個人資料。');
                 void Linking.openURL(`mailto:YOUR_EMAIL@example.com?subject=${subject}&body=${body}`);
               }}
               activeOpacity={0.7}

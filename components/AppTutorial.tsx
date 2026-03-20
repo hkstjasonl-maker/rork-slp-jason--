@@ -27,8 +27,8 @@ interface TutorialScreen {
 const TUTORIAL_SCREENS: TutorialScreen[] = [
   {
     icon: '👋',
-    title_en: 'Welcome to SLP Jason',
-    title_zh: '歡迎使用 SLP Jason',
+    title_en: 'Welcome to NanoHab',
+    title_zh: '歡迎使用醫家動',
     desc_en: 'Your speech therapist has prescribed exercises for you. This app helps you practise at home with video guidance.',
     desc_zh: '你的言語治療師為你安排了練習計劃。此應用程式幫助你在家中跟隨影片指導進行練習。',
   },

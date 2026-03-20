@@ -1,11 +1,11 @@
 {
   "expo": {
-    "name": "SLP Jason ",
+    "name": "NanoHab 醫家動",
     "slug": "slp-jason",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
-    "scheme": "slpjason",
+    "scheme": "nanohab",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
     "splash": {
@@ -16,7 +16,7 @@
     "ios": {
       "supportsTablet": true,
       "requireFullScreen": true,
-      "bundleIdentifier": "app.rork.slp-jason",
+      "bundleIdentifier": "com.dravive.nanohab",
       "buildNumber": "1",
       "infoPlist": {
         "UISupportedInterfaceOrientations": [
@@ -36,7 +36,7 @@
         "foregroundImage": "./assets/images/adaptive-icon.png",
         "backgroundColor": "#ffffff"
       },
-      "package": "com.dravive.slpjason"
+      "package": "com.dravive.nanohab"
     },
     "web": {
       "favicon": "./assets/images/favicon.png"

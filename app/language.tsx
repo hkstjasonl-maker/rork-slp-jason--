@@ -43,10 +43,10 @@ export default function LanguageScreen() {
               <Globe size={36} color={Colors.white} />
             </View>
             <ScaledText size={28} weight="bold" color={Colors.textPrimary} style={styles.title}>
-              SLP Jason Lai
+              NanoHab 醫家動
             </ScaledText>
             <ScaledText size={14} color={Colors.textSecondary} style={styles.subtitle}>
-              言語治療師 Jason · Speech Therapist
+              By Dr. Avive Group Limited
             </ScaledText>
           </View>
 

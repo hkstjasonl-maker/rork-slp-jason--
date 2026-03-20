@@ -89,7 +89,7 @@ export default function CodeEntryScreen() {
                 <KeyRound size={36} color={Colors.white} />
               </View>
               <ScaledText size={28} weight="bold" color={Colors.textPrimary} style={styles.title}>
-                SLP Jason Lai
+                NanoHab 醫家動
               </ScaledText>
               <ScaledText size={15} color={Colors.textSecondary} style={styles.subtitle}>
                 {t('appSubtitle')}

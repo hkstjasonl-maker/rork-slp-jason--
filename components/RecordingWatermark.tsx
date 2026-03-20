@@ -27,7 +27,7 @@ function RecordingWatermarkInner({ exerciseName, patientName, visible }: Recordi
       {patientName ? (
         <Text style={styles.detailText}>{patientName}</Text>
       ) : null}
-      <Text style={styles.brandingText}>Recorded with SLP Jason 使用SLP Jason錄製</Text>
+      <Text style={styles.brandingText}>Recorded with NanoHab 使用醫家動錄製</Text>
     </View>
   );
 }

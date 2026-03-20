@@ -143,10 +143,10 @@ export default function IndexScreen() {
           <Image source={JASON_PHOTO} style={styles.photo} />
         </View>
         <ScaledText size={24} weight="bold" color={Colors.textPrimary} style={styles.title}>
-          <Text>{'SLP Jason Lai'}</Text>
+          <Text>{'NanoHab 醫家動'}</Text>
         </ScaledText>
         <ScaledText size={14} color={Colors.textSecondary} style={styles.subtitle}>
-          <Text>{'Speech-Language Pathologist'}</Text>
+          <Text>{'By Dr. Avive Group Limited'}</Text>
         </ScaledText>
         <ActivityIndicator size="small" color={Colors.primary} style={styles.loader} />
       </Animated.View>

@@ -580,32 +580,33 @@ export default function AssessmentsScreen() {
           <CopyrightFooter />
         </ScrollView>
 
-        <AssessmentModePicker
-          visible={modePickerVisible}
-          onClose={() => {
-            setModePickerVisible(false);
-            setPendingNav(null);
-          }}
-          onSelectMode={(mode: AssessmentViewMode) => {
-            setModePickerVisible(false);
-            if (!pendingNav) return;
-            log('[Assessments] Mode selected:', mode, 'nav:', pendingNav.type);
-            if (pendingNav.type === 'clinical') {
-              router.push({
-                pathname: '/clinical-assessment',
-                params: { ...pendingNav.params, mode },
-              });
-            } else {
-              router.push({
-                pathname: '/questionnaire',
-                params: { ...pendingNav.params, mode },
-              });
-            }
-            setPendingNav(null);
-          }}
-          t={t}
-        />
       </SafeAreaView>
+
+      <AssessmentModePicker
+        visible={modePickerVisible}
+        onClose={() => {
+          setModePickerVisible(false);
+          setPendingNav(null);
+        }}
+        onSelectMode={(mode: AssessmentViewMode) => {
+          setModePickerVisible(false);
+          if (!pendingNav) return;
+          log('[Assessments] Mode selected:', mode, 'nav:', pendingNav.type);
+          if (pendingNav.type === 'clinical') {
+            router.push({
+              pathname: '/clinical-assessment',
+              params: { ...pendingNav.params, mode },
+            });
+          } else {
+            router.push({
+              pathname: '/questionnaire',
+              params: { ...pendingNav.params, mode },
+            });
+          }
+          setPendingNav(null);
+        }}
+        t={t}
+      />
     </View>
   );
 }

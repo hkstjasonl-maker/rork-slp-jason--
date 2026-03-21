@@ -1,0 +1,1609 @@
+import React, { useEffect, useRef, useState, useCallback, useMemo } from 'react';
+import {
+  View,
+  StyleSheet,
+  SafeAreaView,
+  TouchableOpacity,
+  Animated,
+  Easing,
+  Modal,
+  Image,
+  Dimensions,
+  Platform,
+  Alert,
+} from 'react-native';
+import { Stack, useRouter } from 'expo-router';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { ChevronLeft, Sparkles } from 'lucide-react-native';
+import * as Haptics from 'expo-haptics';
+import { LinearGradient } from 'expo-linear-gradient';
+
+import { useApp } from '@/contexts/AppContext';
+import { ScaledText } from '@/components/ScaledText';
+import { supabase } from '@/lib/supabase';
+import Colors from '@/constants/colors';
+import { log } from '@/lib/logger';
+
+const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
+
+const RARITY_CAPSULE_COLORS: Record<string, string> = {
+  common: '#F48FB1',
+  uncommon: '#64B5F6',
+  rare: '#FFD54F',
+  epic: '#CE93D8',
+  legendary: '#BA68C8',
+};
+
+const RARITY_CAPSULE_IMAGES: Record<string, string> = {
+  common: 'https://pfgtnrlgetomfmrzbxgb.supabase.co/storage/v1/object/public/flowers/capsule-pink.png',
+  uncommon: 'https://pfgtnrlgetomfmrzbxgb.supabase.co/storage/v1/object/public/flowers/capsule-blue.png',
+  rare: 'https://pfgtnrlgetomfmrzbxgb.supabase.co/storage/v1/object/public/flowers/capsule-gold.png',
+  epic: 'https://pfgtnrlgetomfmrzbxgb.supabase.co/storage/v1/object/public/flowers/capsule-purple.png',
+  legendary: 'https://pfgtnrlgetomfmrzbxgb.supabase.co/storage/v1/object/public/flowers/capsule-purple.png',
+};
+
+const RARITY_GLOW_COLORS: Record<string, string> = {
+  common: 'rgba(244,143,177,0.4)',
+  uncommon: 'rgba(100,181,246,0.4)',
+  rare: 'rgba(255,213,79,0.5)',
+  epic: 'rgba(206,147,216,0.5)',
+  legendary: 'rgba(186,104,200,0.6)',
+};
+
+const RARITY_LABELS: Record<string, { label: string; labelZh: string }> = {
+  common: { label: 'Common', labelZh: '普通' },
+  uncommon: { label: 'Uncommon', labelZh: '不常見' },
+  rare: { label: 'Rare', labelZh: '稀有' },
+  epic: { label: 'Epic', labelZh: '史詩' },
+  legendary: { label: 'Legendary', labelZh: '傳說' },
+};
+
+interface FlowerType {
+  id: string;
+  name_en: string;
+  name_zh: string;
+  image_url: string;
+  rarity: string;
+  rarity_weight: number;
+  is_active: boolean;
+}
+
+interface DrawResult {
+  flower: FlowerType;
+  isSecondDraw: boolean;
+}
+
+type DrawPhase =
+  | 'idle'
+  | 'shaking'
+  | 'dropping'
+  | 'opening'
+  | 'revealing'
+  | 'done'
+  | 'waiting_second'
+  | 'complete';
+
+const FLAG_COLORS = ['#FF4D6D', '#4CC9F0', '#7209B7', '#F72585', '#4361EE', '#3A0CA3', '#FFD166', '#06D6A0', '#FF4D6D', '#4CC9F0'] as const;
+const CONFETTI_COLORS = ['#FF4D6D', '#4CC9F0', '#FFD166', '#7209B7', '#06D6A0', '#F72585', '#FF8E53'] as const;
+const LIGHT_COLORS = ['#FFF8E7', '#FFD166', '#FFB4C2', '#B8E0FF'] as const;
+
+interface FairyLight {
+  x: number;
+  y: number;
+  color: string;
+  opacity: Animated.Value;
+}
+
+interface ConfettiPiece {
+  startX: number;
+  width: number;
+  height: number;
+  color: string;
+  translateY: Animated.Value;
+  translateX: Animated.Value;
+  rotate: Animated.Value;
+  opacity: Animated.Value;
+}
+
+interface PennantFlag {
+  color: string;
+  rotation: Animated.Value;
+}
+
+function useCarnivalAnimations() {
+  const flagsRow1 = useRef<PennantFlag[]>(
+    FLAG_COLORS.map((color) => ({
+      color,
+      rotation: new Animated.Value(0),
+    }))
+  ).current;
+
+  const flagsRow2 = useRef<PennantFlag[]>(
+    FLAG_COLORS.slice(0, 7).map((color) => ({
+      color,
+      rotation: new Animated.Value(0),
+    }))
+  ).current;
+
+  const fairyLights = useRef<FairyLight[]>(
+    Array.from({ length: 18 }, (_, i) => {
+      const side = i < 9 ? 'left' : 'right';
+      const idx = i < 9 ? i : i - 9;
+      return {
+        x: side === 'left' ? 10 + Math.random() * 25 : 65 + Math.random() * 25,
+        y: 12 + idx * 9 + Math.random() * 5,
+        color: LIGHT_COLORS[i % LIGHT_COLORS.length],
+        opacity: new Animated.Value(0.3 + Math.random() * 0.7),
+      };
+    })
+  ).current;
+
+  const confetti = useRef<ConfettiPiece[]>(
+    Array.from({ length: 14 }, (_, i) => ({
+      startX: Math.random() * 100,
+      width: 4 + Math.random() * 4,
+      height: 8 + Math.random() * 6,
+      color: CONFETTI_COLORS[i % CONFETTI_COLORS.length],
+      translateY: new Animated.Value(-20),
+      translateX: new Animated.Value(0),
+      rotate: new Animated.Value(0),
+      opacity: new Animated.Value(0.7 + Math.random() * 0.3),
+    }))
+  ).current;
+
+  const groundGlowOpacity = useRef(new Animated.Value(0.12)).current;
+
+  useEffect(() => {
+    const animations: Animated.CompositeAnimation[] = [];
+
+    flagsRow1.forEach((flag, index) => {
+      const anim = Animated.loop(
+        Animated.sequence([
+          Animated.timing(flag.rotation, { toValue: 1, duration: 1200 + index * 100, easing: Easing.inOut(Easing.sin), useNativeDriver: true }),
+          Animated.timing(flag.rotation, { toValue: -1, duration: 1200 + index * 100, easing: Easing.inOut(Easing.sin), useNativeDriver: true }),
+        ])
+      );
+      animations.push(anim);
+      anim.start();
+    });
+
+    flagsRow2.forEach((flag, index) => {
+      const anim = Animated.loop(
+        Animated.sequence([
+          Animated.timing(flag.rotation, { toValue: -1, duration: 1300 + index * 120, easing: Easing.inOut(Easing.sin), useNativeDriver: true }),
+          Animated.timing(flag.rotation, { toValue: 1, duration: 1300 + index * 120, easing: Easing.inOut(Easing.sin), useNativeDriver: true }),
+        ])
+      );
+      animations.push(anim);
+      anim.start();
+    });
+
+    fairyLights.forEach((light) => {
+      const dur = 600 + Math.random() * 400;
+      const anim = Animated.loop(
+        Animated.sequence([
+          Animated.timing(light.opacity, { toValue: 1, duration: dur, useNativeDriver: true }),
+          Animated.timing(light.opacity, { toValue: 0.2, duration: dur, useNativeDriver: true }),
+        ])
+      );
+      animations.push(anim);
+      anim.start();
+    });
+
+    confetti.forEach((piece) => {
+      const fallDuration = 6000 + Math.random() * 4000;
+      const swayAmount = 15 + Math.random() * 20;
+      const anim = Animated.loop(
+        Animated.parallel([
+          Animated.timing(piece.translateY, { toValue: SCREEN_HEIGHT + 40, duration: fallDuration, easing: Easing.linear, useNativeDriver: true }),
+          Animated.loop(
+            Animated.sequence([
+              Animated.timing(piece.translateX, { toValue: swayAmount, duration: fallDuration / 4, easing: Easing.inOut(Easing.sin), useNativeDriver: true }),
+              Animated.timing(piece.translateX, { toValue: -swayAmount, duration: fallDuration / 4, easing: Easing.inOut(Easing.sin), useNativeDriver: true }),
+            ])
+          ),
+          Animated.timing(piece.rotate, { toValue: 1, duration: fallDuration, easing: Easing.linear, useNativeDriver: true }),
+        ])
+      );
+      animations.push(anim);
+      anim.start();
+    });
+
+    const glowAnim = Animated.loop(
+      Animated.sequence([
+        Animated.timing(groundGlowOpacity, { toValue: 0.2, duration: 3000, easing: Easing.inOut(Easing.sin), useNativeDriver: true }),
+        Animated.timing(groundGlowOpacity, { toValue: 0.1, duration: 3000, easing: Easing.inOut(Easing.sin), useNativeDriver: true }),
+      ])
+    );
+    animations.push(glowAnim);
+    glowAnim.start();
+
+    return () => {
+      animations.forEach((a) => a.stop());
+    };
+  }, [flagsRow1, flagsRow2, fairyLights, confetti, groundGlowOpacity]);
+
+  return { flagsRow1, flagsRow2, fairyLights, confetti, groundGlowOpacity };
+}
+
+const PennantFlagView = React.memo(function PennantFlagView({ flag, size }: { flag: PennantFlag; size: number }) {
+  const rotateStr = flag.rotation.interpolate({
+    inputRange: [-1, 0, 1],
+    outputRange: ['-5deg', '0deg', '5deg'],
+  });
+  return (
+    <Animated.View style={{ transform: [{ rotate: rotateStr }] }}>
+      <View
+        style={{
+          width: 0,
+          height: 0,
+          borderLeftWidth: size / 2,
+          borderRightWidth: size / 2,
+          borderTopWidth: size,
+          borderLeftColor: 'transparent',
+          borderRightColor: 'transparent',
+          borderTopColor: flag.color,
+        }}
+      />
+    </Animated.View>
+  );
+});
+
+function CarnivalBackground() {
+  const { flagsRow1, flagsRow2, fairyLights, confetti, groundGlowOpacity } = useCarnivalAnimations();
+
+  const flagSpacing1 = useMemo(() => (SCREEN_WIDTH - 20) / flagsRow1.length, [flagsRow1.length]);
+  const flagSpacing2 = useMemo(() => (SCREEN_WIDTH - 40) / flagsRow2.length, [flagsRow2.length]);
+
+  return (
+    <View style={carnivalStyles.container} pointerEvents="none">
+      <LinearGradient
+        colors={['#FF6B35', '#FF8E53', '#FFC857', '#FFE4A0', '#FFECD2']}
+        style={StyleSheet.absoluteFillObject}
+      />
+
+      {/* Ground glow */}
+      <Animated.View style={[carnivalStyles.groundGlow, { opacity: groundGlowOpacity }]} />
+
+      {/* Confetti */}
+      {confetti.map((piece, i) => {
+        const rotateStr = piece.rotate.interpolate({
+          inputRange: [0, 1],
+          outputRange: ['0deg', '360deg'],
+        });
+        return (
+          <Animated.View
+            key={`confetti-${i}`}
+            style={{
+              position: 'absolute',
+              left: `${piece.startX}%` as unknown as number,
+              top: 0,
+              width: piece.width,
+              height: piece.height,
+              borderRadius: 1,
+              backgroundColor: piece.color,
+              opacity: piece.opacity,
+              transform: [
+                { translateY: piece.translateY },
+                { translateX: piece.translateX },
+                { rotate: rotateStr },
+              ],
+            }}
+          />
+        );
+      })}
+
+      {/* Carnival poles */}
+      <View style={carnivalStyles.poleLeft}>
+        <View style={carnivalStyles.poleCap} />
+        <View style={carnivalStyles.poleBar} />
+      </View>
+      <View style={carnivalStyles.poleRight}>
+        <View style={carnivalStyles.poleCap} />
+        <View style={carnivalStyles.poleBar} />
+      </View>
+
+      {/* Fairy lights */}
+      {fairyLights.map((light, i) => (
+        <Animated.View
+          key={`light-${i}`}
+          style={{
+            position: 'absolute',
+            left: `${light.x}%` as unknown as number,
+            top: `${light.y}%` as unknown as number,
+            opacity: light.opacity,
+            alignItems: 'center',
+            justifyContent: 'center',
+          }}
+        >
+          <View style={[carnivalStyles.lightGlow, { backgroundColor: light.color }]} />
+          <View style={[carnivalStyles.lightDot, { backgroundColor: light.color }]} />
+        </Animated.View>
+      ))}
+
+      {/* Bunting row 1 */}
+      <View style={carnivalStyles.buntingRow1}>
+        <View style={carnivalStyles.buntingLine} />
+        <View style={carnivalStyles.flagsContainer}>
+          {flagsRow1.map((flag, i) => (
+            <View key={`flag1-${i}`} style={{ width: flagSpacing1, alignItems: 'center' }}>
+              <PennantFlagView flag={flag} size={18} />
+            </View>
+          ))}
+        </View>
+      </View>
+
+      {/* Bunting row 2 */}
+      <View style={carnivalStyles.buntingRow2}>
+        <View style={carnivalStyles.buntingLine2} />
+        <View style={carnivalStyles.flagsContainer}>
+          {flagsRow2.map((flag, i) => (
+            <View key={`flag2-${i}`} style={{ width: flagSpacing2, alignItems: 'center' }}>
+              <PennantFlagView flag={flag} size={13} />
+            </View>
+          ))}
+        </View>
+      </View>
+    </View>
+  );
+}
+
+const carnivalStyles = StyleSheet.create({
+  container: {
+    ...StyleSheet.absoluteFillObject,
+    overflow: 'hidden',
+  },
+  groundGlow: {
+    position: 'absolute',
+    bottom: -20,
+    left: -30,
+    right: -30,
+    height: 100,
+    backgroundColor: '#FFD166',
+    borderRadius: 100,
+  },
+  poleLeft: {
+    position: 'absolute',
+    left: 8,
+    top: 50,
+    alignItems: 'center',
+  },
+  poleRight: {
+    position: 'absolute',
+    right: 8,
+    top: 50,
+    alignItems: 'center',
+  },
+  poleCap: {
+    width: 16,
+    height: 16,
+    borderRadius: 8,
+    backgroundColor: '#FFD166',
+  },
+  poleBar: {
+    width: 6,
+    height: SCREEN_HEIGHT * 0.55,
+    backgroundColor: '#C9184A',
+    borderRadius: 3,
+  },
+  lightGlow: {
+    position: 'absolute',
+    width: 14,
+    height: 14,
+    borderRadius: 7,
+    opacity: 0.25,
+  },
+  lightDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+  },
+  buntingRow1: {
+    position: 'absolute',
+    top: 44,
+    left: 10,
+    right: 10,
+  },
+  buntingRow2: {
+    position: 'absolute',
+    top: 70,
+    left: 20,
+    right: 20,
+  },
+  buntingLine: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    height: 2,
+    backgroundColor: '#FFD166',
+    borderRadius: 1,
+  },
+  buntingLine2: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    height: 1.5,
+    backgroundColor: 'rgba(255,209,102,0.6)',
+    borderRadius: 1,
+  },
+  flagsContainer: {
+    flexDirection: 'row',
+    marginTop: 2,
+  },
+});
+
+const GRID_COLS = 4;
+const GRID_ROWS = 5;
+const TOTAL_SLOTS = GRID_COLS * GRID_ROWS;
+
+function weightedRandomPick(flowers: FlowerType[]): FlowerType {
+  const totalWeight = flowers.reduce((sum, f) => sum + (f.rarity_weight || 1), 0);
+  let random = Math.random() * totalWeight;
+  for (const flower of flowers) {
+    random -= (flower.rarity_weight || 1);
+    if (random <= 0) return flower;
+  }
+  return flowers[flowers.length - 1];
+}
+
+const GACHA_MACHINE_URL = 'https://pfgtnrlgetomfmrzbxgb.supabase.co/storage/v1/object/public/flowers/gacha-machine.png';
+const gachaMachineSource = { uri: GACHA_MACHINE_URL };
+
+const capsuleSources: Record<string, { uri: string }> = {};
+for (const key of Object.keys(RARITY_CAPSULE_IMAGES)) {
+  capsuleSources[key] = { uri: RARITY_CAPSULE_IMAGES[key] };
+}
+
+const CapsuleMachine = React.memo(function CapsuleMachine({ shakeAnim }: { shakeAnim: Animated.Value }) {
+  const machineShake = shakeAnim.interpolate({
+    inputRange: [-1, 0, 1],
+    outputRange: ['-2deg', '0deg', '2deg'],
+  });
+
+  return (
+    <Animated.View style={[styles.machineContainer, { transform: [{ rotate: machineShake }] }]}>
+      <Image
+        source={gachaMachineSource}
+        style={machineImageStyle}
+        resizeMode="contain"
+        onError={() => log('[GachaDraw] Failed to load gacha machine image')}
+      />
+    </Animated.View>
+  );
+});
+
+const machineImageStyle = { width: '100%' as const, height: undefined, aspectRatio: 0.65 };
+
+function CapsuleBall({
+  rarity,
+  dropAnim,
+  splitAnim,
+  visible,
+}: {
+  rarity: string;
+  dropAnim: Animated.Value;
+  splitAnim: Animated.Value;
+  visible: boolean;
+}) {
+  if (!visible) return null;
+
+  const imageSource = capsuleSources[rarity] || capsuleSources.common;
+
+  const translateY = dropAnim.interpolate({
+    inputRange: [0, 1],
+    outputRange: [-60, 180],
+  });
+
+  const scale = splitAnim.interpolate({
+    inputRange: [0, 0.5, 1],
+    outputRange: [1, 1.2, 0],
+  });
+
+  const opacity = splitAnim.interpolate({
+    inputRange: [0, 0.8, 1],
+    outputRange: [1, 0.6, 0],
+  });
+
+  return (
+    <Animated.View
+      style={[
+        styles.capsuleBallContainer,
+        { transform: [{ translateY }] },
+      ]}
+    >
+      <Animated.Image
+        source={imageSource}
+        style={{
+          width: 56,
+          height: 56,
+          transform: [{ scale }],
+          opacity,
+        }}
+        resizeMode="contain"
+      />
+    </Animated.View>
+  );
+}
+
+function FlowerReveal({
+  flower,
+  revealAnim,
+  isZh,
+}: {
+  flower: FlowerType | null;
+  revealAnim: Animated.Value;
+  isZh: boolean;
+}) {
+  if (!flower) return null;
+
+  const scale = revealAnim.interpolate({
+    inputRange: [0, 0.5, 0.8, 1],
+    outputRange: [0, 0.3, 1.1, 1],
+  });
+
+  const opacity = revealAnim.interpolate({
+    inputRange: [0, 0.3, 1],
+    outputRange: [0, 0.5, 1],
+  });
+
+  const glowScale = revealAnim.interpolate({
+    inputRange: [0, 0.5, 1],
+    outputRange: [0, 1.5, 1.2],
+  });
+
+  const glowOpacity = revealAnim.interpolate({
+    inputRange: [0, 0.5, 0.8, 1],
+    outputRange: [0, 0.8, 0.4, 0.3],
+  });
+
+  const rarity = flower.rarity || 'common';
+  const glowColor = RARITY_GLOW_COLORS[rarity] || RARITY_GLOW_COLORS.common;
+  const rarityInfo = RARITY_LABELS[rarity] || RARITY_LABELS.common;
+
+  return (
+    <View style={styles.revealContainer}>
+      <Animated.View
+        style={[
+          styles.revealGlow,
+          {
+            backgroundColor: glowColor,
+            transform: [{ scale: glowScale }],
+            opacity: glowOpacity,
+          },
+        ]}
+      />
+      <Animated.View style={[styles.revealContent, { transform: [{ scale }], opacity }]}>
+        <Image
+          source={{ uri: flower.image_url }}
+          style={styles.revealFlowerImage}
+          resizeMode="contain"
+        />
+        <ScaledText size={20} weight="bold" color={Colors.textPrimary} style={styles.revealFlowerName}>
+          {isZh ? flower.name_zh || flower.name_en : flower.name_en}
+        </ScaledText>
+        <View style={[styles.revealRarityBadge, { backgroundColor: RARITY_CAPSULE_COLORS[rarity] || '#F48FB1' }]}>
+          <ScaledText size={13} weight="700" color="#FFF">
+            {isZh ? rarityInfo.labelZh : rarityInfo.label}
+          </ScaledText>
+        </View>
+      </Animated.View>
+    </View>
+  );
+}
+
+function FullScreenReveal({
+  visible,
+  flower,
+  isZh,
+  onContinue,
+  hasNextDraw,
+}: {
+  visible: boolean;
+  flower: FlowerType | null;
+  isZh: boolean;
+  onContinue: () => void;
+  hasNextDraw: boolean;
+}) {
+  const overlayOpacity = useRef(new Animated.Value(0)).current;
+  const flowerScale = useRef(new Animated.Value(0)).current;
+  const flowerRotate = useRef(new Animated.Value(0)).current;
+  const glowScale = useRef(new Animated.Value(0)).current;
+  const glowOpacity = useRef(new Animated.Value(0)).current;
+  const bannerTranslateY = useRef(new Animated.Value(60)).current;
+  const bannerOpacity = useRef(new Animated.Value(0)).current;
+  const nameOpacity = useRef(new Animated.Value(0)).current;
+  const congratsOpacity = useRef(new Animated.Value(0)).current;
+  const buttonOpacity = useRef(new Animated.Value(0)).current;
+  const [displayedName, setDisplayedName] = useState<string>('');
+  const [showParticles, setShowParticles] = useState<boolean>(false);
+  const typeTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const timeoutsRef = useRef<ReturnType<typeof setTimeout>[]>([]);
+
+  const particles = useRef(
+    Array.from({ length: 20 }, () => ({
+      x: new Animated.Value(0),
+      y: new Animated.Value(0),
+      opacity: new Animated.Value(0),
+      scale: new Animated.Value(1),
+    }))
+  ).current;
+
+  useEffect(() => {
+    if (!visible || !flower) return;
+
+    overlayOpacity.setValue(0);
+    flowerScale.setValue(0);
+    flowerRotate.setValue(-5);
+    glowScale.setValue(0);
+    glowOpacity.setValue(0);
+    bannerTranslateY.setValue(60);
+    bannerOpacity.setValue(0);
+    nameOpacity.setValue(0);
+    congratsOpacity.setValue(0);
+    buttonOpacity.setValue(0);
+    setDisplayedName('');
+    setShowParticles(false);
+    particles.forEach((p) => {
+      p.x.setValue(0);
+      p.y.setValue(0);
+      p.opacity.setValue(0);
+      p.scale.setValue(1);
+    });
+
+    const name = isZh ? (flower.name_zh || flower.name_en) : flower.name_en;
+    const timers: ReturnType<typeof setTimeout>[] = [];
+
+    Animated.timing(overlayOpacity, { toValue: 1, duration: 300, useNativeDriver: true }).start();
+
+    timers.push(setTimeout(() => {
+      setShowParticles(true);
+      if (Platform.OS !== 'web') Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => {});
+
+      particles.forEach((p) => {
+        const angle = Math.random() * Math.PI * 2;
+        const distance = 80 + Math.random() * 120;
+        p.x.setValue(0);
+        p.y.setValue(0);
+        p.opacity.setValue(1);
+        p.scale.setValue(0.5 + Math.random() * 1);
+
+        Animated.parallel([
+          Animated.timing(p.x, { toValue: Math.cos(angle) * distance, duration: 800, useNativeDriver: true }),
+          Animated.timing(p.y, { toValue: Math.sin(angle) * distance, duration: 800, useNativeDriver: true }),
+          Animated.timing(p.opacity, { toValue: 0, duration: 800, delay: 200, useNativeDriver: true }),
+        ]).start();
+      });
+    }, 300));
+
+    timers.push(setTimeout(() => {
+      if (Platform.OS !== 'web') Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
+
+      Animated.parallel([
+        Animated.spring(flowerScale, { toValue: 1, friction: 4, tension: 40, useNativeDriver: true }),
+        Animated.sequence([
+          Animated.timing(flowerRotate, { toValue: 5, duration: 200, useNativeDriver: true }),
+          Animated.timing(flowerRotate, { toValue: -3, duration: 200, useNativeDriver: true }),
+          Animated.timing(flowerRotate, { toValue: 0, duration: 300, easing: Easing.out(Easing.quad), useNativeDriver: true }),
+        ]),
+        Animated.timing(glowScale, { toValue: 1.5, duration: 600, useNativeDriver: true }),
+        Animated.sequence([
+          Animated.timing(glowOpacity, { toValue: 0.8, duration: 300, useNativeDriver: true }),
+          Animated.timing(glowOpacity, { toValue: 0.3, duration: 300, useNativeDriver: true }),
+        ]),
+      ]).start();
+    }, 600));
+
+    timers.push(setTimeout(() => {
+      Animated.parallel([
+        Animated.spring(bannerTranslateY, { toValue: 0, friction: 6, tension: 50, useNativeDriver: true }),
+        Animated.timing(bannerOpacity, { toValue: 1, duration: 300, useNativeDriver: true }),
+      ]).start();
+    }, 1000));
+
+    timers.push(setTimeout(() => {
+      nameOpacity.setValue(1);
+      let i = 0;
+      const timer = setInterval(() => {
+        i++;
+        setDisplayedName(name.substring(0, i));
+        if (i % 3 === 0 && Platform.OS !== 'web') {
+          Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
+        }
+        if (i >= name.length) clearInterval(timer);
+      }, 80);
+      typeTimerRef.current = timer;
+    }, 1200));
+
+    timers.push(setTimeout(() => {
+      Animated.timing(congratsOpacity, { toValue: 1, duration: 400, useNativeDriver: true }).start();
+    }, 1800));
+
+    timers.push(setTimeout(() => {
+      Animated.timing(buttonOpacity, { toValue: 1, duration: 400, useNativeDriver: true }).start();
+    }, 2500));
+
+    timeoutsRef.current = timers;
+
+    return () => {
+      timers.forEach(clearTimeout);
+      if (typeTimerRef.current) clearInterval(typeTimerRef.current);
+    };
+  }, [visible, flower, isZh, overlayOpacity, flowerScale, flowerRotate, glowScale, glowOpacity, bannerTranslateY, bannerOpacity, nameOpacity, congratsOpacity, buttonOpacity, particles]);
+
+  if (!visible || !flower) return null;
+
+  const rarity = flower.rarity || 'common';
+  const REVEAL_BG: Record<string, string> = {
+    common: '#F48FB1',
+    uncommon: '#64B5F6',
+    rare: '#CE93D8',
+    epic: '#FFB74D',
+    legendary: '#FFD54F',
+  };
+  const REVEAL_STARS: Record<string, string> = {
+    common: '★',
+    uncommon: '★★',
+    rare: '★★★',
+    epic: '★★★★',
+    legendary: '★★★★★',
+  };
+  const REVEAL_LABEL: Record<string, { en: string; zh: string }> = {
+    common: { en: 'Common', zh: '普通' },
+    uncommon: { en: 'Uncommon', zh: '不常見' },
+    rare: { en: 'Rare', zh: '稀有' },
+    epic: { en: 'Epic', zh: '史詩' },
+    legendary: { en: 'Legendary', zh: '傳說' },
+  };
+  const bgColor = REVEAL_BG[rarity] || '#F48FB1';
+  const stars = REVEAL_STARS[rarity] || '★';
+  const label = REVEAL_LABEL[rarity] || REVEAL_LABEL.common;
+  const flowerRotateStr = flowerRotate.interpolate({
+    inputRange: [-5, 0, 5],
+    outputRange: ['-5deg', '0deg', '5deg'],
+  });
+
+  return (
+    <Modal visible={visible} transparent animationType="none">
+      <Animated.View style={[revealStyles.overlay, { opacity: overlayOpacity }]}>
+        {showParticles && particles.map((p, i) => (
+          <Animated.View
+            key={i}
+            style={{
+              position: 'absolute',
+              width: 8 + (i % 3) * 4,
+              height: 8 + (i % 3) * 4,
+              borderRadius: 10,
+              backgroundColor: bgColor,
+              opacity: p.opacity,
+              transform: [{ translateX: p.x }, { translateY: p.y }, { scale: p.scale }],
+            }}
+          />
+        ))}
+
+        <Animated.View style={{ opacity: congratsOpacity, marginBottom: 20 }}>
+          <ScaledText size={28} weight="bold" color="#FFF">
+            🎉 {isZh ? '恭喜！' : 'Congratulations!'}
+          </ScaledText>
+        </Animated.View>
+
+        <Animated.View style={[
+          revealStyles.glowRing,
+          { backgroundColor: bgColor, opacity: glowOpacity, transform: [{ scale: glowScale }] },
+        ]} />
+
+        <Animated.Image
+          source={{ uri: flower.image_url }}
+          style={{
+            width: 140,
+            height: 140,
+            transform: [{ scale: flowerScale }, { rotate: flowerRotateStr }],
+          }}
+          resizeMode="contain"
+        />
+
+        <Animated.View style={[
+          revealStyles.rarityBanner,
+          { backgroundColor: bgColor, opacity: bannerOpacity, transform: [{ translateY: bannerTranslateY }] },
+        ]}>
+          <ScaledText size={16} weight="bold" color="#FFF">
+            {stars} {isZh ? label.zh : label.en}
+          </ScaledText>
+        </Animated.View>
+
+        <Animated.View style={{ marginTop: 16, opacity: nameOpacity }}>
+          <ScaledText size={24} weight="bold" color="#FFF" style={{ textAlign: 'center' as const }}>
+            {displayedName}
+          </ScaledText>
+        </Animated.View>
+
+        <Animated.View style={{ marginTop: 40, opacity: buttonOpacity }}>
+          {hasNextDraw ? (
+            <ScaledText size={14} weight="600" color="rgba(255,255,255,0.7)">
+              {isZh ? '準備下一次抽花...' : 'Preparing next draw...'}
+            </ScaledText>
+          ) : (
+            <TouchableOpacity
+              style={[revealStyles.continueBtn, { shadowColor: bgColor }]}
+              onPress={onContinue}
+              activeOpacity={0.8}
+            >
+              <ScaledText size={16} weight="bold" color={bgColor}>
+                {isZh ? '太棒了！' : 'Amazing!'}
+              </ScaledText>
+            </TouchableOpacity>
+          )}
+        </Animated.View>
+      </Animated.View>
+    </Modal>
+  );
+}
+
+const revealStyles = StyleSheet.create({
+  overlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.88)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  glowRing: {
+    position: 'absolute',
+    width: 200,
+    height: 200,
+    borderRadius: 100,
+  },
+  rarityBanner: {
+    marginTop: 20,
+    paddingHorizontal: 24,
+    paddingVertical: 10,
+    borderRadius: 20,
+  },
+  continueBtn: {
+    backgroundColor: '#FFF',
+    paddingVertical: 14,
+    paddingHorizontal: 40,
+    borderRadius: 16,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 5,
+  },
+});
+
+export default function GachaDrawScreen() {
+  const { patientId, language, refreshPatient: refreshPatientCtx } = useApp();
+  const router = useRouter();
+  const queryClient = useQueryClient();
+
+  const isZh = language === 'zh_hant' || language === 'zh_hans';
+
+  useEffect(() => {
+    if (Platform.OS !== 'web') {
+      Image.prefetch(GACHA_MACHINE_URL).catch(() => {});
+      Object.values(RARITY_CAPSULE_IMAGES).forEach(url => {
+        Image.prefetch(url).catch(() => {});
+      });
+    }
+  }, []);
+
+  const [drawPhase, setDrawPhase] = useState<DrawPhase>('idle');
+  const [currentFlower, setCurrentFlower] = useState<FlowerType | null>(null);
+  const [drawResults, setDrawResults] = useState<DrawResult[]>([]);
+  const [pendingDraws, setPendingDraws] = useState<number>(0);
+  const [showResultModal, setShowResultModal] = useState<boolean>(false);
+  const [isStartingDraw, setIsStartingDraw] = useState<boolean>(false);
+  const [showFullReveal, setShowFullReveal] = useState<boolean>(false);
+
+  const secondFlowerRef = useRef<FlowerType | null>(null);
+
+  const shakeAnim = useRef(new Animated.Value(0)).current;
+  const capsuleDropAnim = useRef(new Animated.Value(0)).current;
+  const capsuleSplitAnim = useRef(new Animated.Value(0)).current;
+  const revealAnim = useRef(new Animated.Value(0)).current;
+  const [showCapsule, setShowCapsule] = useState<boolean>(false);
+
+  const patientDataQuery = useQuery({
+    queryKey: ['gachaPatientData', patientId],
+    queryFn: async () => {
+      log('[GachaDraw] Fetching patient data');
+      const { data, error } = await supabase
+        .from('patients')
+        .select('stars_available, fires_available')
+        .eq('id', patientId!)
+        .single();
+      if (error) throw error;
+      return data as { stars_available: number; fires_available: number };
+    },
+    enabled: !!patientId,
+    staleTime: 30 * 1000,
+  });
+
+  const flowerTypesQuery = useQuery({
+    queryKey: ['activeFlowerTypes'],
+    queryFn: async () => {
+      log('[GachaDraw] Fetching active flower types');
+      const { data, error } = await supabase
+        .from('flower_types')
+        .select('*')
+        .eq('is_active', true);
+      if (error) throw error;
+      return (data || []) as FlowerType[];
+    },
+    staleTime: 10 * 60 * 1000,
+  });
+
+  const refreshAfterDraw = useCallback(() => {
+    log('[GachaDraw] Refreshing data after draw');
+    void queryClient.invalidateQueries({ queryKey: ['gachaPatientData', patientId] });
+    void queryClient.invalidateQueries({ queryKey: ['gardenPatientData', patientId] });
+    void queryClient.invalidateQueries({ queryKey: ['patientFlowerSlots', patientId] });
+    void queryClient.invalidateQueries({ queryKey: ['patientFlowers', patientId] });
+  }, [queryClient, patientId]);
+
+  const resetAnimations = useCallback(() => {
+    shakeAnim.setValue(0);
+    capsuleDropAnim.setValue(0);
+    capsuleSplitAnim.setValue(0);
+    revealAnim.setValue(0);
+    setShowCapsule(false);
+    setCurrentFlower(null);
+  }, [shakeAnim, capsuleDropAnim, capsuleSplitAnim, revealAnim]);
+
+  const runDrawAnimation = useCallback((flower: FlowerType, isSecondDraw: boolean) => {
+    setCurrentFlower(flower);
+
+    setDrawPhase('shaking');
+
+    Animated.sequence([
+      Animated.timing(shakeAnim, { toValue: 0, duration: 0, useNativeDriver: true }),
+    ]).start(() => {
+      const shakeSequence = Animated.loop(
+        Animated.sequence([
+          Animated.timing(shakeAnim, { toValue: 1, duration: 80, useNativeDriver: true }),
+          Animated.timing(shakeAnim, { toValue: -1, duration: 80, useNativeDriver: true }),
+          Animated.timing(shakeAnim, { toValue: 0, duration: 80, useNativeDriver: true }),
+        ]),
+        { iterations: 4 }
+      );
+
+      shakeSequence.start(() => {
+        setDrawPhase('dropping');
+        setShowCapsule(true);
+
+        if (Platform.OS !== 'web') {
+          Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => {});
+        }
+
+        Animated.timing(capsuleDropAnim, {
+          toValue: 1,
+          duration: 800,
+          useNativeDriver: true,
+        }).start(() => {
+          setDrawPhase('opening');
+
+          setTimeout(() => {
+            Animated.timing(capsuleSplitAnim, {
+              toValue: 1,
+              duration: 500,
+              useNativeDriver: true,
+            }).start(() => {
+              setDrawPhase('revealing');
+
+              if (Platform.OS !== 'web') {
+                Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
+              }
+
+              Animated.spring(revealAnim, {
+                toValue: 1,
+                friction: 5,
+                tension: 40,
+                useNativeDriver: true,
+              }).start(() => {
+                setDrawResults((prev) => [...prev, { flower, isSecondDraw }]);
+                setDrawPhase('done');
+              });
+            });
+          }, 300);
+        });
+      });
+    });
+  }, [shakeAnim, capsuleDropAnim, capsuleSplitAnim, revealAnim]);
+
+  const startDraw = useCallback(async (type: 'stars' | 'fires') => {
+    const flowers = flowerTypesQuery.data;
+    if (!flowers || flowers.length === 0) return;
+    if (!patientId) return;
+
+    setIsStartingDraw(true);
+
+    try {
+      if (Platform.OS !== 'web') {
+        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
+      }
+
+      log('[GachaDraw] Fetching existing flowers for grid position calculation');
+      const { data: existingFlowers } = await supabase
+        .from('patient_flowers')
+        .select('grid_position')
+        .eq('patient_id', patientId)
+        .eq('is_stolen', false);
+
+      const usedPositions = new Set((existingFlowers || []).map((f: { grid_position: number }) => f.grid_position));
+
+      if (type === 'stars') {
+        let nextPosition = -1;
+        for (let i = 0; i < TOTAL_SLOTS; i++) {
+          if (!usedPositions.has(i)) {
+            nextPosition = i;
+            break;
+          }
+        }
+
+        if (nextPosition === -1) {
+          Alert.alert(
+            isZh ? '花田已滿！' : 'Garden Full!',
+            isZh ? '你的花田已種滿20朵花。' : 'Your garden has 20 flowers. Remove or wait for theft.'
+          );
+          return;
+        }
+
+        const selectedFlower = weightedRandomPick(flowers);
+        log('[GachaDraw] Single draw: flower=', selectedFlower.id, 'position=', nextPosition);
+
+        const { data: success, error } = await supabase.rpc('perform_gacha_draw', {
+          p_patient_id: patientId,
+          p_cost_type: 'stars',
+          p_cost_amount: 5,
+          p_flower_type_id: selectedFlower.id,
+          p_grid_position: nextPosition,
+        });
+
+        if (error || !success) {
+          log('[GachaDraw] Single draw RPC failed:', error);
+          Alert.alert(isZh ? '星星不足' : 'Not enough stars');
+          return;
+        }
+
+        refreshAfterDraw();
+        void refreshPatientCtx();
+
+        setPendingDraws(0);
+        setDrawResults([]);
+        resetAnimations();
+        secondFlowerRef.current = null;
+        runDrawAnimation(selectedFlower, false);
+      } else {
+        const positions: number[] = [];
+        for (let i = 0; i < TOTAL_SLOTS; i++) {
+          if (!usedPositions.has(i)) {
+            positions.push(i);
+            if (positions.length >= 2) break;
+          }
+        }
+
+        if (positions.length < 2) {
+          Alert.alert(
+            isZh ? '花田空間不足' : 'Not enough garden space',
+            isZh ? '需要至少2個空位來種2朵花。' : 'Need at least 2 empty slots for 2 flowers.'
+          );
+          return;
+        }
+
+        const flower1 = weightedRandomPick(flowers);
+        const flower2 = weightedRandomPick(flowers);
+        log('[GachaDraw] Multi draw: flowers=', flower1.id, flower2.id, 'positions=', positions[0], positions[1]);
+
+        const { data: success, error } = await supabase.rpc('perform_gacha_draw_multi', {
+          p_patient_id: patientId,
+          p_cost_type: 'fires',
+          p_cost_amount: 10,
+          p_flower_type_ids: [flower1.id, flower2.id],
+          p_grid_positions: [positions[0], positions[1]],
+        });
+
+        if (error || !success) {
+          log('[GachaDraw] Multi draw RPC failed:', error);
+          Alert.alert(isZh ? '火焰不足' : 'Not enough fires');
+          return;
+        }
+
+        refreshAfterDraw();
+        void refreshPatientCtx();
+
+        setPendingDraws(1);
+        setDrawResults([]);
+        resetAnimations();
+        secondFlowerRef.current = flower2;
+        runDrawAnimation(flower1, false);
+      }
+    } catch (err) {
+      log('[GachaDraw] Draw error:', err);
+      Alert.alert(isZh ? '抽獎失敗' : 'Draw failed', isZh ? '請稍後再試。' : 'Please try again.');
+    } finally {
+      setIsStartingDraw(false);
+    }
+  }, [flowerTypesQuery.data, patientId, isZh, resetAnimations, runDrawAnimation, refreshAfterDraw, refreshPatientCtx]);
+
+  useEffect(() => {
+    if (drawPhase === 'done') {
+      const timeout = setTimeout(() => {
+        setShowFullReveal(true);
+      }, 800);
+      return () => clearTimeout(timeout);
+    }
+  }, [drawPhase]);
+
+  useEffect(() => {
+    if (showFullReveal && pendingDraws > 0) {
+      const timeout = setTimeout(() => {
+        setShowFullReveal(false);
+        const secondFlower = secondFlowerRef.current;
+        if (!secondFlower) return;
+
+        resetAnimations();
+        setPendingDraws(0);
+        secondFlowerRef.current = null;
+
+        setTimeout(() => {
+          runDrawAnimation(secondFlower, true);
+        }, 300);
+      }, 2500);
+
+      return () => clearTimeout(timeout);
+    }
+  }, [showFullReveal, pendingDraws, resetAnimations, runDrawAnimation]);
+
+  const starsAvailable = patientDataQuery.data?.stars_available ?? 0;
+  const firesAvailable = patientDataQuery.data?.fires_available ?? 0;
+  const canDrawStars = starsAvailable >= 5;
+  const canDrawFires = firesAvailable >= 10;
+  const isDrawing = isStartingDraw || (drawPhase !== 'idle' && drawPhase !== 'complete');
+
+  const handleBackToGarden = useCallback(() => {
+    setShowResultModal(false);
+    setDrawPhase('idle');
+    resetAnimations();
+    setDrawResults([]);
+    router.back();
+  }, [resetAnimations, router]);
+
+  const handleDrawAgain = useCallback(() => {
+    setShowResultModal(false);
+    setDrawPhase('idle');
+    resetAnimations();
+    setDrawResults([]);
+  }, [resetAnimations]);
+
+  return (
+    <View style={styles.root}>
+      <Stack.Screen options={{ headerShown: false }} />
+      <CarnivalBackground />
+      <SafeAreaView style={styles.safeArea}>
+        <View style={styles.header}>
+          <TouchableOpacity
+            onPress={() => router.back()}
+            style={styles.backBtn}
+            testID="gacha-back"
+            disabled={isDrawing}
+          >
+            <ChevronLeft size={24} color={isDrawing ? Colors.disabled : Colors.textPrimary} />
+          </TouchableOpacity>
+          <View style={styles.headerTitleArea}>
+            <ScaledText size={20} weight="bold" color={Colors.textPrimary}>
+              {isZh ? '扭蛋抽花' : 'Lucky Draw'}
+            </ScaledText>
+          </View>
+          <View style={styles.headerSpacer} />
+        </View>
+
+        <View style={styles.balanceBar}>
+          <View style={styles.balanceItem}>
+            <ScaledText size={22}>⭐</ScaledText>
+            <ScaledText size={14} weight="600" color={Colors.textPrimary}>
+              {starsAvailable}
+            </ScaledText>
+            <ScaledText size={10} color={Colors.textSecondary}>
+              {isZh ? '可用' : 'Available'}
+            </ScaledText>
+          </View>
+          <View style={styles.balanceDivider} />
+          <View style={styles.balanceItem}>
+            <ScaledText size={22}>🔥</ScaledText>
+            <ScaledText size={14} weight="600" color={Colors.textPrimary}>
+              {firesAvailable}
+            </ScaledText>
+            <ScaledText size={10} color={Colors.textSecondary}>
+              {isZh ? '可用' : 'Available'}
+            </ScaledText>
+          </View>
+        </View>
+
+        <View style={styles.machineArea}>
+          <CapsuleMachine shakeAnim={shakeAnim} />
+
+          <CapsuleBall
+            rarity={currentFlower?.rarity || 'common'}
+            dropAnim={capsuleDropAnim}
+            splitAnim={capsuleSplitAnim}
+            visible={showCapsule}
+          />
+
+          {(drawPhase === 'revealing' || drawPhase === 'done') && (
+            <FlowerReveal flower={currentFlower} revealAnim={revealAnim} isZh={isZh} />
+          )}
+
+          {drawPhase === 'done' && pendingDraws > 0 && (
+            <View style={styles.nextDrawHint}>
+              <ScaledText size={14} weight="600" color={Colors.primary}>
+                {isZh ? '準備第二次抽花...' : 'Preparing second draw...'}
+              </ScaledText>
+            </View>
+          )}
+        </View>
+
+        {(drawPhase === 'done' || drawPhase === 'revealing') && currentFlower && (
+          <View style={styles.resultBanner}>
+            <ScaledText size={16} weight="bold" color="#FFF" style={styles.resultBannerText}>
+              🎉 {isZh ? `你獲得了：${currentFlower.name_zh || currentFlower.name_en}！` : `You got: ${currentFlower.name_en}!`}
+            </ScaledText>
+          </View>
+        )}
+
+        <View style={styles.buttonArea}>
+          <TouchableOpacity
+            style={[styles.drawBtn, styles.starDrawBtn, (!canDrawStars || isDrawing) && styles.drawBtnDisabled]}
+            onPress={() => startDraw('stars')}
+            disabled={!canDrawStars || isDrawing}
+            activeOpacity={0.75}
+            testID="draw-stars-btn"
+          >
+            <Sparkles size={18} color="#FFF" />
+            <View style={styles.drawBtnTextArea}>
+              <ScaledText size={14} weight="700" color="#FFF">
+                ⭐ {isZh ? '花費 5 星 (1次)' : 'Spend 5 Stars (1 Draw)'}
+              </ScaledText>
+            </View>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={[styles.drawBtn, styles.fireDrawBtn, (!canDrawFires || isDrawing) && styles.drawBtnDisabled]}
+            onPress={() => startDraw('fires')}
+            disabled={!canDrawFires || isDrawing}
+            activeOpacity={0.75}
+            testID="draw-fires-btn"
+          >
+            <Sparkles size={18} color="#FFF" />
+            <View style={styles.drawBtnTextArea}>
+              <ScaledText size={14} weight="700" color="#FFF">
+                🔥 {isZh ? '花費 10 火 (2次)' : 'Spend 10 Fires (2 Draws)'}
+              </ScaledText>
+            </View>
+          </TouchableOpacity>
+        </View>
+      </SafeAreaView>
+
+      <FullScreenReveal
+        visible={showFullReveal}
+        flower={currentFlower}
+        isZh={isZh}
+        hasNextDraw={pendingDraws > 0}
+        onContinue={() => {
+          setShowFullReveal(false);
+          setDrawPhase('complete');
+          setShowResultModal(true);
+        }}
+      />
+
+      <Modal
+        visible={showResultModal}
+        transparent
+        animationType="fade"
+        onRequestClose={handleBackToGarden}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.resultModal}>
+            <ScaledText size={28} style={styles.resultEmoji}>🎉</ScaledText>
+            <ScaledText size={18} weight="bold" color={Colors.textPrimary} style={styles.resultTitle}>
+              {isZh ? '恭喜！' : 'Congratulations!'}
+            </ScaledText>
+
+            {drawResults.map((result, index) => {
+              const rarity = result.flower.rarity || 'common';
+              const rarityInfo = RARITY_LABELS[rarity] || RARITY_LABELS.common;
+              return (
+                <View key={index} style={styles.resultItem}>
+                  <Image
+                    source={{ uri: result.flower.image_url }}
+                    style={styles.resultFlowerImg}
+                    resizeMode="contain"
+                  />
+                  <View style={styles.resultItemInfo}>
+                    <ScaledText size={15} weight="600" color={Colors.textPrimary}>
+                      {isZh ? result.flower.name_zh || result.flower.name_en : result.flower.name_en}
+                    </ScaledText>
+                    <View style={[styles.resultRarityBadge, { backgroundColor: RARITY_CAPSULE_COLORS[rarity] || '#F48FB1' }]}>
+                      <ScaledText size={11} weight="700" color="#FFF">
+                        {isZh ? rarityInfo.labelZh : rarityInfo.label}
+                      </ScaledText>
+                    </View>
+                  </View>
+                </View>
+              );
+            })}
+
+            <View style={styles.resultButtonRow}>
+              {(canDrawStars || canDrawFires) && (
+                <TouchableOpacity
+                  style={styles.drawAgainBtn}
+                  onPress={handleDrawAgain}
+                  testID="draw-again-btn"
+                >
+                  <ScaledText size={14} weight="600" color={Colors.primary}>
+                    {isZh ? '再抽一次' : 'Draw Again'}
+                  </ScaledText>
+                </TouchableOpacity>
+              )}
+              <TouchableOpacity
+                style={styles.backToGardenBtn}
+                onPress={handleBackToGarden}
+                testID="back-to-garden-btn"
+              >
+                <ScaledText size={14} weight="700" color="#FFF">
+                  {isZh ? '返回花田' : 'Back to Garden'}
+                </ScaledText>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+    </View>
+  );
+}
+
+const styles = StyleSheet.create({
+  root: {
+    flex: 1,
+    backgroundColor: '#FF6B35',
+  },
+  safeArea: {
+    flex: 1,
+  },
+  header: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    zIndex: 10,
+  },
+  backBtn: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: 'rgba(255,255,255,0.9)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.12,
+    shadowRadius: 4,
+    elevation: 2,
+  },
+  headerTitleArea: {
+    flex: 1,
+    alignItems: 'center',
+  },
+  headerSpacer: {
+    width: 40,
+  },
+  balanceBar: {
+    flexDirection: 'row',
+    marginHorizontal: 20,
+    marginTop: 4,
+    marginBottom: 8,
+    backgroundColor: 'rgba(255,255,255,0.88)',
+    borderRadius: 16,
+    paddingVertical: 12,
+    paddingHorizontal: 20,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.4)',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 6,
+    elevation: 2,
+    zIndex: 10,
+  },
+  balanceItem: {
+    flex: 1,
+    alignItems: 'center',
+    gap: 2,
+  },
+  balanceDivider: {
+    width: 1,
+    backgroundColor: Colors.border,
+    marginHorizontal: 12,
+  },
+  machineArea: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    position: 'relative',
+  },
+  machineContainer: {
+    alignItems: 'center',
+    width: SCREEN_WIDTH * 0.75,
+    maxWidth: 340,
+  },
+
+  capsuleBallContainer: {
+    position: 'absolute',
+    flexDirection: 'row',
+    zIndex: 20,
+  },
+
+  revealContainer: {
+    position: 'absolute',
+    alignItems: 'center',
+    justifyContent: 'center',
+    zIndex: 30,
+    bottom: 20,
+  },
+  revealGlow: {
+    position: 'absolute',
+    width: 160,
+    height: 160,
+    borderRadius: 80,
+  },
+  revealContent: {
+    alignItems: 'center',
+  },
+  revealFlowerImage: {
+    width: 90,
+    height: 90,
+    marginBottom: 8,
+  },
+  revealFlowerName: {
+    textAlign: 'center',
+    marginBottom: 6,
+  },
+  revealRarityBadge: {
+    paddingHorizontal: 14,
+    paddingVertical: 4,
+    borderRadius: 12,
+  },
+  nextDrawHint: {
+    position: 'absolute',
+    bottom: 0,
+    alignItems: 'center',
+  },
+  resultBanner: {
+    marginHorizontal: 20,
+    marginBottom: 8,
+    backgroundColor: '#E91E63',
+    borderRadius: 14,
+    paddingVertical: 10,
+    paddingHorizontal: 16,
+    alignItems: 'center',
+    zIndex: 10,
+  },
+  resultBannerText: {
+    textAlign: 'center',
+  },
+  buttonArea: {
+    paddingHorizontal: 20,
+    paddingBottom: 16,
+    gap: 10,
+    zIndex: 10,
+  },
+  drawBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    paddingVertical: 16,
+    borderRadius: 18,
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.25,
+    shadowRadius: 6,
+    elevation: 4,
+  },
+  starDrawBtn: {
+    backgroundColor: '#FF9800',
+    shadowColor: '#FF9800',
+  },
+  fireDrawBtn: {
+    backgroundColor: '#F44336',
+    shadowColor: '#F44336',
+  },
+  drawBtnDisabled: {
+    backgroundColor: Colors.disabled,
+    shadowColor: 'transparent',
+    shadowOpacity: 0,
+    elevation: 0,
+  },
+  drawBtnTextArea: {
+    alignItems: 'center',
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.55)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  resultModal: {
+    backgroundColor: Colors.card,
+    borderRadius: 24,
+    padding: 28,
+    marginHorizontal: 28,
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.2,
+    shadowRadius: 16,
+    elevation: 10,
+    width: SCREEN_WIDTH - 56,
+    maxWidth: 380,
+  },
+  resultEmoji: {
+    marginBottom: 8,
+  },
+  resultTitle: {
+    marginBottom: 16,
+    textAlign: 'center',
+  },
+  resultItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#FAFAFA',
+    borderRadius: 14,
+    padding: 12,
+    marginBottom: 10,
+    width: '100%',
+    gap: 12,
+    borderWidth: 1,
+    borderColor: Colors.border,
+  },
+  resultFlowerImg: {
+    width: 52,
+    height: 52,
+  },
+  resultItemInfo: {
+    flex: 1,
+    gap: 4,
+  },
+  resultRarityBadge: {
+    paddingHorizontal: 10,
+    paddingVertical: 3,
+    borderRadius: 8,
+    alignSelf: 'flex-start',
+  },
+  resultButtonRow: {
+    flexDirection: 'row',
+    gap: 10,
+    marginTop: 16,
+    width: '100%',
+  },
+  drawAgainBtn: {
+    flex: 1,
+    paddingVertical: 14,
+    borderRadius: 14,
+    borderWidth: 2,
+    borderColor: Colors.primary,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  backToGardenBtn: {
+    flex: 1,
+    paddingVertical: 14,
+    borderRadius: 14,
+    backgroundColor: '#4CAF50',
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: '#4CAF50',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+});

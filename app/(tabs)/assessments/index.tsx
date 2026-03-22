@@ -17,7 +17,7 @@ import Colors from '@/constants/colors';
 import { Language } from '@/types';
 import { ASSESSMENT_TOOLS } from '@/constants/assessments';
 import { router } from 'expo-router';
-import { ClipboardCheck, Clock, CheckCircle, ChevronRight, FileText, Stethoscope, User } from 'lucide-react-native';
+import { ClipboardCheck, Clock, CheckCircle, ChevronRight, FileText, Stethoscope, User, FlaskConical, Calendar, MessageSquare } from 'lucide-react-native';
 import { log } from '@/lib/logger';
 import AssessmentModePicker, { AssessmentViewMode } from '@/components/AssessmentModePicker';
 
@@ -147,6 +147,49 @@ function getAssessmentReference(submission: ClinicalAssessmentSubmission): strin
   return submission.assessment_library?.reference || '';
 }
 
+interface ResearchAssessment {
+  id: string;
+  patient_id: string;
+  assessment_name: string;
+  timepoint: string;
+  total_score: number | null;
+  subscale_scores: Record<string, unknown> | null;
+  raw_responses: Record<string, unknown> | null;
+  administered_by: string | null;
+  administered_date: string | null;
+  completion_method: string | null;
+  notes: string | null;
+  created_at: string;
+}
+
+function getTimepointLabel(timepoint: string, t: (key: string) => string): string {
+  switch (timepoint) {
+    case 'baseline': return t('researchBaseline');
+    case 'week4': return t('researchWeek4');
+    case 'endpoint': return t('researchEndpoint');
+    default: return timepoint;
+  }
+}
+
+function getTimepointColor(timepoint: string): { bg: string; text: string } {
+  switch (timepoint) {
+    case 'baseline': return { bg: '#E8F8F0', text: '#1B8A4E' };
+    case 'week4': return { bg: '#FFF8E1', text: '#B8860B' };
+    case 'endpoint': return { bg: '#FDEDEC', text: '#C0392B' };
+    default: return { bg: Colors.border, text: Colors.textSecondary };
+  }
+}
+
+function getMethodLabel(method: string | null): string {
+  switch (method) {
+    case 'app_wizard': return 'App (Wizard)';
+    case 'app_checklist': return 'App (Checklist)';
+    case 'paper': return 'Paper';
+    case 'interview': return 'Interview';
+    default: return method || '—';
+  }
+}
+
 interface PendingNavigation {
   type: 'clinical' | 'questionnaire';
   params: Record<string, string>;
@@ -240,12 +283,40 @@ export default function AssessmentsScreen() {
   const totalCompletedCount = completedAssignments.length + clinicalCompleted.length;
   const hasNoData = totalPendingCount === 0 && totalCompletedCount === 0;
 
+  const researchQuery = useQuery({
+    queryKey: ['research-assessments', patientId],
+    queryFn: async () => {
+      try {
+        log('[Assessments] Fetching research assessments for:', patientId);
+        const { data, error } = await supabase
+          .from('research_assessments')
+          .select('*')
+          .eq('patient_id', patientId!)
+          .order('administered_date', { ascending: false });
+        if (error) {
+          log('[Assessments] Research assessments fetch error:', error);
+          return [];
+        }
+        log('[Assessments] Research assessments:', data?.length);
+        return (data || []) as ResearchAssessment[];
+      } catch (e) {
+        log('[Assessments] Research assessments exception:', e);
+        return [];
+      }
+    },
+    enabled: !!patientId,
+    staleTime: 2 * 60 * 1000,
+  });
+
+  const researchData = researchQuery.data || [];
+
   const { refetch: rq } = questionnaireQuery;
   const { refetch: rcl } = clinicalQuery;
+  const { refetch: rres } = researchQuery;
 
   const onRefresh = useCallback(() => {
-    void rq(); void rcl();
-  }, [rq, rcl]);
+    void rq(); void rcl(); void rres();
+  }, [rq, rcl, rres]);
 
   return (
     <View style={styles.root}>
@@ -587,6 +658,103 @@ export default function AssessmentsScreen() {
             </>
           )}
 
+          <View style={styles.researchSection}>
+            <View style={styles.researchSectionHeader}>
+              <FlaskConical size={18} color={Colors.primaryDark} />
+              <Text size={17} weight="bold" color={Colors.textPrimary}>
+                {t('researchAssessments')}
+              </Text>
+            </View>
+
+            {researchData.length === 0 ? (
+              <View style={styles.researchEmptyContainer}>
+                <View style={styles.researchEmptyIcon}>
+                  <ClipboardCheck size={32} color={Colors.disabled} />
+                </View>
+                <Text size={14} color={Colors.textSecondary} style={styles.emptyText}>
+                  {t('noResearchAssessments')}
+                </Text>
+              </View>
+            ) : (
+              researchData.map((item) => {
+                const isCompleted = item.total_score !== null && item.total_score !== undefined;
+                const tpColor = getTimepointColor(item.timepoint);
+                return (
+                  <View key={item.id} style={styles.researchCard} testID={`research-assessment-${item.id}`}>
+                    <View style={styles.researchCardHeader}>
+                      <Text size={18} weight="bold" color={Colors.textPrimary} numberOfLines={1} style={styles.researchCardName}>
+                        {item.assessment_name}
+                      </Text>
+                      <View style={[styles.timepointBadge, { backgroundColor: tpColor.bg }]}> 
+                        <Text size={11} weight="700" color={tpColor.text}>
+                          {getTimepointLabel(item.timepoint, t)}
+                        </Text>
+                      </View>
+                    </View>
+
+                    <View style={styles.researchCardBody}>
+                      <View style={styles.researchMetaRow}>
+                        <View style={[styles.statusBadge, isCompleted ? styles.statusCompleted : styles.statusPending]}>
+                          {isCompleted ? (
+                            <CheckCircle size={12} color={Colors.success} />
+                          ) : (
+                            <Clock size={12} color="#B8860B" />
+                          )}
+                          <Text size={12} weight="600" color={isCompleted ? Colors.success : '#B8860B'}>
+                            {isCompleted ? t('researchCompleted') : t('researchPending')}
+                          </Text>
+                        </View>
+
+                        {isCompleted && item.total_score !== null && (
+                          <View style={styles.researchScoreBadge}>
+                            <Text size={11} color={Colors.textSecondary}>{t('score')}</Text>
+                            <Text size={16} weight="bold" color={Colors.primary}>{item.total_score}</Text>
+                          </View>
+                        )}
+                      </View>
+
+                      {item.administered_date && (
+                        <View style={styles.researchDetailRow}>
+                          <Calendar size={13} color={Colors.textSecondary} />
+                          <Text size={13} color={Colors.textSecondary}>
+                            {new Date(item.administered_date).toLocaleDateString()}
+                          </Text>
+                        </View>
+                      )}
+
+                      {item.administered_by && (
+                        <View style={styles.researchDetailRow}>
+                          <User size={13} color={Colors.textSecondary} />
+                          <Text size={13} color={Colors.textSecondary}>
+                            {t('researchAdministeredBy')}: {item.administered_by}
+                          </Text>
+                        </View>
+                      )}
+
+                      {item.completion_method && (
+                        <View style={styles.researchDetailRow}>
+                          <FileText size={13} color={Colors.textSecondary} />
+                          <Text size={13} color={Colors.textSecondary}>
+                            {t('researchCompletionMethod')}: {getMethodLabel(item.completion_method)}
+                          </Text>
+                        </View>
+                      )}
+
+                      {item.notes ? (
+                        <View style={styles.researchNotesContainer}>
+                          <MessageSquare size={13} color={Colors.textSecondary} />
+                          <Text size={12} color={Colors.textSecondary} style={styles.researchNotesText} numberOfLines={3}>
+                            {item.notes}
+                          </Text>
+                        </View>
+                      ) : null}
+                    </View>
+                  </View>
+                );
+              })
+            )}
+          </View>
+
           <CopyrightFooter />
         </ScrollView>
 
@@ -829,5 +997,109 @@ const styles = StyleSheet.create({
     paddingVertical: 10,
     borderRadius: 10,
     marginTop: 8,
+  },
+  researchSection: {
+    paddingHorizontal: 20,
+    marginTop: 20,
+    marginBottom: 8,
+  },
+  researchSectionHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginBottom: 14,
+  },
+  researchEmptyContainer: {
+    alignItems: 'center',
+    paddingVertical: 32,
+    gap: 12,
+  },
+  researchEmptyIcon: {
+    width: 64,
+    height: 64,
+    borderRadius: 32,
+    backgroundColor: Colors.card,
+    borderWidth: 1.5,
+    borderColor: Colors.border,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  researchCard: {
+    backgroundColor: Colors.card,
+    borderRadius: 16,
+    padding: 16,
+    marginBottom: 12,
+    borderWidth: 1,
+    borderColor: Colors.border,
+    borderLeftWidth: 4,
+    borderLeftColor: Colors.primaryDark,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.04,
+    shadowRadius: 4,
+    elevation: 1,
+  },
+  researchCardHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 10,
+    marginBottom: 12,
+  },
+  researchCardName: {
+    flex: 1,
+  },
+  timepointBadge: {
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 8,
+  },
+  researchCardBody: {
+    gap: 8,
+  },
+  researchMetaRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  statusBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 8,
+  },
+  statusCompleted: {
+    backgroundColor: Colors.successLight,
+  },
+  statusPending: {
+    backgroundColor: '#FFF8E1',
+  },
+  researchScoreBadge: {
+    alignItems: 'center',
+    backgroundColor: Colors.primaryLight,
+    paddingHorizontal: 12,
+    paddingVertical: 4,
+    borderRadius: 10,
+    minWidth: 50,
+  },
+  researchDetailRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  researchNotesContainer: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 6,
+    marginTop: 4,
+    paddingTop: 8,
+    borderTopWidth: 1,
+    borderTopColor: Colors.border,
+  },
+  researchNotesText: {
+    flex: 1,
+    fontStyle: 'italic',
   },
 });

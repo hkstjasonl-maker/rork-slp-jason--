@@ -39,6 +39,7 @@ interface Props {
   assessment: ResearchAssessment | null;
   onClose: () => void;
   onNavigateToSUS: (assessmentId: string) => void;
+  onNavigateToEAT10?: (assessmentId: string) => void;
   patientId: string | null;
   t: (key: string) => string;
   isZh: boolean;
@@ -77,6 +78,7 @@ export default function ResearchAssessmentModal({
   assessment,
   onClose,
   onNavigateToSUS,
+  onNavigateToEAT10,
   patientId: _patientId,
   t,
   isZh,
@@ -85,7 +87,9 @@ export default function ResearchAssessmentModal({
   const fadeAnim = useRef(new Animated.Value(0)).current;
 
   const isCompleted = assessment?.total_score !== null && assessment?.total_score !== undefined;
-  const isSUS = assessment?.assessment_name?.toUpperCase() === 'SUS';
+  const nameUpper = assessment?.assessment_name?.toUpperCase() || '';
+  const isSUS = nameUpper === 'SUS';
+  const isEAT10 = nameUpper.includes('EAT-10') || nameUpper === 'EAT10';
 
   const [scoreInput, setScoreInput] = useState<string>('');
   const [notesInput, setNotesInput] = useState<string>('');
@@ -174,6 +178,14 @@ export default function ResearchAssessmentModal({
       onNavigateToSUS(assessment.id);
     }, 300);
   }, [assessment, handleClose, onNavigateToSUS]);
+
+  const handleEAT10Navigate = useCallback(() => {
+    if (!assessment || !onNavigateToEAT10) return;
+    handleClose();
+    setTimeout(() => {
+      onNavigateToEAT10(assessment.id);
+    }, 300);
+  }, [assessment, handleClose, onNavigateToEAT10]);
 
   if (!assessment) return null;
 
@@ -359,6 +371,38 @@ export default function ResearchAssessmentModal({
               >
                 <Text size={16} weight="bold" color={Colors.white}>
                   {isZh ? '開始填寫 SUS' : 'Start SUS Wizard'}
+                </Text>
+              </TouchableOpacity>
+            </View>
+
+            <View style={styles.orDivider}>
+              <View style={styles.orLine} />
+              <Text size={12} color={Colors.textSecondary}>{isZh ? '或手動輸入' : 'or enter manually'}</Text>
+              <View style={styles.orLine} />
+            </View>
+          </View>
+        ) : null}
+
+        {isEAT10 && !isEditing && onNavigateToEAT10 ? (
+          <View style={styles.susSection}>
+            <View style={[styles.susInfoCard, { backgroundColor: '#EBF5FB', borderColor: '#D4E6F1' }]}>
+              <Award size={36} color="#2980B9" />
+              <Text size={17} weight="bold" color={Colors.textPrimary} style={styles.susTitle}>
+                EAT-10
+              </Text>
+              <Text size={13} color={Colors.textSecondary} style={styles.susDesc}>
+                {isZh
+                  ? '此評估包含10個吞嚥相關問題的引導式問卷。點擊下方按鈕開始填寫。'
+                  : 'This assessment has a guided 10-question swallowing wizard. Tap below to start.'}
+              </Text>
+              <TouchableOpacity
+                style={[styles.susStartButton, { backgroundColor: '#2980B9' }]}
+                onPress={handleEAT10Navigate}
+                activeOpacity={0.8}
+                testID="research-eat10-start"
+              >
+                <Text size={16} weight="bold" color={Colors.white}>
+                  {isZh ? '開始填寫 EAT-10' : 'Start EAT-10 Wizard'}
                 </Text>
               </TouchableOpacity>
             </View>

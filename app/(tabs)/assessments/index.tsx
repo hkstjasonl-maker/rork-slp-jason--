@@ -696,10 +696,15 @@ export default function AssessmentsScreen() {
                     onPress={() => {
                       log('[Assessments] Tapped research assessment:', item.id, item.assessment_name);
                       if (!isCompleted) {
-                        const isSUS = item.assessment_name?.toUpperCase() === 'SUS';
-                        if (isSUS) {
+                        const nameUpper = item.assessment_name?.toUpperCase() || '';
+                        if (nameUpper === 'SUS') {
                           router.push({
                             pathname: '/sus-assessment',
+                            params: { researchAssessmentId: item.id },
+                          });
+                        } else if (nameUpper.includes('EAT-10') || nameUpper === 'EAT10') {
+                          router.push({
+                            pathname: '/eat10-assessment',
                             params: { researchAssessmentId: item.id },
                           });
                         } else {
@@ -823,6 +828,14 @@ export default function AssessmentsScreen() {
         onNavigateToSUS={(researchId) => {
           router.push({
             pathname: '/sus-assessment',
+            params: {
+              researchAssessmentId: researchId,
+            },
+          });
+        }}
+        onNavigateToEAT10={(researchId) => {
+          router.push({
+            pathname: '/eat10-assessment',
             params: {
               researchAssessmentId: researchId,
             },

@@ -43,6 +43,7 @@ import Colors from '@/constants/colors';
 import { TherapistImage } from '@/components/TherapistImage';
 import { Exercise, ExerciseLog, Language, ExerciseReviewRequirement } from '@/types';
 import { log } from '@/lib/logger';
+import { logResearchSession } from '@/lib/researchLogger';
 import { FULLSCREEN_PREVENTION_CSS, FULLSCREEN_PREVENTION_JS, INJECTED_JS_BEFORE_LOAD } from '@/lib/fullscreenPrevention';
 import {
   fetchReviewRequirement,
@@ -881,6 +882,25 @@ export default function ExerciseScreen() {
           }
         })();
       }
+
+      void logResearchSession({
+        patient_id: patientId || '',
+        program_id: exercise?.program_id,
+        exercise_id: activeExerciseId,
+        exercise_title_en: exercise?.title_en,
+        exercise_title_zh: exercise?.title_zh_hant,
+        prescribed_sets: exercise?.dosage ? parseInt(exercise.dosage, 10) || undefined : undefined,
+        prescribed_reps: exercise?.dosage_per_day ?? undefined,
+        duration_seconds: exercise?.duration_minutes ? exercise.duration_minutes * 60 : undefined,
+        used_mirror_mode: mediaMode === 'mirror',
+        used_split_screen: mediaMode === 'split',
+        audio_language: language || 'en',
+        subtitles_on: liveSubtitlesEnabled,
+        video_recorded: !!lastRecordedUri,
+        video_submitted_for_review: submissionSuccess,
+        stars_earned: starInfo.sessionStars,
+        streak_day: starInfo.currentStreak,
+      });
     },
     onError: (error) => {
       log('Complete exercise error:', error);

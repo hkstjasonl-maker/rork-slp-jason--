@@ -36,6 +36,10 @@ function RootLayoutNav() {
       <Stack.Screen name="sus-assessment" options={{ headerShown: false, presentation: 'card' }} />
       <Stack.Screen name="research-assessment-form" options={{ headerShown: false, presentation: 'card' }} />
       <Stack.Screen name="eat10-assessment" options={{ headerShown: false, presentation: 'card' }} />
+      <Stack.Screen name="fois-assessment" options={{ headerShown: false, presentation: 'card' }} />
+      <Stack.Screen name="dhi-assessment" options={{ headerShown: false, presentation: 'card' }} />
+      <Stack.Screen name="swalqol-assessment" options={{ headerShown: false, presentation: 'card' }} />
+      <Stack.Screen name="coast-assessment" options={{ headerShown: false, presentation: 'card' }} />
     </Stack>
   );
 }

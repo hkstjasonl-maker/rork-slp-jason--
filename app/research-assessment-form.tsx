@@ -82,6 +82,9 @@ export default function ResearchAssessmentFormScreen() {
   const queryClient = useQueryClient();
   const isZh = language === 'zh_hant' || language === 'zh_hans';
 
+  const nameUpper = (assessmentName || '').toUpperCase();
+  const isClinicianAdministered = nameUpper.includes('FDA') || nameUpper.includes('D-TOMS') || nameUpper.includes('DTOM');
+
   const [step, setStep] = useState<WizardStep>(isEdit ? 'form' : 'intro');
   const [scoreInput, setScoreInput] = useState<string>(existingScore || '');
   const [notesInput, setNotesInput] = useState<string>(existingNotes || '');
@@ -312,9 +315,13 @@ export default function ResearchAssessmentFormScreen() {
               </View>
 
               <Text size={16} color={Colors.textSecondary} style={styles.introInstruction}>
-                {isZh
-                  ? '請完成此評估\nPlease complete this assessment'
-                  : 'Please complete this assessment\n請完成此評估'}
+                {isClinicianAdministered
+                  ? (isZh
+                    ? '此評估通常由治療師進行，請輸入治療師提供的分數。\nThis assessment is typically administered by your clinician. Enter the score provided.'
+                    : 'This assessment is typically administered by your clinician. Enter the score provided.\n此評估通常由治療師進行，請輸入治療師提供的分數。')
+                  : (isZh
+                    ? '請完成此評估\nPlease complete this assessment'
+                    : 'Please complete this assessment\n請完成此評估')}
               </Text>
             </View>
 

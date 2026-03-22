@@ -697,14 +697,34 @@ export default function AssessmentsScreen() {
                       log('[Assessments] Tapped research assessment:', item.id, item.assessment_name);
                       if (!isCompleted) {
                         const nameUpper = item.assessment_name?.toUpperCase() || '';
-                        if (nameUpper === 'SUS') {
+                        if (nameUpper === 'SUS' || nameUpper.includes('SUS')) {
                           router.push({
                             pathname: '/sus-assessment',
                             params: { researchAssessmentId: item.id },
                           });
-                        } else if (nameUpper.includes('EAT-10') || nameUpper === 'EAT10') {
+                        } else if (nameUpper.includes('EAT-10') || nameUpper === 'EAT10' || nameUpper === 'EAT') {
                           router.push({
                             pathname: '/eat10-assessment',
+                            params: { researchAssessmentId: item.id },
+                          });
+                        } else if (nameUpper.includes('FOIS')) {
+                          router.push({
+                            pathname: '/fois-assessment',
+                            params: { researchAssessmentId: item.id },
+                          });
+                        } else if (nameUpper.includes('DHI')) {
+                          router.push({
+                            pathname: '/dhi-assessment',
+                            params: { researchAssessmentId: item.id },
+                          });
+                        } else if (nameUpper.includes('SWAL-QOL') || nameUpper.includes('SWAL') || nameUpper.includes('SWALQOL')) {
+                          router.push({
+                            pathname: '/swalqol-assessment',
+                            params: { researchAssessmentId: item.id },
+                          });
+                        } else if (nameUpper.includes('COAST')) {
+                          router.push({
+                            pathname: '/coast-assessment',
                             params: { researchAssessmentId: item.id },
                           });
                         } else {

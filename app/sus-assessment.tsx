@@ -78,9 +78,10 @@ function calculateSUSScore(answers: Record<number, number>): number {
 }
 
 export default function SUSAssessmentScreen() {
-  const params = useLocalSearchParams<{ submissionId?: string; assessmentId?: string }>();
+  const params = useLocalSearchParams<{ submissionId?: string; assessmentId?: string; researchAssessmentId?: string }>();
   const submissionId = Array.isArray(params.submissionId) ? params.submissionId[0] : params.submissionId;
   const assessmentId = Array.isArray(params.assessmentId) ? params.assessmentId[0] : params.assessmentId;
+  const researchAssessmentId = Array.isArray(params.researchAssessmentId) ? params.researchAssessmentId[0] : params.researchAssessmentId;
   const { t, language, patientId } = useApp();
   const queryClient = useQueryClient();
 
@@ -213,26 +214,43 @@ export default function SUSAssessmentScreen() {
         }
       }
 
-      try {
-        const { data: patientData } = await supabase
-          .from('patients')
-          .select('is_research_participant')
-          .eq('id', patientId)
-          .maybeSingle();
-
-        if (patientData?.is_research_participant) {
-          log('[SUS] Patient is research participant, logging to research_assessments');
-          await supabase.from('research_assessments').insert({
-            patient_id: patientId,
-            assessment_type: 'SUS',
-            responses,
-            total_score: score,
-            language: langCode,
-            completed_at: new Date().toISOString(),
-          });
+      if (researchAssessmentId) {
+        try {
+          log('[SUS] Updating research_assessments row:', researchAssessmentId);
+          await supabase
+            .from('research_assessments')
+            .update({
+              total_score: score,
+              raw_responses: responses,
+              completion_method: 'app_wizard',
+              administered_date: new Date().toISOString().split('T')[0],
+            })
+            .eq('id', researchAssessmentId);
+        } catch (researchErr) {
+          log('[SUS] Research assessment update error (non-blocking):', researchErr);
         }
-      } catch (researchErr) {
-        log('[SUS] Research logging error (non-blocking):', researchErr);
+      } else {
+        try {
+          const { data: patientData } = await supabase
+            .from('patients')
+            .select('is_research_participant')
+            .eq('id', patientId)
+            .maybeSingle();
+
+          if (patientData?.is_research_participant) {
+            log('[SUS] Patient is research participant, logging to research_assessments');
+            await supabase.from('research_assessments').insert({
+              patient_id: patientId,
+              assessment_type: 'SUS',
+              responses,
+              total_score: score,
+              language: langCode,
+              completed_at: new Date().toISOString(),
+            });
+          }
+        } catch (researchErr) {
+          log('[SUS] Research logging error (non-blocking):', researchErr);
+        }
       }
 
       return score;
@@ -247,6 +265,7 @@ export default function SUSAssessmentScreen() {
       ]).start();
       void queryClient.invalidateQueries({ queryKey: ['clinical_assessments'] });
       void queryClient.invalidateQueries({ queryKey: ['assessments'] });
+      void queryClient.invalidateQueries({ queryKey: ['research-assessments'] });
     },
     onError: (error) => {
       log('[SUS] Submit error:', error);

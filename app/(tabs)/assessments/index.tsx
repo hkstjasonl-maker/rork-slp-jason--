@@ -17,7 +17,8 @@ import Colors from '@/constants/colors';
 import { Language } from '@/types';
 import { ASSESSMENT_TOOLS } from '@/constants/assessments';
 import { router } from 'expo-router';
-import { ClipboardCheck, Clock, CheckCircle, ChevronRight, FileText, Stethoscope, User, FlaskConical, Calendar, MessageSquare } from 'lucide-react-native';
+import { ClipboardCheck, Clock, CheckCircle, ChevronRight, FileText, Stethoscope, User, FlaskConical, Calendar, MessageSquare, Edit3 } from 'lucide-react-native';
+import ResearchAssessmentModal from '@/components/ResearchAssessmentModal';
 import { log } from '@/lib/logger';
 import AssessmentModePicker, { AssessmentViewMode } from '@/components/AssessmentModePicker';
 
@@ -199,6 +200,10 @@ export default function AssessmentsScreen() {
   const { t, patientId, language } = useApp();
   const [modePickerVisible, setModePickerVisible] = useState<boolean>(false);
   const [pendingNav, setPendingNav] = useState<PendingNavigation | null>(null);
+  const [selectedResearch, setSelectedResearch] = useState<ResearchAssessment | null>(null);
+  const [researchModalVisible, setResearchModalVisible] = useState<boolean>(false);
+
+  const isZh = language === 'zh_hant' || language === 'zh_hans';
 
   const questionnaireQuery = useQuery({
     queryKey: ['assessments', 'all', patientId],
@@ -680,7 +685,20 @@ export default function AssessmentsScreen() {
                 const isCompleted = item.total_score !== null && item.total_score !== undefined;
                 const tpColor = getTimepointColor(item.timepoint);
                 return (
-                  <View key={item.id} style={styles.researchCard} testID={`research-assessment-${item.id}`}>
+                  <TouchableOpacity
+                    key={item.id}
+                    style={[
+                      styles.researchCard,
+                      isCompleted ? styles.researchCardCompleted : styles.researchCardPending,
+                    ]}
+                    testID={`research-assessment-${item.id}`}
+                    activeOpacity={0.7}
+                    onPress={() => {
+                      log('[Assessments] Tapped research assessment:', item.id, item.assessment_name);
+                      setSelectedResearch(item);
+                      setResearchModalVisible(true);
+                    }}
+                  >
                     <View style={styles.researchCardHeader}>
                       <Text size={18} weight="bold" color={Colors.textPrimary} numberOfLines={1} style={styles.researchCardName}>
                         {item.assessment_name}
@@ -749,7 +767,23 @@ export default function AssessmentsScreen() {
                         </View>
                       ) : null}
                     </View>
-                  </View>
+
+                    {!isCompleted ? (
+                      <View style={styles.researchFillInButton}>
+                        <Edit3 size={14} color={Colors.white} />
+                        <Text size={14} weight="bold" color={Colors.white}>
+                          {isZh ? '填寫 Fill In' : 'Fill In 填寫'}
+                        </Text>
+                      </View>
+                    ) : (
+                      <View style={styles.researchViewButton}>
+                        <Text size={13} weight="600" color={Colors.primary}>
+                          {isZh ? '查看詳情 View' : 'View Details 查看'}
+                        </Text>
+                        <ChevronRight size={16} color={Colors.primary} />
+                      </View>
+                    )}
+                  </TouchableOpacity>
                 );
               })
             )}
@@ -759,6 +793,26 @@ export default function AssessmentsScreen() {
         </ScrollView>
 
       </SafeAreaView>
+
+      <ResearchAssessmentModal
+        visible={researchModalVisible}
+        assessment={selectedResearch}
+        onClose={() => {
+          setResearchModalVisible(false);
+          setSelectedResearch(null);
+        }}
+        onNavigateToSUS={(researchId) => {
+          router.push({
+            pathname: '/sus-assessment',
+            params: {
+              researchAssessmentId: researchId,
+            },
+          });
+        }}
+        patientId={patientId}
+        t={t}
+        isZh={isZh}
+      />
 
       <AssessmentModePicker
         visible={modePickerVisible}
@@ -1039,6 +1093,14 @@ const styles = StyleSheet.create({
     shadowRadius: 4,
     elevation: 1,
   },
+  researchCardPending: {
+    borderLeftColor: '#E6A817',
+    borderColor: '#FFE082',
+  },
+  researchCardCompleted: {
+    borderLeftColor: Colors.success,
+    borderColor: Colors.successLight,
+  },
   researchCardHeader: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -1101,5 +1163,27 @@ const styles = StyleSheet.create({
   researchNotesText: {
     flex: 1,
     fontStyle: 'italic',
+  },
+  researchFillInButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    backgroundColor: '#E6A817',
+    borderRadius: 12,
+    paddingVertical: 12,
+    marginTop: 12,
+  },
+  researchViewButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 4,
+    borderRadius: 12,
+    paddingVertical: 10,
+    marginTop: 10,
+    borderWidth: 1,
+    borderColor: Colors.primaryLight,
+    backgroundColor: Colors.primaryLight,
   },
 });

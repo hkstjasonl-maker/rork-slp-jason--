@@ -391,7 +391,17 @@ export default function AssessmentsScreen() {
                           testID={`start-clinical-${submission.id}`}
                           onPress={() => {
                             const toolKey = resolveToolKey(submission);
-                            log('[Assessments] Opening mode picker for clinical:', submission.assessment_id);
+                            log('[Assessments] Opening clinical:', submission.assessment_id, 'toolKey:', toolKey);
+                            if (toolKey === 'sus') {
+                              router.push({
+                                pathname: '/sus-assessment',
+                                params: {
+                                  submissionId: submission.id,
+                                  assessmentId: submission.assessment_id,
+                                },
+                              });
+                              return;
+                            }
                             setPendingNav({
                               type: 'clinical',
                               params: {

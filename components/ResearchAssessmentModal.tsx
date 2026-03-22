@@ -300,10 +300,21 @@ export default function ResearchAssessmentModal({
       <TouchableOpacity
         style={styles.editButton}
         onPress={() => {
-          setScoreInput(String(assessment.total_score ?? ''));
-          setNotesInput(assessment.notes || '');
-          setIsEditing(true);
-          setMode('form');
+          handleClose();
+          setTimeout(() => {
+            const { router } = require('expo-router');
+            router.push({
+              pathname: '/research-assessment-form',
+              params: {
+                assessmentId: assessment.id,
+                assessmentName: assessment.assessment_name,
+                timepoint: assessment.timepoint,
+                existingScore: String(assessment.total_score ?? ''),
+                existingNotes: assessment.notes || '',
+                isEdit: 'true',
+              },
+            });
+          }, 350);
         }}
         activeOpacity={0.7}
         testID="research-edit-btn"

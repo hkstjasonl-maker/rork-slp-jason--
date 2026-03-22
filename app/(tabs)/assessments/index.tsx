@@ -695,8 +695,27 @@ export default function AssessmentsScreen() {
                     activeOpacity={0.7}
                     onPress={() => {
                       log('[Assessments] Tapped research assessment:', item.id, item.assessment_name);
-                      setSelectedResearch(item);
-                      setResearchModalVisible(true);
+                      if (!isCompleted) {
+                        const isSUS = item.assessment_name?.toUpperCase() === 'SUS';
+                        if (isSUS) {
+                          router.push({
+                            pathname: '/sus-assessment',
+                            params: { researchAssessmentId: item.id },
+                          });
+                        } else {
+                          router.push({
+                            pathname: '/research-assessment-form',
+                            params: {
+                              assessmentId: item.id,
+                              assessmentName: item.assessment_name,
+                              timepoint: item.timepoint,
+                            },
+                          });
+                        }
+                      } else {
+                        setSelectedResearch(item);
+                        setResearchModalVisible(true);
+                      }
                     }}
                   >
                     <View style={styles.researchCardHeader}>

@@ -34,6 +34,7 @@ function RootLayoutNav() {
       <Stack.Screen name="gacha-draw" options={{ headerShown: false, presentation: 'card' }} />
       <Stack.Screen name="treasure-chest" options={{ headerShown: false, presentation: 'card' }} />
       <Stack.Screen name="sus-assessment" options={{ headerShown: false, presentation: 'card' }} />
+      <Stack.Screen name="research-assessment-form" options={{ headerShown: false, presentation: 'card' }} />
     </Stack>
   );
 }

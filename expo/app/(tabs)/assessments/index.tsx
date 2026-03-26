@@ -191,6 +191,17 @@ function getMethodLabel(method: string | null): string {
   }
 }
 
+function getDirectWizardRoute(toolKey: string, assessmentId: string): string | null {
+  const key = (toolKey || assessmentId || '').toLowerCase();
+  if (key === 'sus' || key === 'msus' || key.includes('sus')) return '/sus-assessment';
+  if (key === 'eat_10' || key === 'eat10' || key.includes('eat')) return '/eat10-assessment';
+  if (key === 'fois' || key.includes('fois')) return '/fois-assessment';
+  if (key === 'dhi' || key.includes('dhi')) return '/dhi-assessment';
+  if (key === 'swal_qol' || key === 'swalqol' || key.includes('swal')) return '/swalqol-assessment';
+  if (key === 'coast' || key.includes('coast')) return '/coast-assessment';
+  return null;
+}
+
 interface PendingNavigation {
   type: 'clinical' | 'questionnaire';
   params: Record<string, string>;
@@ -468,9 +479,10 @@ export default function AssessmentsScreen() {
                           onPress={() => {
                             const toolKey = resolveToolKey(submission);
                             log('[Assessments] Opening clinical:', submission.assessment_id, 'toolKey:', toolKey);
-                            if (toolKey === 'sus') {
+                            const wizardRoute = getDirectWizardRoute(toolKey, submission.assessment_id);
+                            if (wizardRoute) {
                               router.push({
-                                pathname: '/sus-assessment',
+                                pathname: wizardRoute as any,
                                 params: {
                                   submissionId: submission.id,
                                   assessmentId: submission.assessment_id,

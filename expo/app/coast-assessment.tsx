@@ -54,10 +54,13 @@ const THEME = {
 const TOTAL_Q = COAST_QUESTIONS.length;
 
 export default function COASTAssessmentScreen() {
-  const params = useLocalSearchParams<{ researchAssessmentId?: string }>();
+  const params = useLocalSearchParams<{ researchAssessmentId?: string; submissionId?: string }>();
   const researchAssessmentId = Array.isArray(params.researchAssessmentId)
     ? params.researchAssessmentId[0]
     : params.researchAssessmentId;
+  const submissionId = Array.isArray(params.submissionId)
+    ? params.submissionId[0]
+    : params.submissionId;
 
   const { language } = useApp();
   const queryClient = useQueryClient();
@@ -120,7 +123,7 @@ export default function COASTAssessmentScreen() {
 
   const submitMutation = useMutation({
     mutationFn: async () => {
-      if (!researchAssessmentId) throw new Error('No assessment ID');
+      if (!researchAssessmentId && !submissionId) throw new Error('No assessment ID');
       const rawResponses: Record<string, number> = {};
       let sum = 0;
       for (let i = 1; i <= TOTAL_Q; i++) {
@@ -131,23 +134,46 @@ export default function COASTAssessmentScreen() {
       const score = Math.round((sum / TOTAL_Q) * 10) / 10;
       log('[COAST] Calculated mean score:', score);
 
-      const { error } = await supabase
-        .from('research_assessments')
-        .update({
-          total_score: score,
-          raw_responses: rawResponses,
-          completion_method: 'app_wizard',
-          administered_date: new Date().toISOString().split('T')[0],
-        })
-        .eq('id', researchAssessmentId);
+      if (submissionId) {
+        log('[COAST] Updating assessment_submissions row:', submissionId);
+        const { error } = await supabase
+          .from('assessment_submissions')
+          .update({
+            responses: rawResponses,
+            total_score: score,
+            subscale_scores: {},
+            status: 'completed',
+            completed_at: new Date().toISOString(),
+            updated_at: new Date().toISOString(),
+          })
+          .eq('id', submissionId);
 
-      if (error) { log('[COAST] Update error:', error); throw error; }
+        if (error) { log('[COAST] assessment_submissions update error:', error); throw error; }
+      }
+
+      if (researchAssessmentId) {
+        log('[COAST] Updating research_assessments row:', researchAssessmentId);
+        const { error } = await supabase
+          .from('research_assessments')
+          .update({
+            total_score: score,
+            raw_responses: rawResponses,
+            completion_method: 'app_wizard',
+            administered_date: new Date().toISOString().split('T')[0],
+          })
+          .eq('id', researchAssessmentId);
+
+        if (error) { log('[COAST] research_assessments update error:', error); throw error; }
+      }
+
       return score;
     },
     onSuccess: (score) => {
       setTotalScore(score);
       setShowResult(true);
       void queryClient.invalidateQueries({ queryKey: ['research-assessments'] });
+      void queryClient.invalidateQueries({ queryKey: ['clinical_assessments'] });
+      void queryClient.invalidateQueries({ queryKey: ['assessments'] });
       Animated.parallel([
         Animated.timing(fadeAnim, { toValue: 1, duration: 500, useNativeDriver: true }),
         Animated.spring(scaleAnim, { toValue: 1, friction: 6, useNativeDriver: true }),

@@ -70,12 +70,20 @@ const THEME = {
 export default function EAT10AssessmentScreen() {
   const params = useLocalSearchParams<{
     researchAssessmentId?: string;
+    submissionId?: string;
+    assessmentId?: string;
     assessmentName?: string;
     timepoint?: string;
   }>();
   const researchAssessmentId = Array.isArray(params.researchAssessmentId)
     ? params.researchAssessmentId[0]
     : params.researchAssessmentId;
+  const submissionId = Array.isArray(params.submissionId)
+    ? params.submissionId[0]
+    : params.submissionId;
+  const _assessmentId = Array.isArray(params.assessmentId)
+    ? params.assessmentId[0]
+    : params.assessmentId;
 
   const { language } = useApp();
   const queryClient = useQueryClient();
@@ -180,7 +188,28 @@ export default function EAT10AssessmentScreen() {
         rawResponses[`q${i}`] = answers[i] ?? 0;
       }
 
+      if (submissionId) {
+        log('[EAT-10] Updating assessment_submissions row:', submissionId);
+        const { error } = await supabase
+          .from('assessment_submissions')
+          .update({
+            responses: rawResponses,
+            total_score: sum,
+            subscale_scores: {},
+            status: 'completed',
+            completed_at: new Date().toISOString(),
+            updated_at: new Date().toISOString(),
+          })
+          .eq('id', submissionId);
+
+        if (error) {
+          log('[EAT-10] assessment_submissions update error:', error);
+          throw error;
+        }
+      }
+
       if (researchAssessmentId) {
+        log('[EAT-10] Updating research_assessments row:', researchAssessmentId);
         const { error } = await supabase
           .from('research_assessments')
           .update({
@@ -193,7 +222,7 @@ export default function EAT10AssessmentScreen() {
           .eq('id', researchAssessmentId);
 
         if (error) {
-          log('[EAT-10] Update error:', error);
+          log('[EAT-10] research_assessments update error:', error);
           throw error;
         }
       }
@@ -209,6 +238,8 @@ export default function EAT10AssessmentScreen() {
         Animated.spring(scaleAnim, { toValue: 1, friction: 6, useNativeDriver: true }),
       ]).start();
       void queryClient.invalidateQueries({ queryKey: ['research-assessments'] });
+      void queryClient.invalidateQueries({ queryKey: ['clinical_assessments'] });
+      void queryClient.invalidateQueries({ queryKey: ['assessments'] });
     },
     onError: (error) => {
       log('[EAT-10] Submit error:', error);

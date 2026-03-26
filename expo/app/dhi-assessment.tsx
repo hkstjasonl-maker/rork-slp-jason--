@@ -91,10 +91,14 @@ function getSubscaleLabel(subscale: 'P' | 'F' | 'E', isZh: boolean): string {
 export default function DHIAssessmentScreen() {
   const params = useLocalSearchParams<{
     researchAssessmentId?: string;
+    submissionId?: string;
   }>();
   const researchAssessmentId = Array.isArray(params.researchAssessmentId)
     ? params.researchAssessmentId[0]
     : params.researchAssessmentId;
+  const submissionId = Array.isArray(params.submissionId)
+    ? params.submissionId[0]
+    : params.submissionId;
 
   const { language } = useApp();
   const queryClient = useQueryClient();
@@ -169,7 +173,7 @@ export default function DHIAssessmentScreen() {
 
   const submitMutation = useMutation({
     mutationFn: async () => {
-      if (!researchAssessmentId) throw new Error('No assessment ID');
+      if (!researchAssessmentId && !submissionId) throw new Error('No assessment ID');
       let physical = 0, functional = 0, emotional = 0;
       const rawResponses: Record<string, number> = {};
 
@@ -183,21 +187,45 @@ export default function DHIAssessmentScreen() {
       const total = physical + functional + emotional;
       log('[DHI] Scores - Total:', total, 'P:', physical, 'F:', functional, 'E:', emotional);
 
-      const { error } = await supabase
-        .from('research_assessments')
-        .update({
-          total_score: total,
-          subscale_scores: { physical, functional, emotional },
-          raw_responses: rawResponses,
-          completion_method: 'app_wizard',
-          administered_date: new Date().toISOString().split('T')[0],
-        })
-        .eq('id', researchAssessmentId);
+      if (submissionId) {
+        log('[DHI] Updating assessment_submissions row:', submissionId);
+        const { error } = await supabase
+          .from('assessment_submissions')
+          .update({
+            responses: rawResponses,
+            total_score: total,
+            subscale_scores: { physical, functional, emotional },
+            status: 'completed',
+            completed_at: new Date().toISOString(),
+            updated_at: new Date().toISOString(),
+          })
+          .eq('id', submissionId);
 
-      if (error) {
-        log('[DHI] Update error:', error);
-        throw error;
+        if (error) {
+          log('[DHI] assessment_submissions update error:', error);
+          throw error;
+        }
       }
+
+      if (researchAssessmentId) {
+        log('[DHI] Updating research_assessments row:', researchAssessmentId);
+        const { error } = await supabase
+          .from('research_assessments')
+          .update({
+            total_score: total,
+            subscale_scores: { physical, functional, emotional },
+            raw_responses: rawResponses,
+            completion_method: 'app_wizard',
+            administered_date: new Date().toISOString().split('T')[0],
+          })
+          .eq('id', researchAssessmentId);
+
+        if (error) {
+          log('[DHI] research_assessments update error:', error);
+          throw error;
+        }
+      }
+
       return { total, physical, functional, emotional };
     },
     onSuccess: (scores) => {
@@ -205,6 +233,8 @@ export default function DHIAssessmentScreen() {
       setSubscaleScores({ physical: scores.physical, functional: scores.functional, emotional: scores.emotional });
       setShowResult(true);
       void queryClient.invalidateQueries({ queryKey: ['research-assessments'] });
+      void queryClient.invalidateQueries({ queryKey: ['clinical_assessments'] });
+      void queryClient.invalidateQueries({ queryKey: ['assessments'] });
       Animated.parallel([
         Animated.timing(fadeAnim, { toValue: 1, duration: 500, useNativeDriver: true }),
         Animated.spring(scaleAnim, { toValue: 1, friction: 6, useNativeDriver: true }),

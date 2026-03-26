@@ -46,12 +46,16 @@ const THEME = {
 export default function FOISAssessmentScreen() {
   const params = useLocalSearchParams<{
     researchAssessmentId?: string;
+    submissionId?: string;
     assessmentName?: string;
     timepoint?: string;
   }>();
   const researchAssessmentId = Array.isArray(params.researchAssessmentId)
     ? params.researchAssessmentId[0]
     : params.researchAssessmentId;
+  const submissionId = Array.isArray(params.submissionId)
+    ? params.submissionId[0]
+    : params.submissionId;
 
   const { language } = useApp();
   const queryClient = useQueryClient();
@@ -81,23 +85,47 @@ export default function FOISAssessmentScreen() {
   const submitMutation = useMutation({
     mutationFn: async () => {
       if (selectedLevel === null) throw new Error('No level selected');
-      if (!researchAssessmentId) throw new Error('No assessment ID');
+      if (!researchAssessmentId && !submissionId) throw new Error('No assessment ID');
       log('[FOIS] Submitting level:', selectedLevel);
 
-      const { error } = await supabase
-        .from('research_assessments')
-        .update({
-          total_score: selectedLevel,
-          raw_responses: { level: selectedLevel },
-          completion_method: 'app_wizard',
-          administered_date: new Date().toISOString().split('T')[0],
-        })
-        .eq('id', researchAssessmentId);
+      if (submissionId) {
+        log('[FOIS] Updating assessment_submissions row:', submissionId);
+        const { error } = await supabase
+          .from('assessment_submissions')
+          .update({
+            responses: { level: selectedLevel },
+            total_score: selectedLevel,
+            subscale_scores: {},
+            status: 'completed',
+            completed_at: new Date().toISOString(),
+            updated_at: new Date().toISOString(),
+          })
+          .eq('id', submissionId);
 
-      if (error) {
-        log('[FOIS] Update error:', error);
-        throw error;
+        if (error) {
+          log('[FOIS] assessment_submissions update error:', error);
+          throw error;
+        }
       }
+
+      if (researchAssessmentId) {
+        log('[FOIS] Updating research_assessments row:', researchAssessmentId);
+        const { error } = await supabase
+          .from('research_assessments')
+          .update({
+            total_score: selectedLevel,
+            raw_responses: { level: selectedLevel },
+            completion_method: 'app_wizard',
+            administered_date: new Date().toISOString().split('T')[0],
+          })
+          .eq('id', researchAssessmentId);
+
+        if (error) {
+          log('[FOIS] research_assessments update error:', error);
+          throw error;
+        }
+      }
+
       return selectedLevel;
     },
     onSuccess: (score) => {
@@ -105,6 +133,8 @@ export default function FOISAssessmentScreen() {
       setFinalScore(score);
       setShowResult(true);
       void queryClient.invalidateQueries({ queryKey: ['research-assessments'] });
+      void queryClient.invalidateQueries({ queryKey: ['clinical_assessments'] });
+      void queryClient.invalidateQueries({ queryKey: ['assessments'] });
       Animated.parallel([
         Animated.timing(fadeAnim, { toValue: 1, duration: 500, useNativeDriver: true }),
         Animated.spring(scaleAnim, { toValue: 1, friction: 6, useNativeDriver: true }),

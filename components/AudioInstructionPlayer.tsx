@@ -1,6 +1,6 @@
-import React, { useCallback, useMemo } from 'react';
+import React, { useCallback, useMemo, useEffect, useRef, useState } from 'react';
 import { View, TouchableOpacity, StyleSheet } from 'react-native';
-import { useAudioPlayer, useAudioPlayerStatus } from 'expo-audio';
+import { Audio } from 'expo-av';
 import { Headphones, Pause } from 'lucide-react-native';
 import { ScaledText } from '@/components/ScaledText';
 import Colors from '@/constants/colors';
@@ -14,29 +14,76 @@ interface AudioInstructionPlayerProps {
 }
 
 function AudioInstructionPlayerInner({ audioUrl, label, stopLabel, transcript }: AudioInstructionPlayerProps) {
-  const player = useAudioPlayer({ uri: audioUrl });
-  const status = useAudioPlayerStatus(player);
+  const soundRef = useRef<Audio.Sound | null>(null);
+  const [isPlaying, setIsPlaying] = useState(false);
+  const [duration, setDuration] = useState(0);
+  const [currentTime, setCurrentTime] = useState(0);
+  const [didFinish, setDidFinish] = useState(false);
 
-  const isPlaying = status.playing;
-  const duration = status.duration || 0;
-  const currentTime = status.currentTime || 0;
-  const progress = duration > 0 ? currentTime / duration : 0;
-
-  const handleToggle = useCallback(() => {
-    if (isPlaying) {
-      log('[AudioInstruction] Pausing audio');
-      player.pause();
-    } else {
-      if (status.didJustFinish || (duration > 0 && currentTime >= duration - 0.1)) {
-        log('[AudioInstruction] Replaying audio from start');
-        void player.seekTo(0);
-        player.play();
-      } else {
-        log('[AudioInstruction] Playing audio');
-        player.play();
+  useEffect(() => {
+    return () => {
+      if (soundRef.current) {
+        soundRef.current.unloadAsync();
+        soundRef.current = null;
       }
+    };
+  }, []);
+
+  useEffect(() => {
+    // Reload if audioUrl changes
+    if (soundRef.current) {
+      soundRef.current.unloadAsync();
+      soundRef.current = null;
+      setIsPlaying(false);
+      setCurrentTime(0);
+      setDuration(0);
+      setDidFinish(false);
     }
-  }, [isPlaying, player, status.didJustFinish, duration, currentTime]);
+  }, [audioUrl]);
+
+  const loadSound = useCallback(async () => {
+    if (!soundRef.current) {
+      const { sound } = await Audio.Sound.createAsync(
+        { uri: audioUrl },
+        { shouldPlay: false },
+        (status) => {
+          if (status.isLoaded) {
+            setCurrentTime(status.positionMillis / 1000);
+            setDuration((status.durationMillis || 0) / 1000);
+            setIsPlaying(status.isPlaying);
+            if (status.didJustFinish) {
+              setIsPlaying(false);
+              setDidFinish(true);
+            }
+          }
+        }
+      );
+      soundRef.current = sound;
+    }
+    return soundRef.current;
+  }, [audioUrl]);
+
+  const handleToggle = useCallback(async () => {
+    try {
+      const sound = await loadSound();
+      if (isPlaying) {
+        log('[AudioInstruction] Pausing audio');
+        await sound.pauseAsync();
+      } else {
+        if (didFinish) {
+          log('[AudioInstruction] Replaying audio from start');
+          await sound.setPositionAsync(0);
+          setDidFinish(false);
+        }
+        log('[AudioInstruction] Playing audio');
+        await sound.playAsync();
+      }
+    } catch (e) {
+      log('[AudioInstruction] Error toggling audio:', e);
+    }
+  }, [isPlaying, didFinish, loadSound]);
+
+  const progress = duration > 0 ? currentTime / duration : 0;
 
   const timeText = useMemo(() => {
     const formatTime = (s: number) => {

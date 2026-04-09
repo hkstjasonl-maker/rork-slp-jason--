@@ -9,7 +9,7 @@ import {
   Image,
 } from 'react-native';
 import { WebView } from 'react-native-webview';
-import { useAudioPlayer } from 'expo-audio';
+import { Audio } from 'expo-av';
 import { Check, Star, Flame, Volume2, VolumeX } from 'lucide-react-native';
 import * as Haptics from 'expo-haptics';
 import { ScaledText } from '@/components/ScaledText';
@@ -98,10 +98,17 @@ function EncouragementModalInner({
   const [audioMuted, setAudioMuted] = useState<boolean>(false);
   const [showAudio, setShowAudio] = useState<boolean>(false);
   const [useUrlAudio, setUseUrlAudio] = useState<boolean>(false);
+  const soundRef = useRef<Audio.Sound | null>(null);
 
-  const audioPlayer = useAudioPlayer(
-    useUrlAudio && reinforcementAudioUrl ? { uri: reinforcementAudioUrl } : null
-  );
+  // Cleanup sound on unmount
+  useEffect(() => {
+    return () => {
+      if (soundRef.current) {
+        soundRef.current.unloadAsync();
+        soundRef.current = null;
+      }
+    };
+  }, []);
 
   useEffect(() => {
     if (visible && (reinforcementAudioUrl || reinforcementAudioId)) {
@@ -122,43 +129,83 @@ function EncouragementModalInner({
     }
   }, [visible, reinforcementAudioUrl, reinforcementAudioId]);
 
+  // Play/pause audio using expo-av
   useEffect(() => {
-    if (visible && useUrlAudio && audioPlayer && reinforcementAudioUrl) {
-      try {
-        audioPlayer.seekTo(0);
-        audioPlayer.play();
-        log('[EncouragementModal] Expo Audio play started');
-      } catch (e) {
-        log('[EncouragementModal] Expo Audio play error:', e);
+    let cancelled = false;
+
+    async function playAudio() {
+      if (visible && useUrlAudio && reinforcementAudioUrl) {
+        try {
+          // Unload previous sound if any
+          if (soundRef.current) {
+            await soundRef.current.unloadAsync();
+            soundRef.current = null;
+          }
+          const { sound } = await Audio.Sound.createAsync(
+            { uri: reinforcementAudioUrl },
+            { shouldPlay: true, isMuted: audioMuted }
+          );
+          if (cancelled) {
+            await sound.unloadAsync();
+            return;
+          }
+          soundRef.current = sound;
+          log('[EncouragementModal] Expo Audio play started');
+        } catch (e) {
+          log('[EncouragementModal] Expo Audio play error:', e);
+        }
       }
     }
-    if (!visible && audioPlayer) {
-      try {
-        audioPlayer.pause();
-      } catch (err) {
-        log('[EncouragementModal] pause error on hide:', err);
+
+    async function stopAudio() {
+      if (!visible && soundRef.current) {
+        try {
+          await soundRef.current.pauseAsync();
+        } catch (err) {
+          log('[EncouragementModal] pause error on hide:', err);
+        }
       }
     }
-  }, [visible, useUrlAudio, audioPlayer, reinforcementAudioUrl]);
 
-  useEffect(() => {
-    if (useUrlAudio && audioPlayer) {
-      audioPlayer.muted = audioMuted;
+    if (visible && useUrlAudio && reinforcementAudioUrl) {
+      playAudio();
+    } else if (!visible) {
+      stopAudio();
     }
-  }, [audioMuted, useUrlAudio, audioPlayer]);
 
-  const handleContinue = useCallback(() => {
+    return () => {
+      cancelled = true;
+    };
+  }, [visible, useUrlAudio, reinforcementAudioUrl]);
+
+  // Handle mute/unmute
+  useEffect(() => {
+    if (useUrlAudio && soundRef.current) {
+      soundRef.current.setIsMutedAsync(audioMuted).catch((err) => {
+        log('[EncouragementModal] setIsMuted error:', err);
+      });
+    }
+  }, [audioMuted, useUrlAudio]);
+
+  const handleContinue = useCallback(async () => {
     setShowAudio(false);
-    if (useUrlAudio && audioPlayer) {
-      try { audioPlayer.pause(); } catch (err) { log('[EncouragementModal] pause error on continue:', err); }
+    if (useUrlAudio && soundRef.current) {
+      try {
+        await soundRef.current.pauseAsync();
+        await soundRef.current.unloadAsync();
+        soundRef.current = null;
+      } catch (err) {
+        log('[EncouragementModal] pause error on continue:', err);
+      }
     }
     setUseUrlAudio(false);
     onContinue();
-  }, [onContinue, useUrlAudio, audioPlayer]);
+  }, [onContinue, useUrlAudio]);
 
   const toggleMute = useCallback(() => {
     setAudioMuted((prev) => !prev);
   }, []);
+
   const scaleAnim = useRef(new Animated.Value(0)).current;
   const fadeAnim = useRef(new Animated.Value(0)).current;
   const pulseAnim = useRef(new Animated.Value(1)).current;

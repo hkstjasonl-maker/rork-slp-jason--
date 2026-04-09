@@ -20,15 +20,19 @@
       "buildNumber": "1",
       "infoPlist": {
         "UISupportedInterfaceOrientations": [
+          "UIInterfaceOrientationPortrait",
           "UIInterfaceOrientationPortrait"
         ],
         "UISupportedInterfaceOrientations~ipad": [
+          "UIInterfaceOrientationPortrait",
+          "UIInterfaceOrientationPortraitUpsideDown",
           "UIInterfaceOrientationPortrait",
           "UIInterfaceOrientationPortraitUpsideDown"
         ],
         "NSCameraUsageDescription": "This app uses the camera so you can watch yourself while practicing exercises",
         "NSMicrophoneUsageDescription": "This app uses the microphone to record your exercise practice videos",
-        "NSPhotoLibraryAddUsageDescription": "This app saves your exercise practice videos to your photo album so you can show them to your therapist"
+        "NSPhotoLibraryAddUsageDescription": "This app saves your exercise practice videos to your photo album so you can show them to your therapist",
+        "ITSAppUsesNonExemptEncryption": false
       }
     },
     "android": {
@@ -36,7 +40,18 @@
         "foregroundImage": "./assets/images/adaptive-icon.png",
         "backgroundColor": "#ffffff"
       },
-      "package": "com.dravive.nanohab"
+      "package": "com.dravive.nanohab",
+      "permissions": [
+        "android.permission.RECORD_AUDIO",
+        "android.permission.MODIFY_AUDIO_SETTINGS",
+        "android.permission.CAMERA",
+        "android.permission.READ_EXTERNAL_STORAGE",
+        "android.permission.WRITE_EXTERNAL_STORAGE",
+        "android.permission.READ_MEDIA_VISUAL_USER_SELECTED",
+        "android.permission.READ_MEDIA_IMAGES",
+        "android.permission.READ_MEDIA_VIDEO",
+        "android.permission.READ_MEDIA_AUDIO"
+      ]
     },
     "web": {
       "favicon": "./assets/images/favicon.png"
@@ -49,7 +64,6 @@
         }
       ],
       "expo-web-browser",
-      "expo-audio",
       [
         "expo-camera",
         {
@@ -69,6 +83,14 @@
     ],
     "experiments": {
       "typedRoutes": true
+    },
+    "extra": {
+      "router": {
+        "origin": "https://slpmedroom.com"
+      },
+      "eas": {
+        "projectId": "c9af7c40-897b-4393-9527-7a73e7daceac"
+      }
     }
   }
 }

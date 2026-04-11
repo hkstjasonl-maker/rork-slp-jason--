@@ -10,6 +10,7 @@ import {
 } from 'react-native';
 import * as Linking from 'expo-linking';
 import { X } from 'lucide-react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { supabase } from '@/lib/supabase';
 import { ScaledText } from '@/components/ScaledText';
 import Colors from '@/constants/colors';
@@ -137,6 +138,16 @@ export default function AppAdOverlay({ patientId, placement, onClose, language }
   const [canSkip, setCanSkip] = useState(false);
   const [dismissed, setDismissed] = useState(false);
 
+  const insets = useSafeAreaInsets();
+
+  const onCloseRef = useRef(onClose);
+  const patientIdRef = useRef(patientId);
+  const placementRef = useRef(placement);
+
+  useEffect(() => { onCloseRef.current = onClose; }, [onClose]);
+  useEffect(() => { patientIdRef.current = patientId; }, [patientId]);
+  useEffect(() => { placementRef.current = placement; }, [placement]);
+
   const bannerSlide = useRef(new Animated.Value(80)).current;
   const autoDismissTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const countdownTimer = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -154,15 +165,28 @@ export default function AppAdOverlay({ patientId, placement, onClose, language }
 
     const init = async () => {
       try {
-        const adFree = await checkAdFree(patientId);
+        const adFree = await checkAdFree(patientIdRef.current);
         if (adFree || cancelled) {
-          if (!cancelled) onClose();
+          if (!cancelled) onCloseRef.current();
           return;
         }
 
-        const foundAd = await fetchAd(patientId, placement);
+        const foundAd = await fetchAd(patientIdRef.current, placementRef.current);
         if (!foundAd || cancelled) {
-          if (!cancelled) onClose();
+          if (!cancelled) onCloseRef.current();
+          return;
+        }
+
+        const today = new Date().toISOString().split('T')[0];
+        const { count: todayImpressionCount } = await supabase
+          .from('app_ad_impressions')
+          .select('id', { count: 'exact', head: true })
+          .eq('ad_id', foundAd.id)
+          .eq('patient_id', patientIdRef.current)
+          .gte('viewed_at', today + 'T00:00:00');
+
+        if ((todayImpressionCount ?? 0) >= 3) {
+          if (!cancelled) onCloseRef.current();
           return;
         }
 
@@ -172,11 +196,6 @@ export default function AppAdOverlay({ patientId, placement, onClose, language }
         const skipDelay = foundAd.skip_delay_seconds ?? 2;
         const duration = foundAd.duration_seconds ?? 5;
         setCountdown(skipDelay);
-
-        if (!impressionTracked.current) {
-          impressionTracked.current = true;
-          void trackImpression(foundAd.id, patientId, placement);
-        }
 
         if (foundAd.display_format === 'banner') {
           Animated.timing(bannerSlide, {
@@ -208,7 +227,7 @@ export default function AppAdOverlay({ patientId, placement, onClose, language }
         }, duration * 1000);
       } catch (e) {
         log('[AppAdOverlay] Init error:', e);
-        if (!cancelled) onClose();
+        if (!cancelled) onCloseRef.current();
       }
     };
 
@@ -239,23 +258,23 @@ export default function AppAdOverlay({ patientId, placement, onClose, language }
         toValue: 80,
         duration: 250,
         useNativeDriver: true,
-      }).start(() => onClose());
+      }).start(() => onCloseRef.current());
     } else {
-      onClose();
+      onCloseRef.current();
     }
-  }, [dismissed, ad, bannerSlide, onClose]);
+  }, [dismissed, ad, bannerSlide]);
 
   const handleAdPress = useCallback(async () => {
     if (!ad) return;
     if (ad.link_url) {
-      void trackClick(ad.id, patientId, placement);
+      void trackClick(ad.id, patientIdRef.current, placementRef.current);
       try {
         await Linking.openURL(ad.link_url);
       } catch (e) {
         log('[AppAdOverlay] Open URL error:', e);
       }
     }
-  }, [ad, patientId, placement]);
+  }, [ad]);
 
   if (loading || !ad) return null;
 
@@ -288,6 +307,12 @@ export default function AppAdOverlay({ patientId, placement, onClose, language }
             source={{ uri: getImageUrl(ad) }}
             style={bannerStyles.image}
             resizeMode="cover"
+            onLoad={() => {
+              if (!impressionTracked.current && ad) {
+                impressionTracked.current = true;
+                void trackImpression(ad.id, patientIdRef.current, placementRef.current);
+              }
+            }}
           />
           {ad.advertiser_name && (
             <ScaledText size={11} weight="600" color={Colors.textPrimary} numberOfLines={1} style={bannerStyles.name}>
@@ -337,10 +362,16 @@ export default function AppAdOverlay({ patientId, placement, onClose, language }
             source={{ uri: getImageUrl(ad) }}
             style={interstitialStyles.image}
             resizeMode="contain"
+            onLoad={() => {
+              if (!impressionTracked.current && ad) {
+                impressionTracked.current = true;
+                void trackImpression(ad.id, patientIdRef.current, placementRef.current);
+              }
+            }}
           />
         </TouchableOpacity>
 
-        <View style={interstitialStyles.bottomBar}>
+        <View style={[interstitialStyles.bottomBar, { top: Math.max(54, insets.top + 10) }]}>
           {canSkip ? (
             <TouchableOpacity
               style={interstitialStyles.skipBtn}
@@ -419,7 +450,7 @@ const interstitialStyles = StyleSheet.create({
 const bannerStyles = StyleSheet.create({
   container: {
     position: 'absolute' as const,
-    bottom: 0,
+    bottom: 60,
     left: 0,
     right: 0,
     height: 80,

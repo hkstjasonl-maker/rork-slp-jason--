@@ -26,7 +26,6 @@ import { YouTubePlayer } from '@/components/YouTubePlayer';
 import { VimeoPlayer } from '@/components/VimeoPlayer';
 import LiveSubtitleOverlay from '@/components/LiveSubtitleOverlay';
 import MarketingDrawModal from '@/components/MarketingDrawModal';
-import AppAdOverlay from '@/components/AppAdOverlay';
 import { checkAndQueueCampaigns, getTodayExerciseCount } from '@/lib/marketingDraw';
 
 import { EncouragementModal } from '@/components/EncouragementModal';
@@ -578,7 +577,6 @@ export default function ExerciseScreen() {
   const [lastRecordedUri, setLastRecordedUri] = useState<string | null>(null);
   const [submissionSuccess, setSubmissionSuccess] = useState(false);
   const [showMahjongGame, setShowMahjongGame] = useState(false);
-  const [showMahjongAd, setShowMahjongAd] = useState(false);
 
   const countdownFade = useRef(new Animated.Value(0)).current;
   const countdownScale = useRef(new Animated.Value(0.5)).current;
@@ -962,11 +960,6 @@ export default function ExerciseScreen() {
       setToastType('success');
       setToastMessage('🀄 +3 ⭐');
     }
-    setShowMahjongAd(true);
-  }, []);
-
-  const handleMahjongAdClose = useCallback(() => {
-    setShowMahjongAd(false);
     if (hasNext) {
       setCurrentIdx((prev) => prev + 1);
     }
@@ -1998,15 +1991,6 @@ export default function ExerciseScreen() {
           onClose={handleMahjongClose}
           patientId={patientId || ''}
         />
-
-        {showMahjongAd && patientId && (
-          <AppAdOverlay
-            patientId={patientId}
-            placement="mahjong"
-            onClose={handleMahjongAdClose}
-            language={language ?? undefined}
-          />
-        )}
 
         {drawModalVisible && drawQueue.length > 0 && (
           <MarketingDrawModal

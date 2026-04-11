@@ -8,6 +8,7 @@ export async function burnWatermarkIntoVideo(
   inputUri: string,
   exerciseName?: string,
   patientName?: string,
-): Promise<{ uri: string; wasProcessed: boolean }> {
-  return { uri: inputUri, wasProcessed: false };
+): Promise<string> {
+  // FFmpeg removed — return original video without watermark
+  return inputUri;
 }

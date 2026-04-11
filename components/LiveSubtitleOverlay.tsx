@@ -4,6 +4,7 @@ import { ScaledText } from '@/components/ScaledText';
 import { parseVTT, getCurrentCue } from '@/utils/vttParser';
 import type { SubtitleCue } from '@/utils/vttParser';
 import { SUBTITLE_FONT_SIZES, SubtitleSizeLevel } from '@/types';
+import { log } from '@/lib/logger';
 
 interface LiveSubtitleOverlayProps {
   subtitleUrl: string | null;
@@ -38,7 +39,7 @@ export default function LiveSubtitleOverlay({
 
   useEffect(() => {
     if (!subtitleUrl) {
-      console.log('[LiveSubtitle] No subtitle URL provided');
+      log('[LiveSubtitle] No subtitle URL provided');
       setCues([]);
       setLoadError(false);
       setIsLoading(false);
@@ -47,7 +48,7 @@ export default function LiveSubtitleOverlay({
     }
 
     if (fetchedUrlRef.current === subtitleUrl && cues.length > 0) {
-      console.log('[LiveSubtitle] Already fetched URL:', subtitleUrl, 'cues:', cues.length);
+      log('[LiveSubtitle] Already fetched URL:', subtitleUrl, 'cues:', cues.length);
       return;
     }
 
@@ -55,14 +56,14 @@ export default function LiveSubtitleOverlay({
 
     const loadSubtitles = async () => {
       try {
-        console.log('[LiveSubtitle] Fetching subtitle from:', subtitleUrl);
+        log('[LiveSubtitle] Fetching subtitle from:', subtitleUrl);
         setIsLoading(true);
         setLoadError(false);
         const response = await fetch(subtitleUrl);
-        console.log('[LiveSubtitleOverlay] Fetching subtitle URL:', subtitleUrl);
-        console.log('[LiveSubtitleOverlay] Fetch response status:', response.status);
+        log('[LiveSubtitleOverlay] Fetching subtitle URL:', subtitleUrl);
+        log('[LiveSubtitleOverlay] Fetch response status:', response.status);
         if (!response.ok) {
-          console.warn('[LiveSubtitle] Subtitle fetch failed:', response.status, subtitleUrl);
+          log('[LiveSubtitle] Subtitle fetch failed:', response.status, subtitleUrl);
           if (!cancelled) {
             setCues([]);
             setLoadError(true);
@@ -72,13 +73,13 @@ export default function LiveSubtitleOverlay({
         }
         const text = await response.text();
 
-        console.log('[LiveSubtitleOverlay] Fetched text length:', text.length, 'first 200 chars:', text.substring(0, 200));
+        log('[LiveSubtitleOverlay] Fetched text length:', text.length, 'first 200 chars:', text.substring(0, 200));
         if (!cancelled) {
           const parsed = parseVTT(text);
-          console.log('[LiveSubtitle] Parsed', parsed.length, 'subtitle cues');
+          log('[LiveSubtitle] Parsed', parsed.length, 'subtitle cues');
           if (parsed.length > 0) {
-            console.log('[LiveSubtitle] First cue:', JSON.stringify(parsed[0]));
-            console.log('[LiveSubtitle] Last cue:', JSON.stringify(parsed[parsed.length - 1]));
+            log('[LiveSubtitle] First cue:', JSON.stringify(parsed[0]));
+            log('[LiveSubtitle] Last cue:', JSON.stringify(parsed[parsed.length - 1]));
           }
           setCues(parsed);
           fetchedUrlRef.current = subtitleUrl;
@@ -86,7 +87,7 @@ export default function LiveSubtitleOverlay({
           setIsLoading(false);
         }
       } catch (err) {
-        console.warn('[LiveSubtitle] Subtitle load error:', err);
+        log('[LiveSubtitle] Subtitle load error:', err);
         if (!cancelled) {
           setCues([]);
           setLoadError(true);
@@ -105,7 +106,7 @@ export default function LiveSubtitleOverlay({
   useEffect(() => {
     if (!isPlaying || cues.length === 0) {
       if (currentText !== null) {
-        console.log('[LiveSubtitle] Clearing text: isPlaying=', isPlaying, 'cues=', cues.length);
+        log('[LiveSubtitle] Clearing text: isPlaying=', isPlaying, 'cues=', cues.length);
       }
       setCurrentText(null);
       return;
@@ -115,7 +116,7 @@ export default function LiveSubtitleOverlay({
     const newText = cue ? cue.text : null;
 
     if (newText !== currentText) {
-      console.log('[LiveSubtitle] time=', audioCurrentTime.toFixed(2), 'cue=', newText ? newText.substring(0, 40) : 'none', 'totalCues=', cues.length);
+      log('[LiveSubtitle] time=', audioCurrentTime.toFixed(2), 'cue=', newText ? newText.substring(0, 40) : 'none', 'totalCues=', cues.length);
     }
     setCurrentText(newText);
   }, [isPlaying, audioCurrentTime, cues, currentText]);
@@ -156,7 +157,7 @@ export default function LiveSubtitleOverlay({
     prevTextRef.current = currentText;
   }, [currentText, visible, fadeAnim, animateTransition]);
 
-  console.log('[LiveSubtitleOverlay] Render state:', { visible, isLoading, loadError, isPlaying, currentText, cuesCount: cues?.length, audioCurrentTime });
+  log('[LiveSubtitleOverlay] Render state:', { visible, isLoading, loadError, isPlaying, currentText, cuesCount: cues?.length, audioCurrentTime });
 
   if (!visible) {
     return null;

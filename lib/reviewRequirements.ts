@@ -1,7 +1,7 @@
 import { supabase } from '@/lib/supabase';
 import { log } from '@/lib/logger';
 import { ExerciseReviewRequirement, ExerciseVideoSubmission } from '@/types';
-import { File as ExpoFile } from 'expo-file-system';
+import * as FileSystem from 'expo-file-system';
 
 const DAY_NAMES = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'];
 
@@ -112,36 +112,38 @@ export async function uploadAndSubmitVideo(
 
     log('[ReviewReq] Starting upload for video URI:', videoUri);
 
-    const file = new ExpoFile(videoUri);
-    if (!file.exists) {
+    const fileInfo = await FileSystem.getInfoAsync(videoUri);
+    if (!fileInfo.exists) {
       log('[ReviewReq] Video file does not exist at URI:', videoUri);
       return false;
     }
-    log('[ReviewReq] File exists, size:', file.size);
+    const fileSize = (fileInfo as any).size || 0;
+    log('[ReviewReq] File exists, size:', fileSize);
 
-    if (file.size === 0) {
+    if (fileSize === 0) {
       log('[ReviewReq] Video file is empty (0 bytes), aborting upload');
       return false;
     }
 
-    const bytes = await file.bytes();
+    const response = await fetch(videoUri);
+    const blob = await response.blob();
 
-    if (!bytes || bytes.length === 0) {
-      log('[ReviewReq] Failed to read video file bytes');
+    if (!blob || blob.size === 0) {
+      log('[ReviewReq] Failed to read video file blob');
       return false;
     }
 
-    log('[ReviewReq] Read bytes length:', bytes.length);
+    log('[ReviewReq] Read blob size:', blob.size);
 
     const contentType = detectContentType(videoUri);
     const extension = getFileExtension(contentType);
     const filePath = `${patientId}/${today}-${sanitizedTitle}-${timestamp}.${extension}`;
 
-    log('[ReviewReq] Uploading to:', filePath, 'contentType:', contentType, 'size:', bytes.length);
+    log('[ReviewReq] Uploading to:', filePath, 'contentType:', contentType, 'size:', blob.size);
 
     const { error: uploadError } = await supabase.storage
       .from('review-videos')
-      .upload(filePath, bytes.buffer, {
+      .upload(filePath, blob, {
         contentType,
         cacheControl: '3600',
         upsert: true,
@@ -177,7 +179,7 @@ export async function uploadAndSubmitVideo(
       return false;
     }
 
-    log('[ReviewReq] Submission successful, file:', filePath, 'size:', bytes.length, 'contentType:', contentType);
+    log('[ReviewReq] Submission successful, file:', filePath, 'size:', blob.size, 'contentType:', contentType);
     return true;
   } catch (e) {
     log('[ReviewReq] Submit exception:', e);

@@ -1,5 +1,6 @@
 {
   "expo": {
+    "sdkVersion": "54.0.0",
     "name": "NanoHab 醫家動",
     "slug": "nanohab",
     "version": "1.0.0",

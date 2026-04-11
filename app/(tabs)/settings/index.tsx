@@ -39,6 +39,7 @@ import {
 } from 'lucide-react-native';
 import { AppTutorial } from '@/components/AppTutorial';
 import MiniMahjongGame from '@/components/MiniMahjongGame';
+import AppAdOverlay from '@/components/AppAdOverlay';
 import { GameLevel } from '@/utils/mahjongGame';
 import { initAudio } from '@/utils/soundEffects';
 
@@ -86,6 +87,7 @@ export default function SettingsScreen() {
 
   const [showTutorial, setShowTutorial] = useState(false);
   const [showMahjongGame, setShowMahjongGame] = useState(false);
+  const [showMahjongAd, setShowMahjongAd] = useState(false);
   const router = useRouter();
 
   const handleSwitchProfile = useCallback(() => {
@@ -579,10 +581,20 @@ export default function SettingsScreen() {
       <MiniMahjongGame
         visible={showMahjongGame}
         level={(mahjongGameLevel || 'basic') as GameLevel}
-        onClose={() => setShowMahjongGame(false)}
+        onClose={() => {
+          setShowMahjongGame(false);
+          setShowMahjongAd(true);
+        }}
         patientId={patientId || ''}
         practiceMode
       />
+      {showMahjongAd && patientId && (
+        <AppAdOverlay
+          patientId={patientId}
+          placement="mahjong"
+          onClose={() => setShowMahjongAd(false)}
+        />
+      )}
     </View>
   );
 }

@@ -7,7 +7,6 @@ import {
   Image,
   Animated,
   Dimensions,
-  Alert,
 } from 'react-native';
 import * as Linking from 'expo-linking';
 import { X } from 'lucide-react-native';
@@ -64,12 +63,10 @@ async function checkAdFree(patientId: string): Promise<boolean> {
     const tierFree = tierData?.is_ad_free === true;
 
     const result = patientFree || clinicianFree || tierFree;
-    Alert.alert('AD DEBUG 1', 'isAdFree = ' + String(result) + '\npatientFree = ' + String(patientFree) + '\nclinicianFree = ' + String(clinicianFree) + '\ntierFree = ' + String(tierFree));
     return result;
   } catch (e) {
     console.error('[AppAdOverlay] Ad-free check error:', e);
     log('[AppAdOverlay] Ad-free check error:', e);
-    Alert.alert('AD ERROR', String(e));
   }
   return false;
 }
@@ -89,8 +86,6 @@ async function fetchAd(patientId: string, placement: string): Promise<AppAd | nu
       .limit(1)
       .maybeSingle();
 
-    Alert.alert('AD DEBUG 2', 'Ad found: ' + JSON.stringify(ad ? { id: ad.id, title: (ad as any).title, placement: ad.placement } : 'NULL'));
-
     if (!ad) return null;
 
     if (ad.target_type === 'specific') {
@@ -102,18 +97,14 @@ async function fetchAd(patientId: string, placement: string): Promise<AppAd | nu
         .limit(1);
 
       if (!targets || targets.length === 0) {
-        Alert.alert('AD CLOSING AFTER FETCH', 'Reason: target_type is specific but patient not in targets');
         return null;
       }
     }
-
-    Alert.alert('AD DEBUG 3', 'Target check passed');
 
     return ad as AppAd;
   } catch (e) {
     console.error('[AppAdOverlay] Fetch ad error:', e);
     log('[AppAdOverlay] Fetch ad error:', e);
-    Alert.alert('AD ERROR', String(e));
   }
   return null;
 }
@@ -181,7 +172,6 @@ export default function AppAdOverlay({ patientId, placement, onClose, language }
         const adFree = await checkAdFree(patientIdRef.current);
         if (adFree || cancelled) {
           if (!cancelled) {
-            Alert.alert('AD CLOSING', 'Reason: patient is ad-free');
             onCloseRef.current();
           }
           return;
@@ -190,7 +180,6 @@ export default function AppAdOverlay({ patientId, placement, onClose, language }
         const foundAd = await fetchAd(patientIdRef.current, placementRef.current);
         if (!foundAd || cancelled) {
           if (!cancelled) {
-            Alert.alert('AD CLOSING', 'Reason: no ad found from fetchAd');
             onCloseRef.current();
           }
           return;
@@ -204,17 +193,13 @@ export default function AppAdOverlay({ patientId, placement, onClose, language }
           .eq('patient_id', patientIdRef.current)
           .gte('viewed_at', today + 'T00:00:00');
 
-        Alert.alert('AD DEBUG FREQ', 'Today impressions: ' + String(todayImpressionCount));
-
         if ((todayImpressionCount ?? 0) >= 3) {
           if (!cancelled) {
-            Alert.alert('AD CLOSING', 'Reason: daily impression limit reached (' + String(todayImpressionCount) + ')');
             onCloseRef.current();
           }
           return;
         }
 
-        Alert.alert('AD DEBUG 4', 'About to show ad. Image URL: ' + String(foundAd.image_url).substring(0, 80));
         setAd(foundAd);
         setLoading(false);
 
@@ -253,7 +238,6 @@ export default function AppAdOverlay({ patientId, placement, onClose, language }
       } catch (e) {
         console.error('[AppAdOverlay] INIT ERROR:', e);
         log('[AppAdOverlay] Init error:', e);
-        Alert.alert('AD ERROR', String(e));
         if (!cancelled) onCloseRef.current();
       }
     };
@@ -424,14 +408,19 @@ export default function AppAdOverlay({ patientId, placement, onClose, language }
   );
 }
 
-const { width: SCREEN_WIDTH } = Dimensions.get('window');
+const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 
 const interstitialStyles = StyleSheet.create({
   overlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.85)',
+    position: 'absolute' as const,
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: '#000',
     justifyContent: 'center',
     alignItems: 'center',
+    zIndex: 9999,
   },
   topBar: {
     position: 'absolute' as const,
@@ -440,22 +429,21 @@ const interstitialStyles = StyleSheet.create({
     gap: 2,
   },
   imageContainer: {
-    width: SCREEN_WIDTH * 0.9,
-    maxHeight: '70%',
-    borderRadius: 16,
-    overflow: 'hidden',
+    width: SCREEN_WIDTH,
+    height: SCREEN_HEIGHT * 0.85,
+    justifyContent: 'center' as const,
+    alignItems: 'center' as const,
   },
   image: {
-    width: '100%',
-    height: undefined,
-    aspectRatio: 16 / 9,
-    borderRadius: 16,
+    width: SCREEN_WIDTH,
+    height: SCREEN_HEIGHT * 0.85,
   },
   bottomBar: {
     position: 'absolute' as const,
     top: 54,
     right: 20,
     alignItems: 'flex-end' as const,
+    zIndex: 10000,
   },
   skipBtn: {
     flexDirection: 'row' as const,

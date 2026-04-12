@@ -38,35 +38,22 @@ interface AppAd {
 
 async function checkAdFree(patientId: string): Promise<boolean> {
   try {
-    const { data: patient } = await supabase
+    const { data: adFreeData } = await supabase
       .from('patients')
-      .select('is_ad_free, clinician_id')
+      .select('is_ad_free, clinicians(is_ad_free_for_patients, clinician_tiers(is_ad_free))')
       .eq('id', patientId)
-      .single();
+      .maybeSingle();
 
-    if (!patient) return false;
-    if (patient.is_ad_free) return true;
+    if (!adFreeData) return false;
 
-    if (patient.clinician_id) {
-      const { data: clinician } = await supabase
-        .from('clinicians')
-        .select('is_ad_free_for_patients, tier_id')
-        .eq('id', patient.clinician_id)
-        .single();
+    const isAdFree =
+      adFreeData?.is_ad_free === true ||
+      (adFreeData as any)?.clinicians?.is_ad_free_for_patients === true ||
+      (adFreeData as any)?.clinicians?.clinician_tiers?.is_ad_free === true;
 
-      if (clinician?.is_ad_free_for_patients) return true;
-
-      if (clinician?.tier_id) {
-        const { data: tier } = await supabase
-          .from('clinician_tiers')
-          .select('is_ad_free')
-          .eq('id', clinician.tier_id)
-          .single();
-
-        if (tier?.is_ad_free) return true;
-      }
-    }
+    return isAdFree;
   } catch (e) {
+    console.error('[AppAdOverlay] Ad-free check error:', e);
     log('[AppAdOverlay] Ad-free check error:', e);
   }
   return false;
@@ -76,30 +63,35 @@ async function fetchAd(patientId: string, placement: string): Promise<AppAd | nu
   try {
     const today = new Date().toISOString().split('T')[0];
 
-    const { data: allAds } = await supabase
+    const { data: ad } = await supabase
       .from('app_ads')
       .select('*')
-      .eq('placement', placement)
       .eq('is_active', true)
+      .eq('placement', placement)
       .lte('start_date', today)
       .gte('end_date', today)
-      .order('sort_order', { ascending: true });
+      .order('sort_order', { ascending: true })
+      .limit(1)
+      .maybeSingle();
 
-    if (!allAds || allAds.length === 0) return null;
+    if (!ad) return null;
 
-    for (const ad of allAds) {
-      if (ad.target_type === 'all' || !ad.target_type) {
-        return ad as AppAd;
-      }
-      const { data: target } = await supabase
+    if (ad.target_type === 'specific') {
+      const { data: targets } = await supabase
         .from('app_ad_targets')
         .select('id')
         .eq('ad_id', ad.id)
         .eq('patient_id', patientId)
-        .maybeSingle();
-      if (target) return ad as AppAd;
+        .limit(1);
+
+      if (!targets || targets.length === 0) {
+        return null;
+      }
     }
+
+    return ad as AppAd;
   } catch (e) {
+    console.error('[AppAdOverlay] Fetch ad error:', e);
     log('[AppAdOverlay] Fetch ad error:', e);
   }
   return null;
@@ -226,6 +218,7 @@ export default function AppAdOverlay({ patientId, placement, onClose, language }
           }
         }, duration * 1000);
       } catch (e) {
+        console.error('[AppAdOverlay] INIT ERROR:', e);
         log('[AppAdOverlay] Init error:', e);
         if (!cancelled) onCloseRef.current();
       }

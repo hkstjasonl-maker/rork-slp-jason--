@@ -17,7 +17,7 @@
     "ios": {
       "supportsTablet": true,
       "requireFullScreen": true,
-      "bundleIdentifier": "com.dravive.nanohab",
+      "bundleIdentifier": "app.rork.slp-jason",
       "buildNumber": "1",
       "infoPlist": {
         "UISupportedInterfaceOrientations": [

@@ -7,7 +7,6 @@ import {
   Image,
   Animated,
   Dimensions,
-  Alert,
 } from 'react-native';
 import * as Linking from 'expo-linking';
 import { X } from 'lucide-react-native';
@@ -47,12 +46,23 @@ async function checkAdFree(patientId: string): Promise<boolean> {
 
     if (!adFreeData) return false;
 
-    const isAdFree =
-      adFreeData?.is_ad_free === true ||
-      (adFreeData as any)?.clinicians?.is_ad_free_for_patients === true ||
-      (adFreeData as any)?.clinicians?.clinician_tiers?.is_ad_free === true;
+    const patientFree = adFreeData.is_ad_free === true;
 
-    return isAdFree;
+    let clinicianData = (adFreeData as any).clinicians;
+    if (Array.isArray(clinicianData)) {
+      clinicianData = clinicianData[0] || null;
+    }
+
+    const clinicianFree = clinicianData?.is_ad_free_for_patients === true;
+
+    let tierData = clinicianData?.clinician_tiers;
+    if (Array.isArray(tierData)) {
+      tierData = tierData[0] || null;
+    }
+
+    const tierFree = tierData?.is_ad_free === true;
+
+    return patientFree || clinicianFree || tierFree;
   } catch (e) {
     console.error('[AppAdOverlay] Ad-free check error:', e);
     log('[AppAdOverlay] Ad-free check error:', e);
@@ -158,20 +168,15 @@ export default function AppAdOverlay({ patientId, placement, onClose, language }
 
     const init = async () => {
       try {
-        Alert.alert('AD DEBUG', 'Init started. Patient: ' + patientIdRef.current + ' Placement: ' + placementRef.current);
-
         const adFree = await checkAdFree(patientIdRef.current);
-        Alert.alert('AD DEBUG', 'Ad-free check result: ' + JSON.stringify(adFree));
         if (adFree || cancelled) {
           if (!cancelled) onCloseRef.current();
           return;
         }
 
         const foundAd = await fetchAd(patientIdRef.current, placementRef.current);
-        Alert.alert('AD DEBUG', 'Ad fetched: ' + JSON.stringify(foundAd ? { id: foundAd.id, title: (foundAd as any).title } : 'NO AD FOUND'));
         if (!foundAd || cancelled) {
           if (!cancelled) {
-            Alert.alert('AD DEBUG', 'No ad found, closing');
             onCloseRef.current();
           }
           return;
@@ -228,7 +233,6 @@ export default function AppAdOverlay({ patientId, placement, onClose, language }
       } catch (e) {
         console.error('[AppAdOverlay] INIT ERROR:', e);
         log('[AppAdOverlay] Init error:', e);
-        Alert.alert('AD ERROR', 'Failed: ' + String(e));
         if (!cancelled) onCloseRef.current();
       }
     };

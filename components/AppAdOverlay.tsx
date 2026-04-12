@@ -7,6 +7,7 @@ import {
   Image,
   Animated,
   Dimensions,
+  Alert,
 } from 'react-native';
 import * as Linking from 'expo-linking';
 import { X } from 'lucide-react-native';
@@ -62,10 +63,13 @@ async function checkAdFree(patientId: string): Promise<boolean> {
 
     const tierFree = tierData?.is_ad_free === true;
 
-    return patientFree || clinicianFree || tierFree;
+    const result = patientFree || clinicianFree || tierFree;
+    Alert.alert('AD DEBUG 1', 'isAdFree = ' + String(result) + '\npatientFree = ' + String(patientFree) + '\nclinicianFree = ' + String(clinicianFree) + '\ntierFree = ' + String(tierFree));
+    return result;
   } catch (e) {
     console.error('[AppAdOverlay] Ad-free check error:', e);
     log('[AppAdOverlay] Ad-free check error:', e);
+    Alert.alert('AD ERROR', String(e));
   }
   return false;
 }
@@ -85,6 +89,8 @@ async function fetchAd(patientId: string, placement: string): Promise<AppAd | nu
       .limit(1)
       .maybeSingle();
 
+    Alert.alert('AD DEBUG 2', 'Ad found: ' + JSON.stringify(ad ? { id: ad.id, title: (ad as any).title, placement: ad.placement } : 'NULL'));
+
     if (!ad) return null;
 
     if (ad.target_type === 'specific') {
@@ -96,6 +102,7 @@ async function fetchAd(patientId: string, placement: string): Promise<AppAd | nu
         .limit(1);
 
       if (!targets || targets.length === 0) {
+        Alert.alert('AD CLOSING', 'Reason: target_type is specific but patient not in targets');
         return null;
       }
     }
@@ -104,6 +111,7 @@ async function fetchAd(patientId: string, placement: string): Promise<AppAd | nu
   } catch (e) {
     console.error('[AppAdOverlay] Fetch ad error:', e);
     log('[AppAdOverlay] Fetch ad error:', e);
+    Alert.alert('AD ERROR', String(e));
   }
   return null;
 }
@@ -170,13 +178,17 @@ export default function AppAdOverlay({ patientId, placement, onClose, language }
       try {
         const adFree = await checkAdFree(patientIdRef.current);
         if (adFree || cancelled) {
-          if (!cancelled) onCloseRef.current();
+          if (!cancelled) {
+            Alert.alert('AD CLOSING', 'Reason: patient is ad-free');
+            onCloseRef.current();
+          }
           return;
         }
 
         const foundAd = await fetchAd(patientIdRef.current, placementRef.current);
         if (!foundAd || cancelled) {
           if (!cancelled) {
+            Alert.alert('AD CLOSING', 'Reason: no ad found from fetchAd');
             onCloseRef.current();
           }
           return;
@@ -191,7 +203,10 @@ export default function AppAdOverlay({ patientId, placement, onClose, language }
           .gte('viewed_at', today + 'T00:00:00');
 
         if ((todayImpressionCount ?? 0) >= 3) {
-          if (!cancelled) onCloseRef.current();
+          if (!cancelled) {
+            Alert.alert('AD CLOSING', 'Reason: daily impression limit reached (' + String(todayImpressionCount) + ')');
+            onCloseRef.current();
+          }
           return;
         }
 
@@ -233,6 +248,7 @@ export default function AppAdOverlay({ patientId, placement, onClose, language }
       } catch (e) {
         console.error('[AppAdOverlay] INIT ERROR:', e);
         log('[AppAdOverlay] Init error:', e);
+        Alert.alert('AD ERROR', String(e));
         if (!cancelled) onCloseRef.current();
       }
     };

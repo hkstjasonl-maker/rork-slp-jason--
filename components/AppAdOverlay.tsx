@@ -102,10 +102,12 @@ async function fetchAd(patientId: string, placement: string): Promise<AppAd | nu
         .limit(1);
 
       if (!targets || targets.length === 0) {
-        Alert.alert('AD CLOSING', 'Reason: target_type is specific but patient not in targets');
+        Alert.alert('AD CLOSING AFTER FETCH', 'Reason: target_type is specific but patient not in targets');
         return null;
       }
     }
+
+    Alert.alert('AD DEBUG 3', 'Target check passed');
 
     return ad as AppAd;
   } catch (e) {
@@ -202,6 +204,8 @@ export default function AppAdOverlay({ patientId, placement, onClose, language }
           .eq('patient_id', patientIdRef.current)
           .gte('viewed_at', today + 'T00:00:00');
 
+        Alert.alert('AD DEBUG FREQ', 'Today impressions: ' + String(todayImpressionCount));
+
         if ((todayImpressionCount ?? 0) >= 3) {
           if (!cancelled) {
             Alert.alert('AD CLOSING', 'Reason: daily impression limit reached (' + String(todayImpressionCount) + ')');
@@ -210,6 +214,7 @@ export default function AppAdOverlay({ patientId, placement, onClose, language }
           return;
         }
 
+        Alert.alert('AD DEBUG 4', 'About to show ad. Image URL: ' + String(foundAd.image_url).substring(0, 80));
         setAd(foundAd);
         setLoading(false);
 

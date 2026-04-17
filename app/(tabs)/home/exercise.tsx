@@ -1080,9 +1080,10 @@ export default function ExerciseScreen() {
     setShowProcessing(true);
     try {
       const { status } = await MediaLibrary.requestPermissionsAsync();
+      log('[SaveVideo] MediaLibrary permission status:', status);
       if (status !== 'granted') {
         setToastType('error');
-        setToastMessage(t('videoSaveError'));
+        setToastMessage(`${t('videoSaveError')}: Permission ${status}`);
         return;
       }
 
@@ -1113,10 +1114,12 @@ export default function ExerciseScreen() {
       if (reviewRequirement && isTodayAllowed(reviewRequirement.allowed_days) && todaySubmissionCount < reviewRequirement.max_submissions) {
         setTimeout(() => setShowSubmitPrompt(true), 1500);
       }
-    } catch (saveError) {
-      log('Error saving video:', saveError);
+    } catch (saveError: any) {
+      const errMsg = saveError?.message || saveError?.toString() || 'Unknown error';
+      log('Error saving video:', errMsg, JSON.stringify(saveError));
+      console.error('[SaveVideo] Full error:', saveError);
       setToastType('error');
-      setToastMessage(t('videoSaveError'));
+      setToastMessage(`${t('videoSaveError')}: ${errMsg}`);
     } finally {
       setShowProcessing(false);
     }

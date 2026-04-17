@@ -77,6 +77,30 @@ export const [AppProvider, useApp] = createContextHook(() => {
       if (fsize) setFontSizeLevelState(fsize as FontSizeLevel);
       if (tutorialVal === 'true') setTutorialCompletedState(true);
       if (subSize) setSubtitleSizeLevelState(subSize as SubtitleSizeLevel);
+
+      if (pid) {
+        const { data: { session } } = await supabase.auth.getSession();
+        if (!session && code) {
+          const authEmail = `patient-${code}@nanohab.internal`;
+          try {
+            const { error: reAuthError } = await supabase.auth.signInWithPassword({
+              email: authEmail,
+              password: code,
+            });
+            if (reAuthError) {
+              await Promise.all([
+                AsyncStorage.removeItem(STORAGE_KEYS.PATIENT_ID),
+                AsyncStorage.removeItem(STORAGE_KEYS.PATIENT_NAME),
+                AsyncStorage.removeItem(STORAGE_KEYS.ACCESS_CODE),
+              ]);
+              setPatientIdState(null);
+              setPatientNameState(null);
+              setAccessCodeState(null);
+            }
+          } catch (reAuthErr) {
+          }
+        }
+      }
     } catch (e) {
       log('Failed to load persisted state:', e);
     } finally {
@@ -111,6 +135,10 @@ export const [AppProvider, useApp] = createContextHook(() => {
   }, []);
 
   const clearPatient = useCallback(async () => {
+    try {
+      await supabase.auth.signOut();
+    } catch (e) {
+    }
     setPatientIdState(null);
     setPatientNameState(null);
     setAccessCodeState(null);

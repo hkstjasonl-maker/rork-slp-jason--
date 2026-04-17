@@ -28,21 +28,36 @@ export default function CodeEntryScreen() {
 
   const verifyCodeMutation = useMutation({
     mutationFn: async (accessCode: string): Promise<Patient> => {
+      const trimmedCode = accessCode.trim();
+
+      const authEmail = `patient-${trimmedCode}@nanohab.internal`;
+      const { error: authError } = await supabase.auth.signInWithPassword({
+        email: authEmail,
+        password: trimmedCode,
+      });
+
+      if (authError) {
+        throw new Error('invalid');
+      }
+
       const { data, error } = await supabase
         .from('patients')
         .select('*')
-        .eq('access_code', accessCode.trim())
+        .eq('access_code', trimmedCode)
         .single();
 
       if (error || !data) {
+        await supabase.auth.signOut();
         throw new Error('invalid');
       }
 
       if (data.is_frozen) {
+        await supabase.auth.signOut();
         throw new Error('frozen');
       }
 
       if (data.is_active === false) {
+        await supabase.auth.signOut();
         throw new Error('inactive');
       }
 

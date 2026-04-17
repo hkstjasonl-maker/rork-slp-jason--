@@ -1090,7 +1090,8 @@ export default function ExerciseScreen() {
       const exTitle = ex ? getExerciseTitle(ex, language) : '';
       log('[SaveVideo] Attempting watermark burn, exercise:', exTitle);
 
-      const { uri: processedUri, wasProcessed } = await burnWatermarkIntoVideo(uri, exTitle, patientName ?? undefined);
+      const processedUri = await burnWatermarkIntoVideo(uri, exTitle, patientName ?? undefined);
+      const wasProcessed = false;
 
       log('[SaveVideo] Watermark result — processed:', wasProcessed, 'uri:', processedUri);
 

@@ -104,7 +104,7 @@ export async function uploadAndSubmitVideo(
   patientId: string,
   requirementId: string,
   exerciseTitleEn: string
-): Promise<boolean> {
+): Promise<{ success: boolean; error?: string }> {
   try {
     const today = getTodayDateString();
     const sanitizedTitle = exerciseTitleEn.replace(/[^a-zA-Z0-9_-]/g, '_').substring(0, 50);
@@ -115,14 +115,14 @@ export async function uploadAndSubmitVideo(
     const fileInfo = await FileSystem.getInfoAsync(videoUri);
     if (!fileInfo.exists) {
       log('[ReviewReq] Video file does not exist at URI:', videoUri);
-      return false;
+      return { success: false, error: 'Video file does not exist' };
     }
     const fileSize = (fileInfo as any).size || 0;
     log('[ReviewReq] File exists, size:', fileSize);
 
     if (fileSize === 0) {
       log('[ReviewReq] Video file is empty (0 bytes), aborting upload');
-      return false;
+      return { success: false, error: 'Video file is empty (0 bytes)' };
     }
 
     const response = await fetch(videoUri);
@@ -130,7 +130,7 @@ export async function uploadAndSubmitVideo(
 
     if (!blob || blob.size === 0) {
       log('[ReviewReq] Failed to read video file blob');
-      return false;
+      return { success: false, error: 'Failed to read video file' };
     }
 
     log('[ReviewReq] Read blob size:', blob.size);
@@ -151,7 +151,7 @@ export async function uploadAndSubmitVideo(
 
     if (uploadError) {
       log('[ReviewReq] Upload error:', JSON.stringify(uploadError));
-      return false;
+      return { success: false, error: 'Storage upload failed: ' + JSON.stringify(uploadError) };
     }
 
     log('[ReviewReq] Upload successful');
@@ -176,14 +176,14 @@ export async function uploadAndSubmitVideo(
 
     if (insertError) {
       log('[ReviewReq] Insert error:', JSON.stringify(insertError));
-      return false;
+      return { success: false, error: 'DB insert failed: ' + JSON.stringify(insertError) };
     }
 
     log('[ReviewReq] Submission successful, file:', filePath, 'size:', blob.size, 'contentType:', contentType);
-    return true;
+    return { success: true };
   } catch (e) {
     log('[ReviewReq] Submit exception:', e);
-    return false;
+    return { success: false, error: 'Exception: ' + (e instanceof Error ? e.message : String(e)) };
   }
 }
 

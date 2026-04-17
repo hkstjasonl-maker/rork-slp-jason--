@@ -1257,13 +1257,13 @@ export default function ExerciseScreen() {
     if (!lastRecordedUri || !patientId || !reviewRequirement || !exercise) return;
     setIsSubmitting(true);
     try {
-      const success = await uploadAndSubmitVideo(
+      const result = await uploadAndSubmitVideo(
         lastRecordedUri,
         patientId,
         reviewRequirement.id,
         exercise.title_en
       );
-      if (success) {
+      if (result.success) {
         setSubmissionSuccess(true);
         setTodaySubmissionCount((prev) => prev + 1);
         setShowSubmitPrompt(false);
@@ -1290,7 +1290,7 @@ export default function ExerciseScreen() {
         }
       } else {
         setToastType('error');
-        setToastMessage(t('submissionFailed'));
+        setToastMessage(result.error || t('submissionFailed'));
       }
     } catch (e) {
       log('[ReviewSubmit] Error:', e);

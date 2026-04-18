@@ -1,4 +1,5 @@
 import { Platform } from 'react-native';
+import * as FileSystem from 'expo-file-system';
 import { supabase } from '@/lib/supabase';
 import { log } from '@/lib/logger';
 import { FeedingSkillReviewRequirement } from '@/types';
@@ -124,8 +125,35 @@ export async function uploadAndSubmitFeedingVideo(
       const normalizedUri = Platform.OS === 'ios' && !videoUri.startsWith('file://') 
         ? `file://${videoUri}` 
         : videoUri;
-      log('[FeedingReview] Fetching file as blob from:', normalizedUri);
-      const response = await fetch(normalizedUri);
+      log('[FeedingReview] Normalized URI:', normalizedUri);
+
+      const fileInfo = await FileSystem.getInfoAsync(normalizedUri);
+      if (!fileInfo.exists) {
+        log('[FeedingReview] Video file does not exist at:', normalizedUri);
+        return { success: false, errorDetail: 'Video file does not exist' };
+      }
+      const fileSize = (fileInfo as any).size || 0;
+      log('[FeedingReview] File exists, size:', fileSize);
+      if (fileSize === 0) {
+        return { success: false, errorDetail: 'Video file is empty (0 bytes)' };
+      }
+
+      let stableUri = normalizedUri;
+      if (Platform.OS !== 'web') {
+        try {
+          const ext = normalizedUri.toLowerCase().endsWith('.mp4') ? 'mp4' : 'mov';
+          stableUri = `${FileSystem.cacheDirectory}feeding_upload_${Date.now()}.${ext}`;
+          await FileSystem.copyAsync({ from: normalizedUri, to: stableUri });
+          const stableInfo = await FileSystem.getInfoAsync(stableUri);
+          log('[FeedingReview] Copied to stable path:', stableUri, 'size:', (stableInfo as any).size);
+        } catch (copyErr) {
+          log('[FeedingReview] Copy to stable path failed, using original:', copyErr);
+          stableUri = normalizedUri;
+        }
+      }
+
+      log('[FeedingReview] Fetching file as blob from:', stableUri);
+      const response = await fetch(stableUri);
       if (!response.ok) {
         log('[FeedingReview] Fetch failed with status:', response.status);
         return { success: false, errorDetail: `File read failed (status ${response.status})` };

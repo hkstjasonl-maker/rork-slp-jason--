@@ -418,9 +418,6 @@ export default function FeedingSkillPlayerScreen() {
 
       await MediaLibrary.saveToLibraryAsync(processedUri);
       setLastRecordedUri(processedUri);
-      log('[FeedingSkillPlayer] SET lastRecordedUri to:', processedUri);
-      const { Alert: AlertRN } = require('react-native');
-      AlertRN.alert('DEBUG Save', `Saved URI: ${processedUri?.substring(0, 100)}`);
       setToastType('success');
       if (wasProcessed) {
         setToastMessage(t('recordingSavedToAlbum'));

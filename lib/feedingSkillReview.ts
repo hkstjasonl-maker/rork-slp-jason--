@@ -117,7 +117,7 @@ export async function uploadAndSubmitFeedingVideo(
 
     const contentType = detectContentType(videoUri);
     const extension = getFileExtension(contentType);
-    const filePath = `feeding/${patientId}/${today}-${sanitizedTitle}-${timestamp}.${extension}`;
+    const filePath = `${patientId}/${today}-feeding-${sanitizedTitle}-${timestamp}.${extension}`;
 
     const normalizedUri = Platform.OS === 'ios' && !videoUri.startsWith('file://')
       ? `file://${videoUri}`
@@ -131,10 +131,6 @@ export async function uploadAndSubmitFeedingVideo(
     }
     const blob = await response.blob();
     log('[FeedingReview] Blob size:', blob.size, 'type:', blob.type);
-    const { Alert } = require('react-native');
-    Alert.alert('DEBUG Upload', 
-      `URI: ${normalizedUri.substring(0, 80)}...\nBlob size: ${blob.size}\nBlob type: ${blob.type}\nContent type: ${contentType}\nFile path: ${filePath}`
-    );
 
     if (!blob || blob.size === 0) {
       log('[FeedingReview] Video blob is empty (0 bytes), aborting upload');

@@ -2,6 +2,7 @@ import { supabase } from '@/lib/supabase';
 import { log } from '@/lib/logger';
 import { ExerciseReviewRequirement, ExerciseVideoSubmission } from '@/types';
 import * as FileSystem from 'expo-file-system';
+import { Platform } from 'react-native';
 
 const DAY_NAMES = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'];
 
@@ -112,9 +113,14 @@ export async function uploadAndSubmitVideo(
 
     log('[ReviewReq] Starting upload for video URI:', videoUri);
 
-    const fileInfo = await FileSystem.getInfoAsync(videoUri);
+    const normalizedUri = Platform.OS === 'ios' && !videoUri.startsWith('file://')
+      ? `file://${videoUri}`
+      : videoUri;
+    log('[ReviewReq] Normalized URI:', normalizedUri);
+
+    const fileInfo = await FileSystem.getInfoAsync(normalizedUri);
     if (!fileInfo.exists) {
-      log('[ReviewReq] Video file does not exist at URI:', videoUri);
+      log('[ReviewReq] Video file does not exist at URI:', normalizedUri);
       return { success: false, error: 'Video file does not exist' };
     }
     const fileSize = (fileInfo as any).size || 0;
@@ -125,7 +131,25 @@ export async function uploadAndSubmitVideo(
       return { success: false, error: 'Video file is empty (0 bytes)' };
     }
 
-    const response = await fetch(videoUri);
+    let stableUri = normalizedUri;
+    if (Platform.OS !== 'web') {
+      try {
+        const ext = normalizedUri.toLowerCase().endsWith('.mp4') ? 'mp4' : 'mov';
+        stableUri = `${FileSystem.cacheDirectory}upload_ready_${Date.now()}.${ext}`;
+        await FileSystem.copyAsync({ from: normalizedUri, to: stableUri });
+        const stableInfo = await FileSystem.getInfoAsync(stableUri);
+        log('[ReviewReq] Copied to stable path:', stableUri, 'size:', (stableInfo as any).size);
+      } catch (copyErr) {
+        log('[ReviewReq] Copy to stable path failed, using original:', copyErr);
+        stableUri = normalizedUri;
+      }
+    }
+
+    const response = await fetch(stableUri);
+    if (!response.ok) {
+      log('[ReviewReq] Fetch failed with status:', response.status);
+      return { success: false, error: `File read failed (status ${response.status})` };
+    }
     const blob = await response.blob();
 
     if (!blob || blob.size === 0) {

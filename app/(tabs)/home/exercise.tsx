@@ -1854,12 +1854,11 @@ export default function ExerciseScreen() {
 
               {reviewRequirement && canSubmitVideo && lastRecordedUri && !submissionSuccess && (
                 <Pressable
-                  style={styles.submitReviewButton}
-                  onPress={() => {
-                    console.log('[DEBUG] Submit button pressed!');
-                    Alert.alert('DEBUG', 'Button tapped! isSubmitting=' + isSubmitting + ' lastRecordedUri=' + (lastRecordedUri ? 'YES' : 'NO'));
-                    handleSubmitVideo();
-                  }}
+                  style={({ pressed }) => [
+                    styles.submitReviewButton,
+                    pressed && { opacity: 0.8 },
+                  ]}
+                  onPress={handleSubmitVideo}
                   disabled={isSubmitting}
                   testID="submit-review-button"
                 >

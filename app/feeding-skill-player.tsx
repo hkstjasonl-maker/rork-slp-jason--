@@ -416,23 +416,8 @@ export default function FeedingSkillPlayerScreen() {
       const wasProcessed = false;
       log('[FeedingSkillPlayer] Watermark result — processed:', wasProcessed, 'uri:', processedUri);
 
-      let stableUri = processedUri;
-      if (Platform.OS !== 'web') {
-        try {
-          const ext = processedUri.toLowerCase().endsWith('.mp4') ? 'mp4' : 'mov';
-          stableUri = `${LegacyFileSystem.cacheDirectory}upload_ready_${Date.now()}.${ext}`;
-          await LegacyFileSystem.copyAsync({ from: processedUri, to: stableUri });
-          log('[FeedingSkillPlayer] Copied video to stable cache path:', stableUri);
-          const info = await LegacyFileSystem.getInfoAsync(stableUri);
-          log('[FeedingSkillPlayer] Stable copy exists:', info.exists, 'size:', (info as any).size);
-        } catch (copyErr) {
-          log('[FeedingSkillPlayer] Copy to stable path failed, using original:', copyErr);
-          stableUri = processedUri;
-        }
-      }
-
       await MediaLibrary.saveToLibraryAsync(processedUri);
-      setLastRecordedUri(stableUri);
+      setLastRecordedUri(processedUri);
       setToastType('success');
       if (wasProcessed) {
         setToastMessage(t('recordingSavedToAlbum'));

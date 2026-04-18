@@ -1,5 +1,4 @@
 import { Platform } from 'react-native';
-import * as FileSystem from 'expo-file-system/legacy';
 import { supabase } from '@/lib/supabase';
 import { log } from '@/lib/logger';
 import { FeedingSkillReviewRequirement } from '@/types';
@@ -120,61 +119,29 @@ export async function uploadAndSubmitFeedingVideo(
     const extension = getFileExtension(contentType);
     const filePath = `feeding/${patientId}/${today}-${sanitizedTitle}-${timestamp}.${extension}`;
 
-    let uploadData: Blob | ArrayBuffer;
-    try {
-      const normalizedUri = Platform.OS === 'ios' && !videoUri.startsWith('file://') 
-        ? `file://${videoUri}` 
-        : videoUri;
-      log('[FeedingReview] Normalized URI:', normalizedUri);
+    const normalizedUri = Platform.OS === 'ios' && !videoUri.startsWith('file://')
+      ? `file://${videoUri}`
+      : videoUri;
+    log('[FeedingReview] Normalized URI:', normalizedUri);
 
-      const fileInfo = await FileSystem.getInfoAsync(normalizedUri);
-      if (!fileInfo.exists) {
-        log('[FeedingReview] Video file does not exist at:', normalizedUri);
-        return { success: false, errorDetail: 'Video file does not exist' };
-      }
-      const fileSize = (fileInfo as any).size || 0;
-      log('[FeedingReview] File exists, size:', fileSize);
-      if (fileSize === 0) {
-        return { success: false, errorDetail: 'Video file is empty (0 bytes)' };
-      }
+    const response = await fetch(normalizedUri);
+    if (!response.ok) {
+      log('[FeedingReview] Fetch failed with status:', response.status);
+      return { success: false, errorDetail: `File read failed (status ${response.status})` };
+    }
+    const blob = await response.blob();
+    log('[FeedingReview] Blob size:', blob.size, 'type:', blob.type);
 
-      let stableUri = normalizedUri;
-      if (Platform.OS !== 'web') {
-        try {
-          const ext = normalizedUri.toLowerCase().endsWith('.mp4') ? 'mp4' : 'mov';
-          stableUri = `${FileSystem.cacheDirectory}feeding_upload_${Date.now()}.${ext}`;
-          await FileSystem.copyAsync({ from: normalizedUri, to: stableUri });
-          const stableInfo = await FileSystem.getInfoAsync(stableUri);
-          log('[FeedingReview] Copied to stable path:', stableUri, 'size:', (stableInfo as any).size);
-        } catch (copyErr) {
-          log('[FeedingReview] Copy to stable path failed, using original:', copyErr);
-          stableUri = normalizedUri;
-        }
-      }
-
-      log('[FeedingReview] Fetching file as blob from:', stableUri);
-      const response = await fetch(stableUri);
-      if (!response.ok) {
-        log('[FeedingReview] Fetch failed with status:', response.status);
-        return { success: false, errorDetail: `File read failed (status ${response.status})` };
-      }
-      const blob = await response.blob();
-      log('[FeedingReview] Blob size:', blob.size, 'type:', blob.type);
-      if (blob.size === 0) {
-        log('[FeedingReview] Video blob is empty (0 bytes), aborting upload');
-        return { success: false, errorDetail: 'Video file is empty (0 bytes)' };
-      }
-      uploadData = blob;
-    } catch (fileError) {
-      log('[FeedingReview] File read error:', fileError);
-      return { success: false, errorDetail: `File read error: ${fileError instanceof Error ? fileError.message : String(fileError)}` };
+    if (!blob || blob.size === 0) {
+      log('[FeedingReview] Video blob is empty (0 bytes), aborting upload');
+      return { success: false, errorDetail: 'Video file is empty (0 bytes)' };
     }
 
-    log('[FeedingReview] Uploading to storage path:', filePath, 'contentType:', contentType);
+    log('[FeedingReview] Uploading to storage path:', filePath, 'contentType:', contentType, 'size:', blob.size);
 
     const { error: uploadError } = await supabase.storage
       .from('review-videos')
-      .upload(filePath, uploadData, {
+      .upload(filePath, blob, {
         contentType,
         cacheControl: '3600',
         upsert: true,

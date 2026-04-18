@@ -408,7 +408,7 @@ export default function FeedingSkillPlayerScreen() {
       const { status } = await MediaLibrary.requestPermissionsAsync();
       if (status !== 'granted') {
         setToastType('error');
-        setToastMessage(t('videoSaveError'));
+        setToastMessage(`${t('videoSaveError')}: Permission ${status}`);
         return;
       }
       log('[FeedingSkillPlayer] Attempting watermark burn, title:', title);
@@ -441,10 +441,11 @@ export default function FeedingSkillPlayerScreen() {
       }
       if (Platform.OS !== 'web') void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       setCameraMode('picture');
-    } catch (saveError) {
-      log('Error saving video:', saveError);
+    } catch (saveError: any) {
+      const errMsg = saveError?.message || saveError?.toString() || 'Unknown error';
+      log('Error saving video:', errMsg, JSON.stringify(saveError));
       setToastType('error');
-      setToastMessage(t('videoSaveError'));
+      setToastMessage(`${t('videoSaveError')}: ${errMsg}`);
     } finally {
       setShowProcessing(false);
     }

@@ -1254,7 +1254,15 @@ export default function ExerciseScreen() {
   }, [reviewRequirement, todaySubmissionCount, t]);
 
   const handleSubmitVideo = useCallback(async () => {
-    if (!lastRecordedUri || !patientId || !reviewRequirement || !exercise) return;
+    const missing = [];
+    if (!lastRecordedUri) missing.push('lastRecordedUri');
+    if (!patientId) missing.push('patientId');
+    if (!reviewRequirement) missing.push('reviewRequirement');
+    if (!exercise) missing.push('exercise');
+    if (missing.length > 0) {
+      Alert.alert('Debug: Submit blocked', 'Missing: ' + missing.join(', '));
+      return;
+    }
     setIsSubmitting(true);
     try {
       const result = await uploadAndSubmitVideo(

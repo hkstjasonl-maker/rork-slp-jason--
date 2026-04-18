@@ -121,7 +121,7 @@ export async function uploadAndSubmitFeedingVideo(
     const ext = getFileExtension(contentType);
     const filePath = `${patientId}/${today}-feeding-${sanitizedTitle}-${timestamp}.${ext}`;
 
-    log('[FeedingReview] Upload start — uri:', videoUri);
+    log('[FeedingReview] Upload start v2 — uri:', videoUri);
 
     const uri = Platform.OS === 'ios' && !videoUri.startsWith('file://')
       ? `file://${videoUri}`

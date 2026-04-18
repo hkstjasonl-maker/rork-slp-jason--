@@ -18,7 +18,7 @@
       "supportsTablet": true,
       "requireFullScreen": true,
       "bundleIdentifier": "app.rork.slp-jason",
-      "buildNumber": "75",
+      "buildNumber": "79",
       "infoPlist": {
         "UISupportedInterfaceOrientations": [
           "UIInterfaceOrientationPortrait",

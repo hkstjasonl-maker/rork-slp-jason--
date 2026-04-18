@@ -1113,7 +1113,21 @@ export default function ExerciseScreen() {
       setCameraMode('picture');
 
       if (reviewRequirement && isTodayAllowed(reviewRequirement.allowed_days) && todaySubmissionCount < reviewRequirement.max_submissions) {
-        setTimeout(() => setShowSubmitPrompt(true), 1500);
+        setTimeout(() => {
+          Alert.alert(
+            t('submitVideoForReview'),
+            t('submitVideoPrompt') || 'Submit this video for your therapist to review?\n提交此影片供治療師審閱？',
+            [
+              { text: t('cancel') || 'Cancel 取消', style: 'cancel' },
+              {
+                text: t('submit') || 'Submit 提交',
+                onPress: () => {
+                  handleSubmitVideo();
+                },
+              },
+            ]
+          );
+        }, 1500);
       }
     } catch (saveError: any) {
       const errMsg = saveError?.message || saveError?.toString() || 'Unknown error';

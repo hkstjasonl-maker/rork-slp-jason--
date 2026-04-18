@@ -3,6 +3,7 @@ import {
   View,
   ScrollView,
   TouchableOpacity,
+  Pressable,
   StyleSheet,
   SafeAreaView,
   ActivityIndicator,
@@ -1852,11 +1853,14 @@ export default function ExerciseScreen() {
               )}
 
               {reviewRequirement && canSubmitVideo && lastRecordedUri && !submissionSuccess && (
-                <TouchableOpacity
+                <Pressable
                   style={styles.submitReviewButton}
-                  onPress={handleSubmitVideo}
+                  onPress={() => {
+                    console.log('[DEBUG] Submit button pressed!');
+                    Alert.alert('DEBUG', 'Button tapped! isSubmitting=' + isSubmitting + ' lastRecordedUri=' + (lastRecordedUri ? 'YES' : 'NO'));
+                    handleSubmitVideo();
+                  }}
                   disabled={isSubmitting}
-                  activeOpacity={0.8}
                   testID="submit-review-button"
                 >
                   {isSubmitting ? (
@@ -1869,7 +1873,7 @@ export default function ExerciseScreen() {
                       </ScaledText>
                     </>
                   )}
-                </TouchableOpacity>
+                </Pressable>
               )}
 
               {submissionSuccess && (

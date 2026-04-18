@@ -17,30 +17,31 @@ export function getTodayDateString(): string {
   return `${yyyy}-${mm}-${dd}`;
 }
 
-export function getNextAllowedDay(allowedDays: string[]): string | null {
-  if (!allowedDays || allowedDays.length === 0) return null;
-  const todayIndex = new Date().getDay();
-  for (let i = 1; i <= 7; i++) {
-    const checkIndex = (todayIndex + i) % 7;
-    const dayName = DAY_NAMES[checkIndex];
-    if (allowedDays.includes(dayName)) {
-      return dayName;
-    }
-  }
-  return allowedDays[0];
-}
-
 export function isTodayAllowed(allowedDays: string[]): boolean {
   if (!allowedDays || allowedDays.length === 0) return false;
-  return allowedDays.includes(getTodayDayName());
+  const today = DAY_NAMES[new Date().getDay()];
+  return allowedDays.map(d => d.toLowerCase()).includes(today);
 }
 
-export async function fetchFeedingSkillReviewRequirement(
+export function getNextAllowedDay(allowedDays: string[]): string | null {
+  if (!allowedDays || allowedDays.length === 0) return null;
+  const todayIdx = new Date().getDay();
+  const lowerDays = allowedDays.map(d => d.toLowerCase());
+  for (let i = 1; i <= 7; i++) {
+    const checkIdx = (todayIdx + i) % 7;
+    if (lowerDays.includes(DAY_NAMES[checkIdx])) {
+      return DAY_NAMES[checkIdx];
+    }
+  }
+  return null;
+}
+
+export async function fetchFeedingReviewRequirement(
   patientId: string,
   feedingSkillVideoId: string
 ): Promise<FeedingSkillReviewRequirement | null> {
   try {
-    log('[FeedingReview] Fetching for patient:', patientId, 'video:', feedingSkillVideoId);
+    log('[FeedingReview] Fetching requirement for patient:', patientId, 'video:', feedingSkillVideoId);
     const { data, error } = await supabase
       .from('feeding_skill_review_requirements')
       .select('*')
@@ -51,10 +52,10 @@ export async function fetchFeedingSkillReviewRequirement(
       .maybeSingle();
 
     if (error) {
-      log('[FeedingReview] Error:', error);
+      log('[FeedingReview] Fetch error:', error);
       return null;
     }
-    log('[FeedingReview] Result:', data ? 'found' : 'none');
+    log('[FeedingReview] Requirement:', data ? 'found' : 'none');
     return data as FeedingSkillReviewRequirement | null;
   } catch (e) {
     log('[FeedingReview] Exception:', e);
@@ -62,13 +63,17 @@ export async function fetchFeedingSkillReviewRequirement(
   }
 }
 
-export async function countTodayFeedingSubmissions(requirementId: string): Promise<number> {
+export async function countTodayFeedingSubmissions(
+  patientId: string,
+  feedingSkillVideoId: string
+): Promise<number> {
   try {
     const today = getTodayDateString();
     const { count, error } = await supabase
       .from('feeding_skill_video_submissions')
       .select('id', { count: 'exact', head: true })
-      .eq('requirement_id', requirementId)
+      .eq('patient_id', patientId)
+      .eq('feeding_skill_video_id', feedingSkillVideoId)
       .eq('submission_date', today);
 
     if (error) {
@@ -83,20 +88,20 @@ export async function countTodayFeedingSubmissions(requirementId: string): Promi
 }
 
 function detectContentType(uri: string): string {
-  const lowerUri = uri.toLowerCase();
-  if (lowerUri.endsWith('.mov')) return 'video/quicktime';
-  if (lowerUri.endsWith('.mp4')) return 'video/mp4';
-  if (lowerUri.endsWith('.m4v')) return 'video/x-m4v';
+  const lower = uri.toLowerCase();
+  if (lower.endsWith('.mov')) return 'video/quicktime';
+  if (lower.endsWith('.mp4')) return 'video/mp4';
+  if (lower.endsWith('.m4v')) return 'video/x-m4v';
   return 'video/quicktime';
 }
 
-function getFileExtension(contentType: string): string {
-  if (contentType === 'video/quicktime') return 'mov';
-  if (contentType === 'video/x-m4v') return 'm4v';
+function getFileExtension(ct: string): string {
+  if (ct === 'video/quicktime') return 'mov';
+  if (ct === 'video/x-m4v') return 'm4v';
   return 'mp4';
 }
 
-export interface UploadSubmitResult {
+interface UploadSubmitResult {
   success: boolean;
   errorDetail?: string;
 }
@@ -112,79 +117,40 @@ export async function uploadAndSubmitFeedingVideo(
     const today = getTodayDateString();
     const sanitizedTitle = videoTitleEn.replace(/[^a-zA-Z0-9_-]/g, '_').substring(0, 50);
     const timestamp = Date.now();
+    const contentType = detectContentType(videoUri);
+    const ext = getFileExtension(contentType);
+    const filePath = `${patientId}/${today}-feeding-${sanitizedTitle}-${timestamp}.${ext}`;
 
-    log('[FeedingReview] Starting upload — URI:', videoUri);
+    log('[FeedingReview] Upload start — uri:', videoUri);
 
-    const FileSystem = require('expo-file-system');
-
-    const normalizedUri = Platform.OS === 'ios' && !videoUri.startsWith('file://')
+    const uri = Platform.OS === 'ios' && !videoUri.startsWith('file://')
       ? `file://${videoUri}`
       : videoUri;
-    log('[FeedingReview] Normalized URI:', normalizedUri);
 
-    const fileInfo = await FileSystem.getInfoAsync(normalizedUri);
-    if (!fileInfo.exists) {
-      log('[FeedingReview] Video file does not exist');
-      return { success: false, errorDetail: 'Video file does not exist' };
-    }
-    const fileSize = (fileInfo as any).size || 0;
-    log('[FeedingReview] File exists, size:', fileSize);
-    if (fileSize === 0) {
-      return { success: false, errorDetail: 'Video file is empty' };
+    const resp = await fetch(uri);
+    if (!resp.ok) {
+      return { success: false, errorDetail: 'Fetch failed: ' + resp.status };
     }
 
-    let stableUri = normalizedUri;
-    if (Platform.OS !== 'web') {
-      try {
-        const ext = normalizedUri.toLowerCase().endsWith('.mp4') ? 'mp4' : 'mov';
-        stableUri = `${FileSystem.cacheDirectory}feeding_upload_${Date.now()}.${ext}`;
-        await FileSystem.copyAsync({ from: normalizedUri, to: stableUri });
-        const stableInfo = await FileSystem.getInfoAsync(stableUri);
-        log('[FeedingReview] Copied to stable path, size:', (stableInfo as any).size);
-      } catch (copyErr) {
-        log('[FeedingReview] Copy failed, using original:', copyErr);
-        stableUri = normalizedUri;
-      }
+    const buf = await resp.arrayBuffer();
+    log('[FeedingReview] ArrayBuffer bytes:', buf.byteLength);
+
+    if (buf.byteLength === 0) {
+      return { success: false, errorDetail: 'File is empty' };
     }
 
-    const response = await fetch(stableUri);
-    if (!response.ok) {
-      return { success: false, errorDetail: `Fetch failed (${response.status})` };
-    }
-    const blob = await response.blob();
-    log('[FeedingReview] Blob size:', blob.size);
-
-    if (!blob || blob.size === 0) {
-      return { success: false, errorDetail: 'Blob is empty' };
-    }
-
-    const contentType = detectContentType(videoUri);
-    const extension = getFileExtension(contentType);
-    const filePath = `${patientId}/${today}-feeding-${sanitizedTitle}-${timestamp}.${extension}`;
-
-    log('[FeedingReview] Uploading to:', filePath, 'size:', blob.size);
-
-    const { error: uploadError } = await supabase.storage
+    const { error: upErr } = await supabase.storage
       .from('review-videos')
-      .upload(filePath, blob, {
-        contentType,
-        cacheControl: '3600',
-        upsert: true,
-      });
+      .upload(filePath, buf, { contentType, cacheControl: '3600', upsert: true });
 
-    if (uploadError) {
-      log('[FeedingReview] Upload error:', JSON.stringify(uploadError));
-      return { success: false, errorDetail: `Upload failed: ${uploadError.message}` };
+    if (upErr) {
+      return { success: false, errorDetail: 'Upload: ' + upErr.message };
     }
 
-    log('[FeedingReview] Upload successful');
-
-    const { data: urlData } = supabase.storage
-      .from('review-videos')
-      .getPublicUrl(filePath);
+    const { data: urlData } = supabase.storage.from('review-videos').getPublicUrl(filePath);
     const videoUrl = urlData?.publicUrl || filePath;
 
-    const insertPayload: Record<string, unknown> = {
+    const row: Record<string, unknown> = {
       patient_id: patientId,
       feeding_skill_video_id: feedingSkillVideoId,
       video_title_en: videoTitleEn,
@@ -192,93 +158,34 @@ export async function uploadAndSubmitFeedingVideo(
       submission_date: today,
       review_status: 'pending',
     };
-    if (requirementId) {
-      insertPayload.requirement_id = requirementId;
-    }
+    if (requirementId) row.requirement_id = requirementId;
 
-    const { error: insertError } = await supabase
+    const { error: insErr } = await supabase
       .from('feeding_skill_video_submissions')
-      .insert(insertPayload);
+      .insert(row);
 
-    if (insertError) {
-      log('[FeedingReview] Insert error:', JSON.stringify(insertError));
-      return { success: false, errorDetail: `DB insert failed: ${insertError.message}` };
+    if (insErr) {
+      return { success: false, errorDetail: 'Insert: ' + insErr.message };
     }
 
-    log('[FeedingReview] Submission successful');
+    log('[FeedingReview] Done — path:', filePath, 'bytes:', buf.byteLength);
     return { success: true };
   } catch (e) {
-    log('[FeedingReview] Exception:', e);
-    return { success: false, errorDetail: `Exception: ${e instanceof Error ? e.message : String(e)}` };
+    return { success: false, errorDetail: String(e) };
   }
 }
 
-export async function fetchAllFeedingReviewRequirements(
-  patientId: string
-): Promise<FeedingSkillReviewRequirement[]> {
-  try {
-    const { data, error } = await supabase
-      .from('feeding_skill_review_requirements')
-      .select('*')
-      .eq('patient_id', patientId)
-      .eq('is_active', true);
-
-    if (error) {
-      log('[FeedingReview] Fetch all requirements error:', error);
-      return [];
-    }
-    return (data || []) as FeedingSkillReviewRequirement[];
-  } catch (e) {
-    log('[FeedingReview] Fetch all requirements exception:', e);
-    return [];
-  }
-}
-
-export async function fetchPatientFeedingSubmissions(
-  patientId: string
-): Promise<import('@/types').FeedingSkillVideoSubmission[]> {
+export async function fetchPatientFeedingSubmissions(patientId: string): Promise<any[]> {
   try {
     const { data, error } = await supabase
       .from('feeding_skill_video_submissions')
-      .select('*, feeding_skill_review_requirements(*)')
+      .select('*')
       .eq('patient_id', patientId)
       .order('created_at', { ascending: false })
       .limit(100);
-
-    if (error) {
-      log('[FeedingReview] Fetch submissions error:', error);
-      return [];
-    }
-    return (data || []) as import('@/types').FeedingSkillVideoSubmission[];
-  } catch (e) {
-    log('[FeedingReview] Fetch submissions exception:', e);
+    if (error) return [];
+    return data || [];
+  } catch {
     return [];
-  }
-}
-
-export async function fetchTodayFeedingSubmissions(
-  patientId: string
-): Promise<Record<string, number>> {
-  try {
-    const today = getTodayDateString();
-    const { data, error } = await supabase
-      .from('feeding_skill_video_submissions')
-      .select('feeding_skill_video_id')
-      .eq('patient_id', patientId)
-      .eq('submission_date', today);
-
-    if (error) {
-      log('[FeedingReview] Fetch today subs error:', error);
-      return {};
-    }
-
-    const counts: Record<string, number> = {};
-    (data || []).forEach((s: { feeding_skill_video_id: string }) => {
-      counts[s.feeding_skill_video_id] = (counts[s.feeding_skill_video_id] || 0) + 1;
-    });
-    return counts;
-  } catch (e) {
-    log('[FeedingReview] Fetch today subs exception:', e);
-    return {};
   }
 }

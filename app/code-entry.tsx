@@ -31,13 +31,56 @@ export default function CodeEntryScreen() {
       const trimmedCode = accessCode.trim();
 
       const authEmail = `patient-${trimmedCode}@nanohab.internal`;
-      const { error: authError } = await supabase.auth.signInWithPassword({
+
+      let { error: signInError } = await supabase.auth.signInWithPassword({
         email: authEmail,
         password: trimmedCode,
       });
 
-      if (authError) {
-        throw new Error('invalid');
+      if (signInError) {
+        console.log('[CodeEntry] SignIn failed:', signInError.message);
+        await supabase.auth.signOut();
+
+        const { error: signUpError } = await supabase.auth.signUp({
+          email: authEmail,
+          password: trimmedCode,
+        });
+
+        if (signUpError) {
+          console.log('[CodeEntry] SignUp failed:', signUpError.message);
+
+          await supabase.rpc('reset_patient_auth', {
+            patient_access_code: trimmedCode,
+          });
+
+          const { error: signUpRetry } = await supabase.auth.signUp({
+            email: authEmail,
+            password: trimmedCode,
+          });
+
+          if (signUpRetry) {
+            throw new Error('Login failed. Please contact your therapist.\n登入失敗，請聯絡您的治療師。');
+          }
+        }
+
+        await supabase.auth.signOut();
+        const { error: finalSignIn } = await supabase.auth.signInWithPassword({
+          email: authEmail,
+          password: trimmedCode,
+        });
+
+        if (finalSignIn) {
+          throw new Error('Login failed. Please try again.\n登入失敗，請重試。');
+        }
+      }
+
+      const { data: { user: currentUser } } = await supabase.auth.getUser();
+      if (currentUser) {
+        await supabase
+          .from('patients')
+          .update({ auth_user_id: currentUser.id })
+          .eq('access_code', trimmedCode)
+          .is('auth_user_id', null);
       }
 
       const { data, error } = await supabase

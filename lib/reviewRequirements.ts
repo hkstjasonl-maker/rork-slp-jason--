@@ -20,11 +20,12 @@ export function getTodayDateString(): string {
 
 export function getNextAllowedDay(allowedDays: string[]): string | null {
   if (!allowedDays || allowedDays.length === 0) return null;
+  const lowerDays = allowedDays.map(d => d.toLowerCase());
   const todayIndex = new Date().getDay();
   for (let i = 1; i <= 7; i++) {
     const checkIndex = (todayIndex + i) % 7;
     const dayName = DAY_NAMES[checkIndex];
-    if (allowedDays.includes(dayName)) {
+    if (lowerDays.includes(dayName)) {
       return dayName;
     }
   }
@@ -33,7 +34,8 @@ export function getNextAllowedDay(allowedDays: string[]): string | null {
 
 export function isTodayAllowed(allowedDays: string[]): boolean {
   if (!allowedDays || allowedDays.length === 0) return false;
-  return allowedDays.includes(getTodayDayName());
+  const today = getTodayDayName().toLowerCase();
+  return allowedDays.some(d => d.toLowerCase() === today);
 }
 
 export async function fetchReviewRequirement(

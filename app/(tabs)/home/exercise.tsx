@@ -714,10 +714,7 @@ export default function ExerciseScreen() {
   useEffect(() => {
     if (!patientId || !exerciseQuery.data) return;
     const checkReviewReq = async () => {
-      const title = exerciseQuery.data!.title_en;
-      Alert.alert('DEBUG Review', `patientId: ${patientId}\ntitle: ${title}\nChecking...`);
-      const req = await fetchReviewRequirement(patientId, title);
-      Alert.alert('DEBUG Result', `Found: ${req ? 'YES' : 'NO'}\n${req ? JSON.stringify({id: req.id, title: req.exercise_title_en, active: req.is_active}).substring(0, 200) : 'null'}`);
+      const req = await fetchReviewRequirement(patientId, exerciseQuery.data!.title_en);
       setReviewRequirement(req);
       if (req) {
         const count = await countTodaySubmissions(req.id);

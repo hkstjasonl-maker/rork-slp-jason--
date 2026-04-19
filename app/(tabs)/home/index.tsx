@@ -10,6 +10,8 @@ import {
   Modal,
   Platform,
   Animated,
+  Image,
+  Linking,
 } from 'react-native';
 import * as Haptics from 'expo-haptics';
 import { useRouter } from 'expo-router';
@@ -61,6 +63,7 @@ import {
   Target,
   Sparkles,
   X,
+  Bell,
 } from 'lucide-react-native';
 
 const PROGRAM_ACCENT_COLORS = [
@@ -298,6 +301,31 @@ function CategorySection({
 export default function HomeScreen() {
   const { t, patientId, patientName, language, tutorialCompleted, setTutorialCompleted } = useApp();
   const router = useRouter();
+
+  const notificationsQuery = useQuery({
+    queryKey: ['patient-notifications', patientId],
+    queryFn: async () => {
+      if (!patientId) return [];
+      const today = new Date().toISOString().split('T')[0];
+
+      const { data, error } = await supabase
+        .from('notifications')
+        .select('*')
+        .eq('is_active', true)
+        .lte('start_date', today)
+        .gte('end_date', today)
+        .order('created_at', { ascending: false })
+        .limit(10);
+
+      if (error) {
+        console.log('Notifications query error:', error);
+        return [];
+      }
+      return data || [];
+    },
+    enabled: !!patientId,
+    staleTime: 5 * 60 * 1000,
+  });
 
   const programQuery = useQuery({
     queryKey: ['programs', patientId],
@@ -790,7 +818,8 @@ export default function HomeScreen() {
     void refetchObjectives();
     void refetchHolisticObjectives();
     void refetchRewards();
-  }, [refetchProgram, refetchSchedules, refetchLogs, refetchAllLogs, refetchSubmissions, refetchReviewReqs, refetchTodaySubs, refetchFeedingSkills, refetchFeedingReviewReqs, refetchFeedingTodaySubs, refetchObjectives, refetchHolisticObjectives, refetchRewards]);
+    void notificationsQuery.refetch();
+  }, [refetchProgram, refetchSchedules, refetchLogs, refetchAllLogs, refetchSubmissions, refetchReviewReqs, refetchTodaySubs, refetchFeedingSkills, refetchFeedingReviewReqs, refetchFeedingTodaySubs, refetchObjectives, refetchHolisticObjectives, refetchRewards, notificationsQuery]);
 
   if (programQuery.isLoading) {
     return (
@@ -883,6 +912,63 @@ export default function HomeScreen() {
               <TherapistImage type="cartoon" style={styles.welcomeAvatar} />
             </View>
           </View>
+
+          {notificationsQuery.data && notificationsQuery.data.length > 0 && (
+            <View style={styles.notificationsSection}>
+              {notificationsQuery.data.map((notif: any) => {
+                const title = language === 'zh_hant' ? (notif.title_zh || notif.title_en) :
+                              language === 'zh_hans' ? (notif.title_zh || notif.title_en) :
+                              notif.title_en;
+                const body = language === 'zh_hant' ? (notif.body_zh || notif.body_en) :
+                             language === 'zh_hans' ? (notif.body_zh || notif.body_en) :
+                             notif.body_en;
+
+                const typeColors: Record<string, string> = {
+                  announcement: '#3B82F6',
+                  festive: '#F59E0B',
+                  poster: '#8B5CF6',
+                  video: '#EC4899',
+                  link: '#06B6D4',
+                  info: '#6B7280',
+                };
+                const borderColor = typeColors[notif.type] || '#6B7280';
+
+                return (
+                  <TouchableOpacity
+                    key={notif.id}
+                    style={[styles.notificationCard, { borderLeftColor: borderColor }]}
+                    activeOpacity={notif.link_url ? 0.7 : 1}
+                    onPress={() => {
+                      if (notif.link_url) {
+                        Linking.openURL(notif.link_url).catch(() => {});
+                      }
+                    }}
+                  >
+                    <View style={styles.notificationHeader}>
+                      <Bell size={14} color={borderColor} />
+                      <ScaledText size={14} weight="700" color={Colors.textPrimary} style={{ flex: 1 }}>
+                        {title}
+                      </ScaledText>
+                    </View>
+                    {body ? (
+                      <ScaledText size={13} color={Colors.textSecondary} style={styles.notificationBody}>
+                        {body}
+                      </ScaledText>
+                    ) : null}
+                    {notif.image_url ? (
+                      <View style={styles.notificationImageContainer}>
+                        <Image
+                          source={{ uri: notif.image_url }}
+                          style={styles.notificationImage}
+                          resizeMode="cover"
+                        />
+                      </View>
+                    ) : null}
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
+          )}
 
           {(starInfo.totalStars > 0 || starInfo.currentStreak > 0 || periodInfo) && (
             <View style={styles.starSummaryCard}>
@@ -1619,6 +1705,42 @@ const styles = StyleSheet.create({
   root: {
     flex: 1,
     backgroundColor: Colors.background,
+  },
+  notificationsSection: {
+    paddingHorizontal: 20,
+    marginBottom: 12,
+    gap: 8,
+  },
+  notificationCard: {
+    backgroundColor: Colors.white,
+    borderRadius: 12,
+    padding: 14,
+    borderLeftWidth: 4,
+    borderLeftColor: '#3B82F6',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 4,
+    elevation: 2,
+  },
+  notificationHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  notificationBody: {
+    marginTop: 6,
+    lineHeight: 20,
+  },
+  notificationImageContainer: {
+    marginTop: 10,
+    borderRadius: 8,
+    overflow: 'hidden',
+  },
+  notificationImage: {
+    width: '100%',
+    height: 160,
+    borderRadius: 8,
   },
   container: {
     flex: 1,

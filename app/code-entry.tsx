@@ -38,7 +38,7 @@ export default function CodeEntryScreen() {
       });
 
       if (signInError) {
-        console.log('[CodeEntry] SignIn failed:', signInError.message);
+        console.log('[CodeEntry] SignIn failed v2:', signInError.message);
         await supabase.auth.signOut();
 
         const { error: signUpError } = await supabase.auth.signUp({

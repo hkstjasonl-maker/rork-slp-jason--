@@ -76,11 +76,10 @@ export default function CodeEntryScreen() {
 
       const { data: { user: currentUser } } = await supabase.auth.getUser();
       if (currentUser) {
-        await supabase
-          .from('patients')
-          .update({ auth_user_id: currentUser.id })
-          .eq('access_code', trimmedCode)
-          .is('auth_user_id', null);
+        await supabase.rpc('link_patient_auth', {
+          patient_access_code: trimmedCode,
+          new_auth_user_id: currentUser.id,
+        });
       }
 
       const { data, error } = await supabase

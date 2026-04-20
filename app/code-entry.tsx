@@ -8,7 +8,6 @@ import {
   ActivityIndicator,
   KeyboardAvoidingView,
   Platform,
-  Alert,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useMutation } from '@tanstack/react-query';
@@ -75,7 +74,6 @@ export default function CodeEntryScreen() {
         }
       }
 
-      Alert.alert('DEBUG Auth', 'Auth flow complete. About to query patient...');
       const { data: { user: currentUser } } = await supabase.auth.getUser();
       if (currentUser) {
         await supabase.rpc('link_patient_auth', {
@@ -89,10 +87,6 @@ export default function CodeEntryScreen() {
         .select('*')
         .eq('access_code', trimmedCode)
         .single();
-
-      Alert.alert('DEBUG Query', 
-        `code: ${trimmedCode}\ndata: ${data ? 'YES - ' + data.patient_name : 'NULL'}\nerror: ${error ? error.message + ' code:' + error.code : 'none'}`
-      );
 
       if (error || !data) {
         await supabase.auth.signOut();

@@ -1122,7 +1122,7 @@ export default function ExerciseScreen() {
               {
                 text: t('submit') || 'Submit 提交',
                 onPress: () => {
-                  handleSubmitVideo();
+                  handleSubmitVideo(processedUri);
                 },
               },
             ]
@@ -1268,20 +1268,21 @@ export default function ExerciseScreen() {
     return t('videoRequired');
   }, [reviewRequirement, todaySubmissionCount, t]);
 
-  const handleSubmitVideo = useCallback(async () => {
+  const handleSubmitVideo = useCallback(async (overrideUri?: string) => {
+    const videoUri = overrideUri || lastRecordedUri;
     const missing = [];
-    if (!lastRecordedUri) missing.push('lastRecordedUri');
+    if (!videoUri) missing.push('lastRecordedUri');
     if (!patientId) missing.push('patientId');
     if (!reviewRequirement) missing.push('reviewRequirement');
     if (!exercise) missing.push('exercise');
     if (missing.length > 0) {
-      Alert.alert('Debug: Submit blocked', 'Missing: ' + missing.join(', '));
+      console.log('[ReviewSubmit] Missing:', missing.join(', '));
       return;
     }
     setIsSubmitting(true);
     try {
       const result = await uploadAndSubmitVideo(
-        lastRecordedUri,
+        videoUri,
         patientId,
         reviewRequirement.id,
         exercise.title_en

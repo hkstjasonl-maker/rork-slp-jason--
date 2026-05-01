@@ -398,7 +398,7 @@ export default function AppAdOverlay({ patientId, placement, onClose, language }
           ) : (
             <View style={interstitialStyles.countdownContainer}>
               <ScaledText size={13} weight="500" color="rgba(255,255,255,0.7)">
-                {isZh ? `${countdown}秒後可跳過` : `Skip in ${countdown}s`}
+                {isZh ? `${countdown}秒後跳過` : `Skip in ${countdown}s`}
               </ScaledText>
             </View>
           )}

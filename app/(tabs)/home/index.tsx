@@ -390,6 +390,13 @@ export default function HomeScreen() {
     const todayDow = new Date().getDay();
     return allPrograms.filter(p => {
       if (p.schedule_type === 'daily' || !p.schedule_type) return true;
+
+      // Check custom_days array on the program itself (primary source)
+      if (p.custom_days && Array.isArray(p.custom_days) && p.custom_days.length > 0) {
+        return p.custom_days.some(d => Number(d) === todayDow);
+      }
+
+      // Fallback: check program_schedules table (legacy)
       return schedules.some(s => s.program_id === p.id && s.day_of_week === todayDow);
     });
   }, [allPrograms, schedules]);
@@ -861,8 +868,15 @@ export default function HomeScreen() {
 
   const getScheduleLabel = (p: ExerciseProgram): string => {
     if (p.schedule_type === 'daily' || !p.schedule_type) return t('everyDay');
-    const programSchedules = schedules.filter(s => s.program_id === p.id);
+
     const dayKeys = ['sunShort', 'monShort', 'tueShort', 'wedShort', 'thuShort', 'friShort', 'satShort'];
+
+    if (p.custom_days && Array.isArray(p.custom_days) && p.custom_days.length > 0) {
+      const days = p.custom_days.map(d => t(dayKeys[Number(d)])).join(', ');
+      return days || t('customSchedule');
+    }
+
+    const programSchedules = schedules.filter(s => s.program_id === p.id);
     const days = programSchedules.map(s => t(dayKeys[s.day_of_week])).join(', ');
     return days || t('customSchedule');
   };

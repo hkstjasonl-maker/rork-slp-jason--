@@ -29,6 +29,7 @@ export interface ExerciseProgram {
   name_zh_hant?: string | null;
   name_zh_hans?: string | null;
   schedule_type?: string | null;
+  custom_days?: number[];
   sort_order?: number;
   exercises?: Exercise[];
 }

@@ -28,7 +28,7 @@ export default function CodeEntryScreen() {
 
   const verifyCodeMutation = useMutation({
     mutationFn: async (accessCode: string): Promise<Patient> => {
-      const trimmedCode = accessCode.trim();
+      const trimmedCode = accessCode.trim().toLowerCase();
 
       const authEmail = `patient-${trimmedCode}@nanohab.internal`;
 

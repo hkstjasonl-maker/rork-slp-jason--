@@ -29,63 +29,22 @@ export default function CodeEntryScreen() {
   const verifyCodeMutation = useMutation({
     mutationFn: async (accessCode: string): Promise<Patient> => {
       const trimmedCode = accessCode.trim().toLowerCase();
-
       const authEmail = `patient-${trimmedCode}@nanohab.internal`;
 
-      let { error: signInError } = await supabase.auth.signInWithPassword({
+      const { error: signInError } = await supabase.auth.signInWithPassword({
         email: authEmail,
         password: trimmedCode,
       });
 
       if (signInError) {
-        console.log('[CodeEntry] SignIn failed v2:', signInError.message);
-        await supabase.auth.signOut();
-
-        const { error: signUpError } = await supabase.auth.signUp({
-          email: authEmail,
-          password: trimmedCode,
-        });
-
-        if (signUpError) {
-          console.log('[CodeEntry] SignUp failed:', signUpError.message);
-
-          await supabase.rpc('reset_patient_auth', {
-            patient_access_code: trimmedCode,
-          });
-
-          const { error: signUpRetry } = await supabase.auth.signUp({
-            email: authEmail,
-            password: trimmedCode,
-          });
-
-          if (signUpRetry) {
-            throw new Error('Login failed. Please contact your therapist.\n登入失敗，請聯絡您的治療師。');
-          }
-        }
-
-        await supabase.auth.signOut();
-        const { error: finalSignIn } = await supabase.auth.signInWithPassword({
-          email: authEmail,
-          password: trimmedCode,
-        });
-
-        if (finalSignIn) {
-          throw new Error('Login failed. Please try again.\n登入失敗，請重試。');
-        }
-      }
-
-      const { data: { user: currentUser } } = await supabase.auth.getUser();
-      if (currentUser) {
-        await supabase.rpc('link_patient_auth', {
-          patient_access_code: trimmedCode,
-          new_auth_user_id: currentUser.id,
-        });
+        console.log('[CodeEntry] SignIn failed:', signInError.message);
+        throw new Error('Login failed. Please contact your therapist.\n登入失敗，請聯絡您的治療師。');
       }
 
       const { data, error } = await supabase
         .from('patients')
         .select('*')
-        .eq('access_code', trimmedCode)
+        .ilike('access_code', trimmedCode)
         .single();
 
       if (error || !data) {

@@ -1,7 +1,7 @@
 import { supabase } from '@/lib/supabase';
 import { log } from '@/lib/logger';
 import { ExerciseReviewRequirement, ExerciseVideoSubmission } from '@/types';
-import * as FileSystem from 'expo-file-system';
+import * as FileSystem from 'expo-file-system/legacy';
 import { Platform } from 'react-native';
 
 const DAY_NAMES = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'];

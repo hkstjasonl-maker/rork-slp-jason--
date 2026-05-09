@@ -746,6 +746,38 @@ export default function HomeScreen() {
 
   const feedingSkills = feedingSkillsQuery.data || [];
 
+  const CARE_CATEGORIES: { key: string; icon: string }[] = [
+    { key: 'oral_care', icon: '🦷' },
+    { key: 'feeding_technique', icon: '🍽️' },
+    { key: 'swallowing_strategy', icon: '💧' },
+    { key: 'positioning', icon: '🛏️' },
+    { key: 'mobility', icon: '🚶' },
+    { key: 'wound_care', icon: '🩹' },
+    { key: 'tube_feeding', icon: '💉' },
+    { key: 'breathing', icon: '🌬️' },
+    { key: 'communication', icon: '💬' },
+    { key: 'other', icon: '📋' },
+  ];
+
+  const normalizeCareCategory = (cat: string | null | undefined): string => {
+    if (!cat) return 'other';
+    const k = cat.toLowerCase().replace(/[\s\-/]+/g, '_');
+    return CARE_CATEGORIES.some(c => c.key === k) ? k : 'other';
+  };
+
+  const groupedFeedingSkills = useMemo(() => {
+    const map = new Map<string, FeedingSkillAssignment[]>();
+    for (const a of feedingSkills) {
+      const key = normalizeCareCategory(a.feeding_skill_videos?.category);
+      if (!map.has(key)) map.set(key, []);
+      map.get(key)!.push(a);
+    }
+    return CARE_CATEGORIES
+      .filter(c => map.has(c.key))
+      .map(c => ({ key: c.key, icon: c.icon, items: map.get(c.key)! }));
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [feedingSkills]);
+
   const feedingReviewReqQuery = useQuery({
     queryKey: ['feedingReviewRequirements', patientId],
     queryFn: () => fetchAllFeedingReviewRequirements(patientId!),
@@ -1428,7 +1460,20 @@ export default function HomeScreen() {
 
               {feedingSkillsExpanded && (
                 <>
-                  {feedingSkills.map((assignment) => {
+                  {groupedFeedingSkills.map((group) => (
+                    <View key={group.key} style={styles.careCategoryGroup}>
+                      <View style={styles.careCategoryHeader}>
+                        <ScaledText size={18} style={styles.careCategoryIcon}>{group.icon}</ScaledText>
+                        <ScaledText size={14} weight="700" color={Colors.textPrimary}>
+                          {t(`careCat_${group.key}`)}
+                        </ScaledText>
+                        <View style={styles.careCategoryCount}>
+                          <ScaledText size={10} weight="700" color="#E67E22">
+                            {group.items.length}
+                          </ScaledText>
+                        </View>
+                      </View>
+                      {group.items.map((assignment) => {
                     const video = assignment.feeding_skill_videos;
                     if (!video) return null;
                     const lang = language || 'en';
@@ -1513,6 +1558,8 @@ export default function HomeScreen() {
                       </TouchableOpacity>
                     );
                   })}
+                    </View>
+                  ))}
                 </>
               )}
             </View>
@@ -2242,6 +2289,29 @@ const styles = StyleSheet.create({
     paddingHorizontal: 8,
     paddingVertical: 2,
     borderRadius: 6,
+  },
+  careCategoryGroup: {
+    marginBottom: 8,
+  },
+  careCategoryHeader: {
+    flexDirection: 'row' as const,
+    alignItems: 'center' as const,
+    gap: 8,
+    paddingVertical: 6,
+    paddingHorizontal: 4,
+    marginTop: 4,
+    marginBottom: 4,
+  },
+  careCategoryIcon: {
+    marginRight: 2,
+  },
+  careCategoryCount: {
+    backgroundColor: '#FEF3E2',
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 8,
+    minWidth: 22,
+    alignItems: 'center' as const,
   },
   feedingSkillViewedBadge: {
     flexDirection: 'row' as const,

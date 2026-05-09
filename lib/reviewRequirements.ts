@@ -182,11 +182,7 @@ export async function uploadAndSubmitVideo(
 
     log('[ReviewReq] Upload successful');
 
-    const { data: urlData } = supabase.storage
-      .from('review-videos')
-      .getPublicUrl(filePath);
-
-    const videoUrl = urlData?.publicUrl || filePath;
+    const videoUrl = filePath;
     log('[ReviewReq] Video URL:', videoUrl);
 
     const { error: insertError } = await supabase

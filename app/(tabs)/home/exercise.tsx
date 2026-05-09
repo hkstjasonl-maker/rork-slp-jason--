@@ -586,6 +586,7 @@ export default function ExerciseScreen() {
 
   const cameraRef = useRef<CameraView>(null);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const lastRecordingDuration = useRef<number>(0);
   const bubbleFade = useRef(new Animated.Value(0)).current;
   const bubbleSlide = useRef(new Animated.Value(10)).current;
   const recordPulse = useRef(new Animated.Value(1)).current;
@@ -1122,7 +1123,7 @@ export default function ExerciseScreen() {
               {
                 text: t('submit') || 'Submit 提交',
                 onPress: () => {
-                  handleSubmitVideo(processedUri);
+                  handleSubmitVideo(processedUri, lastRecordingDuration.current);
                 },
               },
             ]
@@ -1208,6 +1209,7 @@ export default function ExerciseScreen() {
     const camRef = activeRecordingRef();
     if (!camRef.current) return;
     log('Stopping video recording');
+    lastRecordingDuration.current = elapsed;
     setIsRecording(false);
     camRef.current.stopRecording();
 
@@ -1228,7 +1230,7 @@ export default function ExerciseScreen() {
     if (Platform.OS !== 'web') {
       void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     }
-  }, [activeRecordingRef]);
+  }, [activeRecordingRef, elapsed]);
 
   const handlePlayNarrative = useCallback(() => {
     setNarrativePlaying(true);
@@ -1268,8 +1270,9 @@ export default function ExerciseScreen() {
     return t('videoRequired');
   }, [reviewRequirement, todaySubmissionCount, t]);
 
-  const handleSubmitVideo = useCallback(async (overrideUri?: string) => {
+  const handleSubmitVideo = useCallback(async (overrideUri?: string, overrideDuration?: number) => {
     const videoUri = overrideUri || lastRecordedUri;
+    const durationSeconds = overrideDuration ?? lastRecordingDuration.current;
     const missing = [];
     if (!videoUri) missing.push('lastRecordedUri');
     if (!patientId) missing.push('patientId');
@@ -1285,7 +1288,8 @@ export default function ExerciseScreen() {
         videoUri,
         patientId,
         reviewRequirement.id,
-        exercise.title_en
+        exercise.title_en,
+        durationSeconds
       );
       if (result.success) {
         setSubmissionSuccess(true);

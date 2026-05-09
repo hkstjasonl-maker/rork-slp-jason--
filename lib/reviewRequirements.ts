@@ -106,7 +106,8 @@ export async function uploadAndSubmitVideo(
   videoUri: string,
   patientId: string,
   requirementId: string,
-  exerciseTitleEn: string
+  exerciseTitleEn: string,
+  durationSeconds?: number
 ): Promise<{ success: boolean; error?: string }> {
   try {
     const today = getTodayDateString();
@@ -191,6 +192,7 @@ export async function uploadAndSubmitVideo(
         video_url: videoUrl,
         submission_date: today,
         review_status: 'pending',
+        video_duration_seconds: durationSeconds || null,
       });
 
     if (insertError) {

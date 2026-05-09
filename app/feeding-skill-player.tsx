@@ -173,6 +173,7 @@ export default function FeedingSkillPlayerScreen() {
   const recordPulse = useRef(new Animated.Value(1)).current;
   const countdownScale = useRef(new Animated.Value(0.5)).current;
   const countdownFade = useRef(new Animated.Value(0)).current;
+  const lastRecordingDuration = useRef<number>(0);
 
   const [cameraPermission, requestCameraPermission] = useCameraPermissions();
   const [micPermission, requestMicPermission] = useMicrophonePermissions();
@@ -499,6 +500,7 @@ export default function FeedingSkillPlayerScreen() {
     const camRef = activeRecordingRef();
     if (!camRef.current) return;
     log('Stopping video recording');
+    lastRecordingDuration.current = elapsed;
     setIsRecording(false);
     camRef.current.stopRecording();
     setTimeout(async () => {
@@ -515,7 +517,7 @@ export default function FeedingSkillPlayerScreen() {
       }
     }, 500);
     if (Platform.OS !== 'web') void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-  }, [activeRecordingRef]);
+  }, [activeRecordingRef, elapsed]);
 
   const handleSubmitVideo = useCallback(async () => {
     if (!lastRecordedUri || !patientId || !video) {
@@ -545,7 +547,8 @@ export default function FeedingSkillPlayerScreen() {
         patientId,
         reviewRequirement?.id ?? null,
         assignment!.video_id,
-        video.title_en
+        video.title_en,
+        lastRecordingDuration.current || undefined
       );
       if (result.success) {
         setSubmissionSuccess(true);

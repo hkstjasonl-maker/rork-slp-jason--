@@ -1,5 +1,6 @@
 import { Platform } from 'react-native';
-import { supabase } from '@/lib/supabase';
+import * as FileSystem from 'expo-file-system/legacy';
+import { supabase, SUPABASE_URL, SUPABASE_ANON_KEY } from '@/lib/supabase';
 import { log } from '@/lib/logger';
 import { FeedingSkillReviewRequirement } from '@/types';
 
@@ -111,7 +112,8 @@ export async function uploadAndSubmitFeedingVideo(
   patientId: string,
   requirementId: string | null,
   feedingSkillVideoId: string,
-  videoTitleEn: string
+  videoTitleEn: string,
+  durationSeconds?: number
 ): Promise<UploadSubmitResult> {
   try {
     const today = getTodayDateString();
@@ -121,34 +123,59 @@ export async function uploadAndSubmitFeedingVideo(
     const ext = getFileExtension(contentType);
     const filePath = `${patientId}/${today}-feeding-${sanitizedTitle}-${timestamp}.${ext}`;
 
-    log('[FeedingReview] Upload start v2 — uri:', videoUri);
+    log('[FeedingReview] Upload start — uri:', videoUri);
 
-    const uri = Platform.OS === 'ios' && !videoUri.startsWith('file://')
+    const normalizedUri = Platform.OS === 'ios' && !videoUri.startsWith('file://')
       ? `file://${videoUri}`
       : videoUri;
 
-    const resp = await fetch(uri);
-    if (!resp.ok) {
-      return { success: false, errorDetail: 'Fetch failed: ' + resp.status };
+    const fileInfo = await FileSystem.getInfoAsync(normalizedUri);
+    if (!fileInfo.exists) {
+      return { success: false, errorDetail: 'Video file does not exist' };
+    }
+    const fileSize = (fileInfo as any).size || 0;
+    log('[FeedingReview] File exists, size:', fileSize);
+    if (fileSize === 0) {
+      return { success: false, errorDetail: 'Video file is empty (0 bytes)' };
     }
 
-    const buf = await resp.arrayBuffer();
-    log('[FeedingReview] ArrayBuffer bytes:', buf.byteLength);
-
-    if (buf.byteLength === 0) {
-      return { success: false, errorDetail: 'File is empty' };
+    let stableUri = normalizedUri;
+    if (Platform.OS !== 'web') {
+      try {
+        stableUri = `${FileSystem.cacheDirectory}upload_ready_feeding_${Date.now()}.${ext}`;
+        await FileSystem.copyAsync({ from: normalizedUri, to: stableUri });
+        const stableInfo = await FileSystem.getInfoAsync(stableUri);
+        log('[FeedingReview] Copied to stable path:', stableUri, 'size:', (stableInfo as any).size);
+      } catch (copyErr) {
+        log('[FeedingReview] Copy to stable path failed, using original:', copyErr);
+        stableUri = normalizedUri;
+      }
     }
 
-    const { error: upErr } = await supabase.storage
-      .from('review-videos')
-      .upload(filePath, buf, { contentType, cacheControl: '3600', upsert: true });
+    const uploadUrl = `${SUPABASE_URL}/storage/v1/object/review-videos/${filePath}`;
+    const { data: { session } } = await supabase.auth.getSession();
+    const accessToken = session?.access_token || SUPABASE_ANON_KEY;
 
-    if (upErr) {
-      return { success: false, errorDetail: 'Upload: ' + upErr.message };
+    const uploadResult = await FileSystem.uploadAsync(uploadUrl, stableUri, {
+      httpMethod: 'POST',
+      uploadType: FileSystem.FileSystemUploadType.BINARY_CONTENT,
+      headers: {
+        'Authorization': `Bearer ${accessToken}`,
+        'apikey': SUPABASE_ANON_KEY,
+        'Content-Type': contentType,
+        'x-upsert': 'true',
+        'Cache-Control': 'max-age=3600',
+      },
+    });
+
+    log('[FeedingReview] Upload result status:', uploadResult.status);
+
+    if (uploadResult.status < 200 || uploadResult.status >= 300) {
+      log('[FeedingReview] Upload failed:', uploadResult.body);
+      return { success: false, errorDetail: 'Storage upload failed: ' + uploadResult.body };
     }
 
-    const { data: urlData } = supabase.storage.from('review-videos').getPublicUrl(filePath);
-    const videoUrl = urlData?.publicUrl || filePath;
+    const videoUrl = filePath;
 
     const row: Record<string, unknown> = {
       patient_id: patientId,
@@ -157,6 +184,7 @@ export async function uploadAndSubmitFeedingVideo(
       video_url: videoUrl,
       submission_date: today,
       review_status: 'pending',
+      video_duration_seconds: durationSeconds || null,
     };
     if (requirementId) row.requirement_id = requirementId;
 
@@ -168,7 +196,7 @@ export async function uploadAndSubmitFeedingVideo(
       return { success: false, errorDetail: 'Insert: ' + insErr.message };
     }
 
-    log('[FeedingReview] Done — path:', filePath, 'bytes:', buf.byteLength);
+    log('[FeedingReview] Done — path:', filePath);
     return { success: true };
   } catch (e) {
     return { success: false, errorDetail: String(e) };

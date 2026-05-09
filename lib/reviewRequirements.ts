@@ -1,4 +1,4 @@
-import { supabase } from '@/lib/supabase';
+import { supabase, SUPABASE_URL, SUPABASE_ANON_KEY } from '@/lib/supabase';
 import { log } from '@/lib/logger';
 import { ExerciseReviewRequirement, ExerciseVideoSubmission } from '@/types';
 import * as FileSystem from 'expo-file-system/legacy';
@@ -147,37 +147,34 @@ export async function uploadAndSubmitVideo(
       }
     }
 
-    const response = await fetch(stableUri);
-    if (!response.ok) {
-      log('[ReviewReq] Fetch failed with status:', response.status);
-      return { success: false, error: `File read failed (status ${response.status})` };
-    }
-    const blob = await response.blob();
-
-    if (!blob || blob.size === 0) {
-      log('[ReviewReq] Failed to read video file blob');
-      return { success: false, error: 'Failed to read video file' };
-    }
-
-    log('[ReviewReq] Read blob size:', blob.size);
-
     const contentType = detectContentType(videoUri);
     const extension = getFileExtension(contentType);
     const filePath = `${patientId}/${today}-${sanitizedTitle}-${timestamp}.${extension}`;
 
-    log('[ReviewReq] Uploading to:', filePath, 'contentType:', contentType, 'size:', blob.size);
+    log('[ReviewReq] Uploading to:', filePath, 'contentType:', contentType);
 
-    const { error: uploadError } = await supabase.storage
-      .from('review-videos')
-      .upload(filePath, blob, {
-        contentType,
-        cacheControl: '3600',
-        upsert: true,
-      });
+    const uploadUrl = `${SUPABASE_URL}/storage/v1/object/review-videos/${filePath}`;
 
-    if (uploadError) {
-      log('[ReviewReq] Upload error:', JSON.stringify(uploadError));
-      return { success: false, error: 'Storage upload failed: ' + JSON.stringify(uploadError) };
+    const { data: { session } } = await supabase.auth.getSession();
+    const accessToken = session?.access_token || SUPABASE_ANON_KEY;
+
+    const uploadResult = await FileSystem.uploadAsync(uploadUrl, stableUri, {
+      httpMethod: 'POST',
+      uploadType: FileSystem.FileSystemUploadType.BINARY_CONTENT,
+      headers: {
+        'Authorization': `Bearer ${accessToken}`,
+        'apikey': SUPABASE_ANON_KEY,
+        'Content-Type': contentType,
+        'x-upsert': 'true',
+        'Cache-Control': 'max-age=3600',
+      },
+    });
+
+    log('[ReviewReq] Upload result status:', uploadResult.status);
+
+    if (uploadResult.status < 200 || uploadResult.status >= 300) {
+      log('[ReviewReq] Upload failed:', uploadResult.body);
+      return { success: false, error: 'Storage upload failed: ' + uploadResult.body };
     }
 
     log('[ReviewReq] Upload successful');
@@ -201,7 +198,7 @@ export async function uploadAndSubmitVideo(
       return { success: false, error: 'DB insert failed: ' + JSON.stringify(insertError) };
     }
 
-    log('[ReviewReq] Submission successful, file:', filePath, 'size:', blob.size, 'contentType:', contentType);
+    log('[ReviewReq] Submission successful, file:', filePath, 'contentType:', contentType);
     return { success: true };
   } catch (e) {
     log('[ReviewReq] Submit exception:', e);

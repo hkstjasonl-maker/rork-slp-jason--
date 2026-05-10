@@ -602,6 +602,7 @@ export default function ExerciseScreen() {
   const isTablet = screenWidth >= 768;
   const videoHeight = isTablet ? Math.round(screenHeight * 0.45) : 220;
   const splitVideoHeight = isTablet ? Math.round(screenHeight * 0.35) : 200;
+  const [videoZoom, setVideoZoom] = useState<number>(1);
 
 
   const hasCameraPermission = cameraPermission?.granted === true;
@@ -1434,8 +1435,27 @@ export default function ExerciseScreen() {
         <View style={{ flex: 1 }}>
           {mediaMode === 'split' && (
             <View style={isTablet ? styles.splitContainerTablet : { flex: 1 }}>
-              <View style={[isTablet ? styles.splitVideoSectionTablet : styles.splitVideoSection, { height: splitVideoHeight }]}>
-                <SplitVideoLayer vimeoId={vimeoId} youtubeId={youtubeId} />
+              <View style={[isTablet ? styles.splitVideoSectionTablet : styles.splitVideoSection, { height: splitVideoHeight * (isTablet ? videoZoom : 1) }]}>
+                <View style={isTablet ? { transform: [{ scale: videoZoom }], width: '100%', height: '100%' } : { width: '100%', height: '100%' }}>
+                  <SplitVideoLayer vimeoId={vimeoId} youtubeId={youtubeId} />
+                </View>
+                {isTablet && (
+                  <View style={styles.zoomControls} pointerEvents="box-none">
+                    {[1, 1.5, 2].map((level) => (
+                      <TouchableOpacity
+                        key={level}
+                        style={[styles.zoomButton, videoZoom === level && styles.zoomButtonActive]}
+                        onPress={() => setVideoZoom(level)}
+                        activeOpacity={0.7}
+                        testID={`split-zoom-${level}`}
+                      >
+                        <ScaledText size={13} weight="600" color={videoZoom === level ? Colors.white : 'rgba(255,255,255,0.7)'}>
+                          {`${level}x`}
+                        </ScaledText>
+                      </TouchableOpacity>
+                    ))}
+                  </View>
+                )}
               </View>
               <View style={isTablet ? styles.splitMirrorSectionTablet : styles.splitMirrorSection}>
                 {hasCameraPermission ? (
@@ -1764,10 +1784,29 @@ export default function ExerciseScreen() {
               contentContainerStyle={styles.scrollContent}
               showsVerticalScrollIndicator={false}
             >
-              <View style={styles.videoSection}>
-                <VideoProtectionOverlay patientName={patientName ?? ''} height={videoHeight}>
-                  <ExerciseVideoPlayer exercise={exercise} height={videoHeight} />
-                </VideoProtectionOverlay>
+              <View style={[styles.videoSection, isTablet && { height: videoHeight * videoZoom, overflow: 'hidden' }]}>
+                <View style={isTablet ? { transform: [{ scale: videoZoom }], width: '100%', height: '100%' } : { width: '100%', height: '100%' }}>
+                  <VideoProtectionOverlay patientName={patientName ?? ''} height={videoHeight}>
+                    <ExerciseVideoPlayer exercise={exercise} height={videoHeight} />
+                  </VideoProtectionOverlay>
+                </View>
+                {isTablet && (
+                  <View style={styles.zoomControls} pointerEvents="box-none">
+                    {[1, 1.5, 2].map((level) => (
+                      <TouchableOpacity
+                        key={level}
+                        style={[styles.zoomButton, videoZoom === level && styles.zoomButtonActive]}
+                        onPress={() => setVideoZoom(level)}
+                        activeOpacity={0.7}
+                        testID={`main-zoom-${level}`}
+                      >
+                        <ScaledText size={13} weight="600" color={videoZoom === level ? Colors.white : 'rgba(255,255,255,0.7)'}>
+                          {`${level}x`}
+                        </ScaledText>
+                      </TouchableOpacity>
+                    ))}
+                  </View>
+                )}
                 <Animated.View
                   style={[
                     styles.slpBubbleRow,
@@ -2158,6 +2197,25 @@ const styles = StyleSheet.create({
     marginBottom: 6,
     backgroundColor: '#000',
     position: 'relative' as const,
+  },
+  zoomControls: {
+    position: 'absolute' as const,
+    top: 8,
+    right: 8,
+    flexDirection: 'row' as const,
+    gap: 4,
+    zIndex: 20,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    borderRadius: 8,
+    padding: 4,
+  },
+  zoomButton: {
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 6,
+  },
+  zoomButtonActive: {
+    backgroundColor: Colors.primary,
   },
   mirrorBadge: {
     position: 'absolute' as const,

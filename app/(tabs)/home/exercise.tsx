@@ -601,6 +601,7 @@ export default function ExerciseScreen() {
   const { width: screenWidth, height: screenHeight } = useWindowDimensions();
   const isTablet = screenWidth >= 768;
   const videoHeight = isTablet ? Math.round(screenHeight * 0.45) : 220;
+  const splitVideoHeight = isTablet ? Math.round(screenHeight * 0.35) : 200;
 
 
   const hasCameraPermission = cameraPermission?.granted === true;
@@ -1433,7 +1434,7 @@ export default function ExerciseScreen() {
         <View style={{ flex: 1 }}>
           {mediaMode === 'split' && (
             <View style={isTablet ? styles.splitContainerTablet : { flex: 1 }}>
-              <View style={isTablet ? styles.splitVideoSectionTablet : styles.splitVideoSection}>
+              <View style={[isTablet ? styles.splitVideoSectionTablet : styles.splitVideoSection, !isTablet && { height: splitVideoHeight }]}>
                 <SplitVideoLayer vimeoId={vimeoId} youtubeId={youtubeId} />
               </View>
               <View style={isTablet ? styles.splitMirrorSectionTablet : styles.splitMirrorSection}>

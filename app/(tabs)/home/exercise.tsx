@@ -602,7 +602,7 @@ export default function ExerciseScreen() {
   const isTablet = screenWidth >= 768;
   const videoHeight = isTablet ? Math.round(screenHeight * 0.45) : 220;
   const splitVideoHeight = isTablet ? Math.round(screenHeight * 0.35) : 200;
-  const [videoZoom, setVideoZoom] = useState<number>(1);
+  const [videoZoom, setVideoZoom] = useState<number>(isTablet ? 1.5 : 1);
 
 
   const hasCameraPermission = cameraPermission?.granted === true;
@@ -1441,7 +1441,7 @@ export default function ExerciseScreen() {
                 </View>
                 {isTablet && (
                   <View style={styles.zoomControls} pointerEvents="box-none">
-                    {[1, 1.5, 2].map((level) => (
+                    {[1.5, 2].map((level) => (
                       <TouchableOpacity
                         key={level}
                         style={[styles.zoomButton, videoZoom === level && styles.zoomButtonActive]}
@@ -1449,7 +1449,7 @@ export default function ExerciseScreen() {
                         activeOpacity={0.7}
                         testID={`split-zoom-${level}`}
                       >
-                        <ScaledText size={13} weight="600" color={videoZoom === level ? Colors.white : 'rgba(255,255,255,0.7)'}>
+                        <ScaledText size={14} weight="700" color={videoZoom === level ? '#FFFFFF' : 'rgba(255,255,255,0.5)'}>
                           {`${level}x`}
                         </ScaledText>
                       </TouchableOpacity>
@@ -1792,7 +1792,7 @@ export default function ExerciseScreen() {
                 </View>
                 {isTablet && (
                   <View style={styles.zoomControls} pointerEvents="box-none">
-                    {[1, 1.5, 2].map((level) => (
+                    {[1.5, 2].map((level) => (
                       <TouchableOpacity
                         key={level}
                         style={[styles.zoomButton, videoZoom === level && styles.zoomButtonActive]}
@@ -1800,7 +1800,7 @@ export default function ExerciseScreen() {
                         activeOpacity={0.7}
                         testID={`main-zoom-${level}`}
                       >
-                        <ScaledText size={13} weight="600" color={videoZoom === level ? Colors.white : 'rgba(255,255,255,0.7)'}>
+                        <ScaledText size={14} weight="700" color={videoZoom === level ? '#FFFFFF' : 'rgba(255,255,255,0.5)'}>
                           {`${level}x`}
                         </ScaledText>
                       </TouchableOpacity>
@@ -2200,22 +2200,24 @@ const styles = StyleSheet.create({
   },
   zoomControls: {
     position: 'absolute' as const,
-    top: 8,
-    right: 8,
+    top: 10,
+    right: 10,
     flexDirection: 'row' as const,
-    gap: 4,
+    gap: 6,
     zIndex: 20,
-    backgroundColor: 'rgba(0,0,0,0.5)',
-    borderRadius: 8,
+    backgroundColor: 'rgba(0,0,0,0.6)',
+    borderRadius: 10,
     padding: 4,
   },
   zoomButton: {
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-    borderRadius: 6,
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderRadius: 8,
+    minWidth: 48,
+    alignItems: 'center' as const,
   },
   zoomButtonActive: {
-    backgroundColor: Colors.primary,
+    backgroundColor: '#3B82F6',
   },
   mirrorBadge: {
     position: 'absolute' as const,

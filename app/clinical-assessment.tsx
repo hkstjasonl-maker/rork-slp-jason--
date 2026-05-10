@@ -619,12 +619,12 @@ export default function ClinicalAssessmentScreen() {
     mutationFn: async () => {
       if (!tool || !patientId) throw new Error('Missing data');
       const scores = calculateScores(tool, answers);
-      log('[ClinicalAssessment] Submitting. Scores:', scores);
+      console.log('[Assessment] Saving submission:', submissionId, 'patient:', patientId, 'total:', scores.total_score);
 
       const langCode = language === 'zh_hant' || language === 'zh_hans' ? 'zh' : 'en';
 
       if (submissionId) {
-        const { error } = await supabase
+        const { data: updated, error } = await supabase
           .from('assessment_submissions')
           .update({
             responses: JSON.stringify(answers),
@@ -636,11 +636,20 @@ export default function ClinicalAssessmentScreen() {
             completed_at: new Date().toISOString(),
             updated_at: new Date().toISOString(),
           })
-          .eq('id', submissionId);
+          .eq('id', submissionId)
+          .eq('patient_id', patientId)
+          .select('id');
+
+        console.log('[Assessment] Save result:', error ? error.message : `success rows=${updated?.length ?? 0}`);
 
         if (error) {
-          log('[ClinicalAssessment] Update error:', error);
+          console.error('[ClinicalAssessment] Update error:', error);
           throw error;
+        }
+        if (!updated || updated.length === 0) {
+          const msg = `No submission row updated for id=${submissionId} patient=${patientId}`;
+          console.error('[ClinicalAssessment]', msg);
+          throw new Error(msg);
         }
       } else {
         const { error } = await supabase
@@ -676,9 +685,9 @@ export default function ClinicalAssessmentScreen() {
       void queryClient.invalidateQueries({ queryKey: ['clinical_assessments'] });
       void queryClient.invalidateQueries({ queryKey: ['assessments'] });
     },
-    onError: (error) => {
-      log('[ClinicalAssessment] Submit error:', error);
-      Alert.alert('Error', 'Failed to submit assessment. Please try again.');
+    onError: (error: any) => {
+      console.error('[ClinicalAssessment] Submit error:', error);
+      Alert.alert('Error', `Failed to save assessment results: ${error?.message ?? 'Unknown error'}`);
     },
   });
 
@@ -741,12 +750,12 @@ export default function ClinicalAssessmentScreen() {
     mutationFn: async (wizardAnswers: Record<string, number | string>) => {
       if (!tool || !patientId) throw new Error('Missing data');
       const scores = calculateScores(tool, wizardAnswers);
-      log('[ClinicalAssessment] Wizard submitting. Scores:', scores);
+      console.log('[Assessment] Wizard saving submission:', submissionId, 'patient:', patientId, 'total:', scores.total_score);
 
       const langCode = language === 'zh_hant' || language === 'zh_hans' ? 'zh' : 'en';
 
       if (submissionId) {
-        const { error } = await supabase
+        const { data: updated, error } = await supabase
           .from('assessment_submissions')
           .update({
             responses: JSON.stringify(wizardAnswers),
@@ -758,11 +767,20 @@ export default function ClinicalAssessmentScreen() {
             completed_at: new Date().toISOString(),
             updated_at: new Date().toISOString(),
           })
-          .eq('id', submissionId);
+          .eq('id', submissionId)
+          .eq('patient_id', patientId)
+          .select('id');
+
+        console.log('[Assessment] Wizard save result:', error ? error.message : `success rows=${updated?.length ?? 0}`);
 
         if (error) {
-          log('[ClinicalAssessment] Wizard update error:', error);
+          console.error('[ClinicalAssessment] Wizard update error:', error);
           throw error;
+        }
+        if (!updated || updated.length === 0) {
+          const msg = `No submission row updated for id=${submissionId} patient=${patientId}`;
+          console.error('[ClinicalAssessment]', msg);
+          throw new Error(msg);
         }
       } else {
         const { error } = await supabase
@@ -798,9 +816,9 @@ export default function ClinicalAssessmentScreen() {
       void queryClient.invalidateQueries({ queryKey: ['clinical_assessments'] });
       void queryClient.invalidateQueries({ queryKey: ['assessments'] });
     },
-    onError: (error) => {
-      log('[ClinicalAssessment] Wizard submit error:', error);
-      Alert.alert('Error', 'Failed to submit assessment. Please try again.');
+    onError: (error: any) => {
+      console.error('[ClinicalAssessment] Wizard submit error:', error);
+      Alert.alert('Error', `Failed to save assessment results: ${error?.message ?? 'Unknown error'}`);
     },
   });
 

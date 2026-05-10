@@ -7,7 +7,10 @@ import {
   SafeAreaView,
   TextInput,
   ActivityIndicator,
+  Animated,
+  Easing,
   Platform,
+  Alert,
   ScrollView,
   KeyboardAvoidingView,
 } from 'react-native';
@@ -19,16 +22,20 @@ import { useApp } from '@/contexts/AppContext';
 import { supabase } from '@/lib/supabase';
 import { log } from '@/lib/logger';
 
-const ACCENT = '#3B82F6';
-const ACCENT_DARK = '#2563EB';
+const ACCENT = '#6366F1';
+const ACCENT_DARK = '#4F46E5';
+const LECTURE_ACCENT = '#3B82F6';
+
+type Mode = 'choose' | 'scan' | 'manual' | 'waiting' | 'lectureDetails';
 
 const STORAGE_KEYS = {
-  EVENT_ID: 'lecture_event_id',
-  ATTENDEE_ID: 'lecture_attendee_id',
-  ATTENDEE_TOKEN: 'lecture_attendee_token',
+  GROUP_SESSION_ID: 'group_session_id',
+  GROUP_PARTICIPANT_ID: 'group_participant_id',
+  GROUP_PARTICIPANT_TOKEN: 'group_participant_token',
+  LECTURE_EVENT_ID: 'lecture_event_id',
+  LECTURE_ATTENDEE_ID: 'lecture_attendee_id',
+  LECTURE_ATTENDEE_TOKEN: 'lecture_attendee_token',
 };
-
-type Mode = 'choose' | 'scan' | 'manual' | 'details';
 
 type LectureEvent = {
   id: string;
@@ -44,7 +51,7 @@ function generateToken(): string {
   return `${Date.now().toString(36)}-${rand()}-${rand()}`;
 }
 
-function extractCode(input: string): string {
+function extractSessionCode(input: string): string {
   const trimmed = input.trim();
   const m = trimmed.match(/code=([A-Za-z0-9]{4,12})/i);
   if (m) return m[1].toUpperCase();
@@ -54,14 +61,13 @@ function extractCode(input: string): string {
 function formatScheduled(iso?: string | null): string {
   if (!iso) return '';
   try {
-    const d = new Date(iso);
-    return d.toLocaleString();
+    return new Date(iso).toLocaleString();
   } catch {
     return iso;
   }
 }
 
-export default function LectureJoinScreen() {
+export default function SessionJoinScreen() {
   const router = useRouter();
   const { language, patientId, patientName } = useApp();
   const isZh = language === 'zh_hant' || language === 'zh_hans';
@@ -70,56 +76,233 @@ export default function LectureJoinScreen() {
   const [code, setCode] = useState<string>('');
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState<boolean>(false);
-  const [event, setEvent] = useState<LectureEvent | null>(null);
+
+  // Group state
+  const [participantId, setParticipantId] = useState<string | null>(null);
+  const [groupSessionId, setGroupSessionId] = useState<string | null>(null);
+
+  // Lecture state
+  const [lectureEvent, setLectureEvent] = useState<LectureEvent | null>(null);
   const [displayName, setDisplayName] = useState<string>(patientName || '');
   const [email, setEmail] = useState<string>('');
 
   const [permission, requestPermission] = useCameraPermissions();
   const scannedRef = useRef<boolean>(false);
+  const pulseAnim = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
     if (patientName && !displayName) setDisplayName(patientName);
   }, [patientName, displayName]);
 
-  const lookupEvent = useCallback(async (rawCode: string) => {
-    const sessionCode = extractCode(rawCode);
+  useEffect(() => {
+    if (mode !== 'waiting') return;
+    const loop = Animated.loop(
+      Animated.sequence([
+        Animated.timing(pulseAnim, { toValue: 1, duration: 900, easing: Easing.inOut(Easing.ease), useNativeDriver: true }),
+        Animated.timing(pulseAnim, { toValue: 0, duration: 900, easing: Easing.inOut(Easing.ease), useNativeDriver: true }),
+      ])
+    );
+    loop.start();
+    return () => loop.stop();
+  }, [mode, pulseAnim]);
+
+  const joinGroupSession = useCallback(async (sessionRow: { id: string }) => {
+    if (!patientId) {
+      setError(isZh ? '請先登入' : 'Please log in first');
+      setSubmitting(false);
+      return;
+    }
+    const { data: { user: authUser } } = await supabase.auth.getUser();
+    const token = generateToken();
+
+    const { data: existing } = await supabase
+      .from('group_participants')
+      .select('id, status, participant_token')
+      .eq('session_id', sessionRow.id)
+      .eq('patient_id', patientId)
+      .maybeSingle();
+
+    let pId: string;
+    let pToken: string;
+
+    if (existing) {
+      pId = existing.id;
+      pToken = existing.participant_token || token;
+      if (existing.status === 'rejected' || existing.status === 'kicked') {
+        await supabase
+          .from('group_participants')
+          .update({
+            status: 'requested',
+            participant_token: token,
+            last_seen_at: new Date().toISOString(),
+          })
+          .eq('id', existing.id);
+        pToken = token;
+      }
+    } else {
+      const { data: inserted, error: insertErr } = await supabase
+        .from('group_participants')
+        .insert({
+          session_id: sessionRow.id,
+          user_type: 'patient',
+          patient_id: patientId,
+          auth_user_id: authUser?.id || null,
+          display_name: patientName || (isZh ? '參加者' : 'Participant'),
+          status: 'requested',
+          participant_token: token,
+          last_seen_at: new Date().toISOString(),
+        })
+        .select('id')
+        .single();
+
+      if (insertErr || !inserted) {
+        log('[SessionJoin] Insert participant failed:', insertErr);
+        setError(isZh ? '加入失敗，請再試' : 'Failed to join, please try again');
+        setSubmitting(false);
+        return;
+      }
+      pId = inserted.id;
+      pToken = token;
+    }
+
+    await AsyncStorage.multiSet([
+      [STORAGE_KEYS.GROUP_SESSION_ID, sessionRow.id],
+      [STORAGE_KEYS.GROUP_PARTICIPANT_ID, pId],
+      [STORAGE_KEYS.GROUP_PARTICIPANT_TOKEN, pToken],
+    ]);
+
+    setGroupSessionId(sessionRow.id);
+    setParticipantId(pId);
+    setMode('waiting');
+    setSubmitting(false);
+  }, [isZh, patientId, patientName]);
+
+  const lookupAndRoute = useCallback(async (rawCode: string) => {
+    const sessionCode = extractSessionCode(rawCode);
     if (!sessionCode || sessionCode.length < 4) {
       setError(isZh ? '請輸入有效代碼' : 'Please enter a valid code');
+      scannedRef.current = false;
+      return;
+    }
+    if (!patientId) {
+      setError(isZh ? '請先登入' : 'Please log in first');
       scannedRef.current = false;
       return;
     }
     setError(null);
     setSubmitting(true);
     try {
-      log('[LectureJoin] Looking up event:', sessionCode);
-      const { data, error: err } = await supabase
+      log('[SessionJoin] Looking up session code:', sessionCode);
+
+      // 1. Try group_sessions
+      const { data: groupSession } = await supabase
+        .from('group_sessions')
+        .select('id, status, session_name')
+        .eq('session_code', sessionCode)
+        .in('status', ['waiting', 'active'])
+        .maybeSingle();
+
+      if (groupSession) {
+        log('[SessionJoin] Matched group_sessions:', groupSession.id);
+        await joinGroupSession(groupSession);
+        return;
+      }
+
+      // 2. Try quiz_sessions
+      const { data: quizSession } = await supabase
+        .from('quiz_sessions')
+        .select('id, status, quiz_id, session_name')
+        .eq('session_code', sessionCode)
+        .in('status', ['active', 'waiting'])
+        .maybeSingle();
+
+      if (quizSession) {
+        log('[SessionJoin] Matched quiz_sessions:', quizSession.id);
+        router.replace({
+          pathname: '/quiz-take',
+          params: {
+            sessionId: quizSession.id,
+            quizId: quizSession.quiz_id,
+            sessionName: quizSession.session_name || '',
+          },
+        } as never);
+        return;
+      }
+
+      // 3. Try lecture_events
+      const { data: lectureRow } = await supabase
         .from('lecture_events')
         .select('id, status, title, speaker_name, scheduled_at, session_code')
         .eq('session_code', sessionCode)
         .in('status', ['scheduled', 'live'])
         .maybeSingle();
 
-      if (err || !data) {
-        log('[LectureJoin] lookup error:', err?.message, 'code:', sessionCode);
-        setError(isZh ? '找不到或已結束' : 'Lecture not found or ended');
+      if (lectureRow) {
+        log('[SessionJoin] Matched lecture_events:', lectureRow.id);
+        setLectureEvent(lectureRow as LectureEvent);
+        setMode('lectureDetails');
         setSubmitting(false);
-        scannedRef.current = false;
         return;
       }
 
-      setEvent(data as LectureEvent);
-      setMode('details');
-    } catch (e) {
-      log('[LectureJoin] lookup error:', e);
-      setError(isZh ? '網絡錯誤' : 'Network error');
-      scannedRef.current = false;
-    } finally {
+      setError(isZh ? '找不到或已過期' : 'Session not found or expired');
       setSubmitting(false);
+      scannedRef.current = false;
+    } catch (e) {
+      log('[SessionJoin] lookup error:', e);
+      setError(isZh ? '網絡錯誤' : 'Network error');
+      setSubmitting(false);
+      scannedRef.current = false;
     }
-  }, [isZh]);
+  }, [isZh, patientId, joinGroupSession, router]);
 
-  const submitJoin = useCallback(async () => {
-    if (!event) return;
+  // Polling for group approval
+  useEffect(() => {
+    if (mode !== 'waiting' || !participantId || !groupSessionId) return;
+    let cancelled = false;
+    const tick = async () => {
+      try {
+        const { data, error: err } = await supabase
+          .from('group_participants')
+          .select('status')
+          .eq('id', participantId)
+          .maybeSingle();
+        if (cancelled || err || !data) return;
+        if (data.status === 'accepted' || data.status === 'active') {
+          router.replace({
+            pathname: '/group-participant',
+            params: { sessionId: groupSessionId, participantId },
+          } as never);
+        } else if (data.status === 'rejected' || data.status === 'kicked') {
+          if (Platform.OS === 'web') {
+            window.alert(isZh ? '主持人未批准您的請求' : 'Host did not approve your request');
+          } else {
+            Alert.alert(
+              isZh ? '請求被拒絕' : 'Request Rejected',
+              isZh ? '主持人未批准您的請求' : 'Host did not approve your request'
+            );
+          }
+          await AsyncStorage.multiRemove([
+            STORAGE_KEYS.GROUP_SESSION_ID,
+            STORAGE_KEYS.GROUP_PARTICIPANT_ID,
+            STORAGE_KEYS.GROUP_PARTICIPANT_TOKEN,
+          ]);
+          router.back();
+        }
+      } catch (e) {
+        log('[SessionJoin] poll error:', e);
+      }
+    };
+    void tick();
+    const interval = setInterval(tick, 3000);
+    return () => {
+      cancelled = true;
+      clearInterval(interval);
+    };
+  }, [mode, participantId, groupSessionId, router, isZh]);
+
+  const submitLectureJoin = useCallback(async () => {
+    if (!lectureEvent) return;
     const name = displayName.trim();
     if (!name) {
       setError(isZh ? '請輸入您的名稱' : 'Please enter your name');
@@ -137,8 +320,8 @@ export default function LectureJoinScreen() {
 
       const { data: existing } = await supabase
         .from('lecture_attendees')
-        .select('id, attendee_token, reconnection_count')
-        .eq('event_id', event.id)
+        .select('id, attendee_token')
+        .eq('event_id', lectureEvent.id)
         .eq('patient_id', patientId || '')
         .maybeSingle();
 
@@ -160,7 +343,7 @@ export default function LectureJoinScreen() {
         const { data: inserted, error: insertErr } = await supabase
           .from('lecture_attendees')
           .insert({
-            event_id: event.id,
+            event_id: lectureEvent.id,
             patient_id: patientId || null,
             auth_user_id: authUser?.id || null,
             display_name: name,
@@ -174,7 +357,7 @@ export default function LectureJoinScreen() {
           .single();
 
         if (insertErr || !inserted) {
-          log('[LectureJoin] insert attendee failed:', insertErr);
+          log('[SessionJoin] insert attendee failed:', insertErr);
           setError(isZh ? '加入失敗，請再試' : 'Failed to join, please try again');
           setSubmitting(false);
           return;
@@ -184,34 +367,79 @@ export default function LectureJoinScreen() {
       }
 
       await AsyncStorage.multiSet([
-        [STORAGE_KEYS.EVENT_ID, event.id],
-        [STORAGE_KEYS.ATTENDEE_ID, attendeeId],
-        [STORAGE_KEYS.ATTENDEE_TOKEN, attendeeToken],
+        [STORAGE_KEYS.LECTURE_EVENT_ID, lectureEvent.id],
+        [STORAGE_KEYS.LECTURE_ATTENDEE_ID, attendeeId],
+        [STORAGE_KEYS.LECTURE_ATTENDEE_TOKEN, attendeeToken],
       ]);
 
       router.replace({
         pathname: '/lecture-viewer',
         params: {
-          eventId: event.id,
+          eventId: lectureEvent.id,
           attendeeId,
-          eventTitle: event.title || '',
+          eventTitle: lectureEvent.title || '',
         },
       } as never);
     } catch (e) {
-      log('[LectureJoin] submit error:', e);
+      log('[SessionJoin] submit lecture error:', e);
       setError(isZh ? '網絡錯誤' : 'Network error');
     } finally {
       setSubmitting(false);
     }
-  }, [event, displayName, email, isZh, patientId, router]);
+  }, [lectureEvent, displayName, email, isZh, patientId, router]);
 
   const handleQRScanned = useCallback((data: { data: string }) => {
     if (scannedRef.current) return;
     scannedRef.current = true;
-    void lookupEvent(data.data);
-  }, [lookupEvent]);
+    void lookupAndRoute(data.data);
+  }, [lookupAndRoute]);
 
-  const headerTitle = isZh ? '參加講座' : 'Join Lecture';
+  const cancelWaiting = useCallback(async () => {
+    if (participantId) {
+      try {
+        await supabase
+          .from('group_participants')
+          .update({ status: 'cancelled' })
+          .eq('id', participantId);
+      } catch (e) {
+        log('[SessionJoin] cancel error:', e);
+      }
+    }
+    await AsyncStorage.multiRemove([
+      STORAGE_KEYS.GROUP_SESSION_ID,
+      STORAGE_KEYS.GROUP_PARTICIPANT_ID,
+      STORAGE_KEYS.GROUP_PARTICIPANT_TOKEN,
+    ]);
+    router.back();
+  }, [participantId, router]);
+
+  const headerTitle = isZh ? '加入活動' : 'Join Session';
+
+  if (mode === 'waiting') {
+    const scale = pulseAnim.interpolate({ inputRange: [0, 1], outputRange: [1, 1.2] });
+    const opacity = pulseAnim.interpolate({ inputRange: [0, 1], outputRange: [0.85, 0.4] });
+    return (
+      <View style={styles.root}>
+        <SafeAreaView style={styles.waitContainer}>
+          <View style={styles.pulseWrap}>
+            <Animated.View style={[styles.pulseRing, { transform: [{ scale }], opacity }]} />
+            <View style={styles.pulseCore}>
+              <QrCode size={42} color="#fff" />
+            </View>
+          </View>
+          <Text style={styles.waitTitle}>
+            {isZh ? '等待批准...' : 'Waiting for approval...'}
+          </Text>
+          <Text style={styles.waitSubtitle}>
+            {isZh ? '主持人需確認您的請求' : 'The host needs to approve your request'}
+          </Text>
+          <TouchableOpacity style={styles.cancelButton} onPress={cancelWaiting} activeOpacity={0.8}>
+            <Text style={styles.cancelButtonText}>{isZh ? '取消' : 'Cancel'}</Text>
+          </TouchableOpacity>
+        </SafeAreaView>
+      </View>
+    );
+  }
 
   if (mode === 'scan') {
     if (!permission) {
@@ -275,15 +503,15 @@ export default function LectureJoinScreen() {
     );
   }
 
-  if (mode === 'details' && event) {
+  if (mode === 'lectureDetails' && lectureEvent) {
     return (
       <View style={styles.root}>
         <SafeAreaView style={styles.container}>
           <View style={styles.header}>
-            <TouchableOpacity style={styles.backBtn} onPress={() => { setEvent(null); setMode('choose'); }}>
+            <TouchableOpacity style={styles.backBtn} onPress={() => { setLectureEvent(null); setError(null); setMode('choose'); }}>
               <ArrowLeft size={22} color="#1F2937" />
             </TouchableOpacity>
-            <Text style={styles.headerTitle}>{headerTitle}</Text>
+            <Text style={styles.headerTitle}>{isZh ? '參加講座' : 'Join Lecture'}</Text>
             <View style={{ width: 40 }} />
           </View>
           <KeyboardAvoidingView
@@ -295,22 +523,22 @@ export default function LectureJoinScreen() {
                 <View style={styles.eventIconWrap}>
                   <GraduationCap size={28} color="#fff" />
                 </View>
-                <Text style={styles.eventTitle}>{event.title || (isZh ? '講座' : 'Lecture')}</Text>
-                {event.speaker_name ? (
+                <Text style={styles.eventTitle}>{lectureEvent.title || (isZh ? '講座' : 'Lecture')}</Text>
+                {lectureEvent.speaker_name ? (
                   <View style={styles.eventRow}>
                     <Mic size={14} color="#6B7280" />
-                    <Text style={styles.eventMeta}>{event.speaker_name}</Text>
+                    <Text style={styles.eventMeta}>{lectureEvent.speaker_name}</Text>
                   </View>
                 ) : null}
-                {event.scheduled_at ? (
+                {lectureEvent.scheduled_at ? (
                   <View style={styles.eventRow}>
                     <Calendar size={14} color="#6B7280" />
-                    <Text style={styles.eventMeta}>{formatScheduled(event.scheduled_at)}</Text>
+                    <Text style={styles.eventMeta}>{formatScheduled(lectureEvent.scheduled_at)}</Text>
                   </View>
                 ) : null}
-                <View style={[styles.statusPill, event.status === 'live' ? styles.statusLive : styles.statusScheduled]}>
+                <View style={[styles.statusPill, lectureEvent.status === 'live' ? styles.statusLive : styles.statusScheduled]}>
                   <Text style={styles.statusPillText}>
-                    {event.status === 'live'
+                    {lectureEvent.status === 'live'
                       ? (isZh ? '直播中' : 'LIVE')
                       : (isZh ? '即將開始' : 'Scheduled')}
                   </Text>
@@ -342,7 +570,7 @@ export default function LectureJoinScreen() {
                   style={styles.textInput}
                   value={email}
                   onChangeText={setEmail}
-                  placeholder={isZh ? 'name@example.com' : 'name@example.com'}
+                  placeholder="name@example.com"
                   placeholderTextColor="#9CA3AF"
                   autoCapitalize="none"
                   autoCorrect={false}
@@ -354,8 +582,8 @@ export default function LectureJoinScreen() {
               {error && <Text style={styles.errorText}>{error}</Text>}
 
               <TouchableOpacity
-                style={[styles.primaryBtn, (submitting || !displayName.trim()) && styles.primaryBtnDisabled]}
-                onPress={() => void submitJoin()}
+                style={[styles.primaryBtn, { backgroundColor: LECTURE_ACCENT }, (submitting || !displayName.trim()) && styles.primaryBtnDisabled]}
+                onPress={() => void submitLectureJoin()}
                 disabled={submitting || !displayName.trim()}
                 activeOpacity={0.85}
               >
@@ -385,7 +613,7 @@ export default function LectureJoinScreen() {
 
         {mode === 'manual' ? (
           <View style={styles.body}>
-            <Text style={styles.label}>{isZh ? '輸入講座代碼' : 'Enter lecture code'}</Text>
+            <Text style={styles.label}>{isZh ? '輸入活動代碼' : 'Enter session code'}</Text>
             <TextInput
               style={styles.input}
               value={code}
@@ -400,14 +628,14 @@ export default function LectureJoinScreen() {
             {error && <Text style={styles.errorText}>{error}</Text>}
             <TouchableOpacity
               style={[styles.primaryBtn, (!code.trim() || submitting) && styles.primaryBtnDisabled]}
-              onPress={() => void lookupEvent(code)}
+              onPress={() => void lookupAndRoute(code)}
               disabled={!code.trim() || submitting}
               activeOpacity={0.85}
             >
               {submitting ? (
                 <ActivityIndicator color="#fff" />
               ) : (
-                <Text style={styles.primaryBtnText}>{isZh ? '繼續' : 'Continue'}</Text>
+                <Text style={styles.primaryBtnText}>{isZh ? '加入' : 'Join'}</Text>
               )}
             </TouchableOpacity>
             <TouchableOpacity style={styles.linkBtn} onPress={() => { setError(null); setMode('choose'); }}>
@@ -418,8 +646,8 @@ export default function LectureJoinScreen() {
           <View style={styles.body}>
             <Text style={styles.intro}>
               {isZh
-                ? '加入由講者主持的講座或網路研討會'
-                : 'Join a lecture or webinar hosted by your speaker'}
+                ? '加入小組訓練、測驗或講座'
+                : 'Join a group session, quiz, or lecture'}
             </Text>
             <TouchableOpacity
               style={styles.choiceCard}
@@ -432,7 +660,7 @@ export default function LectureJoinScreen() {
               <View style={{ flex: 1 }}>
                 <Text style={styles.choiceTitle}>{isZh ? '掃描 QR 碼' : 'Scan QR Code'}</Text>
                 <Text style={styles.choiceSubtitle}>
-                  {isZh ? '使用相機掃描講座 QR 碼' : 'Use camera to scan the lecture QR code'}
+                  {isZh ? '使用相機掃描主持人顯示的 QR 碼' : "Use camera to scan the host's QR code"}
                 </Text>
               </View>
             </TouchableOpacity>
@@ -447,7 +675,7 @@ export default function LectureJoinScreen() {
               <View style={{ flex: 1 }}>
                 <Text style={styles.choiceTitle}>{isZh ? '輸入代碼' : 'Enter Code'}</Text>
                 <Text style={styles.choiceSubtitle}>
-                  {isZh ? '手動輸入講座代碼' : 'Type the lecture session code'}
+                  {isZh ? '手動輸入活動代碼' : 'Type the session code'}
                 </Text>
               </View>
             </TouchableOpacity>
@@ -472,7 +700,9 @@ const styles = StyleSheet.create({
     borderBottomColor: '#E5E7EB',
     backgroundColor: '#fff',
   },
-  backBtn: { width: 40, height: 40, borderRadius: 20, alignItems: 'center', justifyContent: 'center' },
+  backBtn: {
+    width: 40, height: 40, borderRadius: 20, alignItems: 'center', justifyContent: 'center',
+  },
   headerTitle: { fontSize: 17, fontWeight: '700', color: '#1F2937' },
   body: { flex: 1, paddingHorizontal: 20, paddingTop: 24, gap: 14 },
   intro: { fontSize: 14, color: '#6B7280', marginBottom: 8, lineHeight: 20 },
@@ -485,8 +715,15 @@ const styles = StyleSheet.create({
     gap: 14,
     borderWidth: 1,
     borderColor: '#E5E7EB',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.04,
+    shadowRadius: 8,
+    elevation: 2,
   },
-  choiceIcon: { width: 52, height: 52, borderRadius: 14, alignItems: 'center', justifyContent: 'center' },
+  choiceIcon: {
+    width: 52, height: 52, borderRadius: 14, alignItems: 'center', justifyContent: 'center',
+  },
   choiceTitle: { fontSize: 16, fontWeight: '700', color: '#1F2937' },
   choiceSubtitle: { fontSize: 13, color: '#6B7280', marginTop: 2 },
   label: { fontSize: 14, fontWeight: '600', color: '#374151', marginBottom: 4 },
@@ -537,11 +774,39 @@ const styles = StyleSheet.create({
     width: 240, height: 240, borderRadius: 24,
     borderWidth: 3, borderColor: ACCENT,
     alignItems: 'center', justifyContent: 'center',
-    backgroundColor: 'rgba(59, 130, 246, 0.08)',
+    backgroundColor: 'rgba(99, 102, 241, 0.08)',
   },
   scanHint: { color: '#fff', fontSize: 14, fontWeight: '500', textAlign: 'center', paddingHorizontal: 24 },
-  scanLoading: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 10, paddingBottom: 28 },
+  scanLoading: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 10,
+    paddingBottom: 28,
+  },
   scanLoadingText: { color: '#fff', fontSize: 14, fontWeight: '600' },
+
+  waitContainer: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 32, gap: 12 },
+  pulseWrap: {
+    width: 140, height: 140, alignItems: 'center', justifyContent: 'center', marginBottom: 16,
+  },
+  pulseRing: {
+    position: 'absolute',
+    width: 140, height: 140, borderRadius: 70,
+    backgroundColor: ACCENT,
+  },
+  pulseCore: {
+    width: 96, height: 96, borderRadius: 48,
+    backgroundColor: ACCENT_DARK,
+    alignItems: 'center', justifyContent: 'center',
+  },
+  waitTitle: { fontSize: 22, fontWeight: '700', color: '#1F2937', textAlign: 'center' },
+  waitSubtitle: { fontSize: 14, color: '#6B7280', textAlign: 'center', marginTop: 4, marginBottom: 24 },
+  cancelButton: {
+    paddingHorizontal: 32, paddingVertical: 14, borderRadius: 12,
+    borderWidth: 1, borderColor: '#E5E7EB', backgroundColor: '#fff',
+  },
+  cancelButtonText: { color: '#374151', fontSize: 15, fontWeight: '600' },
 
   detailsBody: { padding: 20, gap: 12, paddingBottom: 40 },
   eventCard: {
@@ -556,7 +821,7 @@ const styles = StyleSheet.create({
   },
   eventIconWrap: {
     width: 60, height: 60, borderRadius: 18,
-    backgroundColor: ACCENT,
+    backgroundColor: LECTURE_ACCENT,
     alignItems: 'center', justifyContent: 'center',
     marginBottom: 8,
   },

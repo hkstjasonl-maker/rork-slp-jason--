@@ -37,8 +37,6 @@ import {
   Captions,
   MessageSquare,
   Users,
-  ClipboardList,
-  GraduationCap,
 } from 'lucide-react-native';
 import { AppTutorial } from '@/components/AppTutorial';
 import MiniMahjongGame from '@/components/MiniMahjongGame';
@@ -190,63 +188,19 @@ export default function SettingsScreen() {
           <View style={styles.section}>
             <TouchableOpacity
               style={[styles.actionCard, styles.groupJoinCard]}
-              onPress={() => router.push('/group-join' as any)}
+              onPress={() => router.push('/session-join' as any)}
               activeOpacity={0.85}
-              testID="join-group-button"
+              testID="join-session-button"
             >
               <View style={styles.groupJoinIcon}>
                 <Users size={22} color="#FFFFFF" />
               </View>
               <View style={styles.actionContent}>
                 <ScaledText size={15} weight="700" color={Colors.textPrimary}>
-                  {language === 'zh_hant' || language === 'zh_hans' ? '加入小組' : 'Join Group Session'}
+                  {language === 'zh_hant' || language === 'zh_hans' ? '加入活動' : 'Join Session'}
                 </ScaledText>
                 <ScaledText size={13} color={Colors.textSecondary}>
-                  {language === 'zh_hant' || language === 'zh_hans' ? '掃描 QR 碼或輸入代碼' : 'Scan QR code or enter code'}
-                </ScaledText>
-              </View>
-              <ChevronRight size={18} color={Colors.disabled} />
-            </TouchableOpacity>
-          </View>
-
-          <View style={styles.section}>
-            <TouchableOpacity
-              style={[styles.actionCard, styles.quizJoinCard]}
-              onPress={() => router.push('/quiz-join' as any)}
-              activeOpacity={0.85}
-              testID="join-quiz-button"
-            >
-              <View style={styles.quizJoinIcon}>
-                <ClipboardList size={22} color="#FFFFFF" />
-              </View>
-              <View style={styles.actionContent}>
-                <ScaledText size={15} weight="700" color={Colors.textPrimary}>
-                  {language === 'zh_hant' || language === 'zh_hans' ? '參加測驗' : 'Join Quiz'}
-                </ScaledText>
-                <ScaledText size={13} color={Colors.textSecondary}>
-                  {language === 'zh_hant' || language === 'zh_hans' ? '掃描 QR 碼或輸入代碼' : 'Scan QR code or enter code'}
-                </ScaledText>
-              </View>
-              <ChevronRight size={18} color={Colors.disabled} />
-            </TouchableOpacity>
-          </View>
-
-          <View style={styles.section}>
-            <TouchableOpacity
-              style={[styles.actionCard, styles.lectureJoinCard]}
-              onPress={() => router.push('/lecture-join' as any)}
-              activeOpacity={0.85}
-              testID="join-lecture-button"
-            >
-              <View style={styles.lectureJoinIcon}>
-                <GraduationCap size={22} color="#FFFFFF" />
-              </View>
-              <View style={styles.actionContent}>
-                <ScaledText size={15} weight="700" color={Colors.textPrimary}>
-                  {language === 'zh_hant' || language === 'zh_hans' ? '參加講座' : 'Join Lecture'}
-                </ScaledText>
-                <ScaledText size={13} color={Colors.textSecondary}>
-                  {language === 'zh_hant' || language === 'zh_hans' ? '掃描 QR 碼或輸入代碼' : 'Scan QR code or enter code'}
+                  {language === 'zh_hant' || language === 'zh_hans' ? '掃描 QR 碼或輸入代碼加入' : 'Scan QR code or enter code to join'}
                 </ScaledText>
               </View>
               <ChevronRight size={18} color={Colors.disabled} />
@@ -849,30 +803,6 @@ const styles = StyleSheet.create({
     height: 40,
     borderRadius: 12,
     backgroundColor: '#6366F1',
-    alignItems: 'center' as const,
-    justifyContent: 'center' as const,
-  },
-  quizJoinCard: {
-    borderColor: '#A7F3D0',
-    backgroundColor: '#ECFDF5',
-  },
-  quizJoinIcon: {
-    width: 40,
-    height: 40,
-    borderRadius: 12,
-    backgroundColor: '#10B981',
-    alignItems: 'center' as const,
-    justifyContent: 'center' as const,
-  },
-  lectureJoinCard: {
-    borderColor: '#BFDBFE',
-    backgroundColor: '#EFF6FF',
-  },
-  lectureJoinIcon: {
-    width: 40,
-    height: 40,
-    borderRadius: 12,
-    backgroundColor: '#3B82F6',
     alignItems: 'center' as const,
     justifyContent: 'center' as const,
   },

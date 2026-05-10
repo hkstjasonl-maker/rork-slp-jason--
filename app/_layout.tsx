@@ -33,6 +33,8 @@ function RootLayoutNav() {
       <Stack.Screen name="flower-yield" options={{ headerShown: false, presentation: 'card' }} />
       <Stack.Screen name="gacha-draw" options={{ headerShown: false, presentation: 'card' }} />
       <Stack.Screen name="treasure-chest" options={{ headerShown: false, presentation: 'card' }} />
+      <Stack.Screen name="group-join" options={{ headerShown: false, presentation: 'card' }} />
+      <Stack.Screen name="group-participant" options={{ headerShown: false, presentation: 'fullScreenModal', gestureEnabled: false }} />
     </Stack>
   );
 }

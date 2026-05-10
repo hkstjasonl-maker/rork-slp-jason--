@@ -36,6 +36,7 @@ import {
   Dices,
   Captions,
   MessageSquare,
+  Users,
 } from 'lucide-react-native';
 import { AppTutorial } from '@/components/AppTutorial';
 import MiniMahjongGame from '@/components/MiniMahjongGame';
@@ -186,8 +187,30 @@ export default function SettingsScreen() {
 
           <View style={styles.section}>
             <TouchableOpacity
+              style={[styles.actionCard, styles.groupJoinCard]}
+              onPress={() => router.push('/group-join' as any)}
+              activeOpacity={0.85}
+              testID="join-group-button"
+            >
+              <View style={styles.groupJoinIcon}>
+                <Users size={22} color="#FFFFFF" />
+              </View>
+              <View style={styles.actionContent}>
+                <ScaledText size={15} weight="700" color={Colors.textPrimary}>
+                  {language === 'zh_hant' || language === 'zh_hans' ? '加入小組' : 'Join Group Session'}
+                </ScaledText>
+                <ScaledText size={13} color={Colors.textSecondary}>
+                  {language === 'zh_hant' || language === 'zh_hans' ? '掃描 QR 碼或輸入代碼' : 'Scan QR code or enter code'}
+                </ScaledText>
+              </View>
+              <ChevronRight size={18} color={Colors.disabled} />
+            </TouchableOpacity>
+          </View>
+
+          <View style={styles.section}>
+            <TouchableOpacity
               style={styles.actionCard}
-              onPress={() => router.push('/settings/feedback' as any)}
+              onPress={() => router.push('/settings/feedback' as any)
               activeOpacity={0.7}
               testID="feedback-support-button"
             >
@@ -770,5 +793,17 @@ const styles = StyleSheet.create({
     gap: 6,
     marginTop: 12,
     marginBottom: 10,
+  },
+  groupJoinCard: {
+    borderColor: '#C7D2FE',
+    backgroundColor: '#EEF2FF',
+  },
+  groupJoinIcon: {
+    width: 40,
+    height: 40,
+    borderRadius: 12,
+    backgroundColor: '#6366F1',
+    alignItems: 'center' as const,
+    justifyContent: 'center' as const,
   },
 });

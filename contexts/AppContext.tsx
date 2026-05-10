@@ -19,7 +19,61 @@ const STORAGE_KEYS = {
   TUTORIAL_COMPLETED: 'app_tutorial_completed',
   SUBTITLE_SIZE_LEVEL: 'app_subtitle_size_level',
   CONSENT_ACCEPTED: 'nanohab_consent_accepted',
+  GROUP_SESSION_ID: 'group_session_id',
+  GROUP_PARTICIPANT_ID: 'group_participant_id',
+  GROUP_PARTICIPANT_TOKEN: 'group_participant_token',
 };
+
+async function checkActiveGroupSession(): Promise<{ sessionId: string; participantId: string } | null> {
+  try {
+    const [sid, pid] = await Promise.all([
+      AsyncStorage.getItem(STORAGE_KEYS.GROUP_SESSION_ID),
+      AsyncStorage.getItem(STORAGE_KEYS.GROUP_PARTICIPANT_ID),
+    ]);
+    if (!sid || !pid) return null;
+    const { data: session } = await supabase
+      .from('group_sessions')
+      .select('id, status')
+      .eq('id', sid)
+      .maybeSingle();
+    if (!session || session.status === 'ended') {
+      await AsyncStorage.multiRemove([
+        STORAGE_KEYS.GROUP_SESSION_ID,
+        STORAGE_KEYS.GROUP_PARTICIPANT_ID,
+        STORAGE_KEYS.GROUP_PARTICIPANT_TOKEN,
+      ]);
+      return null;
+    }
+    const { data: participant } = await supabase
+      .from('group_participants')
+      .select('id, status, reconnection_count')
+      .eq('id', pid)
+      .maybeSingle();
+    if (!participant || (participant.status !== 'accepted' && participant.status !== 'active')) {
+      await AsyncStorage.multiRemove([
+        STORAGE_KEYS.GROUP_SESSION_ID,
+        STORAGE_KEYS.GROUP_PARTICIPANT_ID,
+        STORAGE_KEYS.GROUP_PARTICIPANT_TOKEN,
+      ]);
+      return null;
+    }
+    try {
+      await supabase
+        .from('group_participants')
+        .update({
+          reconnection_count: (participant.reconnection_count || 0) + 1,
+          last_seen_at: new Date().toISOString(),
+        })
+        .eq('id', pid);
+    } catch {}
+    return { sessionId: sid, participantId: pid };
+  } catch (e) {
+    log('[AppContext] checkActiveGroupSession error:', e);
+    return null;
+  }
+}
+
+export { checkActiveGroupSession };
 
 export const [AppProvider, useApp] = createContextHook(() => {
   const [language, setLanguageState] = useState<Language | null>(null);

@@ -37,6 +37,8 @@ function RootLayoutNav() {
       <Stack.Screen name="group-participant" options={{ headerShown: false, presentation: 'fullScreenModal', gestureEnabled: false }} />
       <Stack.Screen name="quiz-join" options={{ headerShown: false, presentation: 'card' }} />
       <Stack.Screen name="quiz-take" options={{ headerShown: false, presentation: 'fullScreenModal', gestureEnabled: false }} />
+      <Stack.Screen name="lecture-join" options={{ headerShown: false, presentation: 'card' }} />
+      <Stack.Screen name="lecture-viewer" options={{ headerShown: false, presentation: 'fullScreenModal', gestureEnabled: false }} />
     </Stack>
   );
 }

@@ -19,6 +19,35 @@ import Colors from '@/constants/colors';
 import { Patient } from '@/types';
 import { KeyRound } from 'lucide-react-native';
 import { log } from '@/lib/logger';
+import * as Device from 'expo-device';
+import * as Application from 'expo-application';
+import * as Localization from 'expo-localization';
+
+async function logLoginAudit(params: {
+  authUserId: string | null;
+  patientId: string | null;
+  success: boolean;
+  failureReason?: string;
+}) {
+  try {
+    const tz = Localization.getCalendars?.()[0]?.timeZone || null;
+    await supabase.from('login_audit_log').insert({
+      auth_user_id: params.authUserId,
+      user_type: 'patient',
+      patient_id: params.patientId,
+      login_method: 'access_code',
+      success: params.success,
+      failure_reason: params.failureReason || null,
+      device_model: Device.modelName || Device.deviceName || null,
+      device_os: Device.osName || null,
+      device_os_version: Device.osVersion || null,
+      app_version: Application.nativeApplicationVersion || null,
+      timezone: tz,
+    });
+  } catch (e) {
+    log('[CodeEntry] login_audit_log insert failed:', e);
+  }
+}
 
 export default function CodeEntryScreen() {
   const { t, setPatient, fontScale } = useApp();
@@ -38,8 +67,11 @@ export default function CodeEntryScreen() {
 
       if (signInError) {
         console.log('[CodeEntry] SignIn failed:', signInError.message);
+        await logLoginAudit({ authUserId: null, patientId: null, success: false, failureReason: signInError.message });
         throw new Error('Login failed. Please contact your therapist.\n登入失敗，請聯絡您的治療師。');
       }
+
+      const { data: { user: authUser } } = await supabase.auth.getUser();
 
       const { data, error } = await supabase
         .from('patients')
@@ -48,19 +80,24 @@ export default function CodeEntryScreen() {
         .single();
 
       if (error || !data) {
+        await logLoginAudit({ authUserId: authUser?.id || null, patientId: null, success: false, failureReason: 'invalid' });
         await supabase.auth.signOut();
         throw new Error('invalid');
       }
 
       if (data.is_frozen) {
+        await logLoginAudit({ authUserId: authUser?.id || null, patientId: data.id, success: false, failureReason: 'frozen' });
         await supabase.auth.signOut();
         throw new Error('frozen');
       }
 
       if (data.is_active === false) {
+        await logLoginAudit({ authUserId: authUser?.id || null, patientId: data.id, success: false, failureReason: 'inactive' });
         await supabase.auth.signOut();
         throw new Error('inactive');
       }
+
+      await logLoginAudit({ authUserId: authUser?.id || null, patientId: data.id, success: true });
 
       return data as Patient;
     },

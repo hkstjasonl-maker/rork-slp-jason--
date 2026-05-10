@@ -1,6 +1,23 @@
-import { AppState, AppStateStatus, Platform } from 'react-native';
+import { AppState, AppStateStatus, Dimensions, Platform } from 'react-native';
+import * as Device from 'expo-device';
+import * as Application from 'expo-application';
+import * as Localization from 'expo-localization';
 import { supabase } from '@/lib/supabase';
 import { log } from '@/lib/logger';
+
+export function getDeviceInfo() {
+  const { width, height } = Dimensions.get('window');
+  return {
+    device_model: Device.modelName || Device.deviceName || null,
+    device_os: Device.osName || Platform.OS,
+    device_os_version: Device.osVersion || String(Platform.Version),
+    app_version: Application.nativeApplicationVersion || Application.applicationId || null,
+    screen_width: Math.round(width),
+    screen_height: Math.round(height),
+    timezone: Localization.getCalendars?.()[0]?.timeZone || (Localization as unknown as { timezone?: string }).timezone || null,
+    language: Localization.getLocales?.()[0]?.languageTag || (Localization as unknown as { locale?: string }).locale || null,
+  };
+}
 
 let currentSessionId: string | null = null;
 let sessionStartTime: Date | null = null;
@@ -10,11 +27,13 @@ export async function startSession(patientId: string): Promise<void> {
     log('[Analytics] Starting session for patient:', patientId);
     sessionStartTime = new Date();
 
+    const deviceInfo = getDeviceInfo();
     const { data, error } = await supabase
       .from('app_sessions')
       .insert({
         patient_id: patientId,
         opened_at: sessionStartTime.toISOString(),
+        ...deviceInfo,
       })
       .select('id')
       .single();

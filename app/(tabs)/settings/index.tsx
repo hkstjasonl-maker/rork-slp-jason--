@@ -210,7 +210,7 @@ export default function SettingsScreen() {
           <View style={styles.section}>
             <TouchableOpacity
               style={styles.actionCard}
-              onPress={() => router.push('/settings/feedback' as any)
+              onPress={() => router.push('/settings/feedback' as any)}
               activeOpacity={0.7}
               testID="feedback-support-button"
             >

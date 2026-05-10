@@ -627,8 +627,8 @@ export default function ClinicalAssessmentScreen() {
         const { error } = await supabase
           .from('assessment_submissions')
           .update({
-            responses: answers,
-            subscale_scores: scores.subscale_scores,
+            responses: JSON.stringify(answers),
+            subscale_scores: JSON.stringify(scores.subscale_scores),
             total_score: scores.total_score,
             severity_rating: scores.severity_rating ?? null,
             language: langCode,
@@ -649,8 +649,8 @@ export default function ClinicalAssessmentScreen() {
             patient_id: patientId,
             assessment_id: assessmentId,
             language: langCode,
-            responses: answers,
-            subscale_scores: scores.subscale_scores,
+            responses: JSON.stringify(answers),
+            subscale_scores: JSON.stringify(scores.subscale_scores),
             total_score: scores.total_score,
             severity_rating: scores.severity_rating ?? null,
             status: 'completed',
@@ -749,8 +749,8 @@ export default function ClinicalAssessmentScreen() {
         const { error } = await supabase
           .from('assessment_submissions')
           .update({
-            responses: wizardAnswers,
-            subscale_scores: scores.subscale_scores,
+            responses: JSON.stringify(wizardAnswers),
+            subscale_scores: JSON.stringify(scores.subscale_scores),
             total_score: scores.total_score,
             severity_rating: scores.severity_rating ?? null,
             language: langCode,
@@ -771,8 +771,8 @@ export default function ClinicalAssessmentScreen() {
             patient_id: patientId,
             assessment_id: assessmentId,
             language: langCode,
-            responses: wizardAnswers,
-            subscale_scores: scores.subscale_scores,
+            responses: JSON.stringify(wizardAnswers),
+            subscale_scores: JSON.stringify(scores.subscale_scores),
             total_score: scores.total_score,
             severity_rating: scores.severity_rating ?? null,
             status: 'completed',
@@ -2083,17 +2083,16 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   scaleButton: {
-    minWidth: 48,
-    paddingVertical: 10,
-    paddingHorizontal: 6,
+    minWidth: 44,
+    minHeight: 44,
+    paddingVertical: 8,
+    paddingHorizontal: 8,
     borderRadius: 10,
     borderWidth: 1.5,
     borderColor: Colors.border,
     alignItems: 'center',
     justifyContent: 'center',
     backgroundColor: Colors.card,
-    flex: 1,
-    maxWidth: 80,
   },
   scaleButtonSelected: {
     backgroundColor: Colors.primary,

@@ -1434,7 +1434,7 @@ export default function ExerciseScreen() {
         <View style={{ flex: 1 }}>
           {mediaMode === 'split' && (
             <View style={isTablet ? styles.splitContainerTablet : { flex: 1 }}>
-              <View style={[isTablet ? styles.splitVideoSectionTablet : styles.splitVideoSection, !isTablet && { height: splitVideoHeight }]}>
+              <View style={[isTablet ? styles.splitVideoSectionTablet : styles.splitVideoSection, { height: splitVideoHeight }]}>
                 <SplitVideoLayer vimeoId={vimeoId} youtubeId={youtubeId} />
               </View>
               <View style={isTablet ? styles.splitMirrorSectionTablet : styles.splitMirrorSection}>

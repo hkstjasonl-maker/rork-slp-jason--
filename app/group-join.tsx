@@ -104,6 +104,26 @@ export default function GroupJoinScreen() {
       const { data: { user: authUser } } = await supabase.auth.getUser();
       const token = generateToken();
 
+      // Resolve display name with fallback to patients table to avoid 'Anonymous' on host side
+      let resolvedName = (patientName || '').trim();
+      if (!resolvedName) {
+        try {
+          const { data: patientRow } = await supabase
+            .from('patients')
+            .select('name, display_name, full_name')
+            .eq('id', patientId)
+            .maybeSingle();
+          resolvedName =
+            (patientRow?.name as string | undefined)?.trim() ||
+            (patientRow?.display_name as string | undefined)?.trim() ||
+            (patientRow?.full_name as string | undefined)?.trim() ||
+            '';
+        } catch (e) {
+          log('[GroupJoin] patient name lookup failed:', e);
+        }
+      }
+      if (!resolvedName) resolvedName = isZh ? '參加者' : 'Participant';
+
       // Check if there's already a participant record for this patient in this session
       const { data: existing } = await supabase
         .from('group_participants')
@@ -125,10 +145,17 @@ export default function GroupJoinScreen() {
             .update({
               status: 'requested',
               participant_token: token,
+              display_name: resolvedName,
               last_seen_at: new Date().toISOString(),
             })
             .eq('id', existing.id);
           pToken = token;
+        } else {
+          // ensure display_name is up-to-date for already-existing record
+          await supabase
+            .from('group_participants')
+            .update({ display_name: resolvedName, last_seen_at: new Date().toISOString() })
+            .eq('id', existing.id);
         }
       } else {
         const { data: inserted, error: insertErr } = await supabase
@@ -138,7 +165,7 @@ export default function GroupJoinScreen() {
             user_type: 'patient',
             patient_id: patientId,
             auth_user_id: authUser?.id || null,
-            display_name: patientName || (isZh ? '參加者' : 'Participant'),
+            display_name: resolvedName,
             status: 'requested',
             participant_token: token,
             last_seen_at: new Date().toISOString(),

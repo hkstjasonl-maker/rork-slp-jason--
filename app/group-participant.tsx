@@ -28,13 +28,23 @@ const STORAGE_KEYS = {
   PARTICIPANT_TOKEN: 'group_participant_token',
 };
 
+type StimulusData = {
+  word?: string;
+  phonetic?: string;
+  imageUrl?: string;
+  itemNumber?: number;
+  totalItems?: number;
+  category?: string;
+};
+
 type CurrentState = {
   type?: 'idle' | 'text' | 'image' | 'stimulus' | 'video' | 'instruction';
   title?: string;
   subtitle?: string;
   text?: string;
   imageUrl?: string;
-  stimulus?: { word?: string; phonetic?: string; imageUrl?: string };
+  stimulus?: StimulusData;
+  data?: StimulusData;
   [key: string]: unknown;
 } | null;
 
@@ -288,15 +298,21 @@ export default function GroupParticipantScreen() {
       );
     }
 
-    if (currentState.type === 'stimulus' && currentState.stimulus) {
-      const s = currentState.stimulus;
+    if (currentState.type === 'stimulus' && (currentState.data || currentState.stimulus)) {
+      const s = (currentState.data || currentState.stimulus) as StimulusData;
       return (
         <View style={styles.stimulusWrap}>
+          {s.itemNumber && s.totalItems ? (
+            <Text style={styles.contentSubtitle}>
+              {s.itemNumber} / {s.totalItems}
+            </Text>
+          ) : null}
           {s.imageUrl ? (
             <Image source={{ uri: s.imageUrl }} style={styles.stimulusImage} resizeMode="contain" />
           ) : null}
           {s.word ? <Text style={styles.stimulusWord}>{s.word}</Text> : null}
           {s.phonetic ? <Text style={styles.stimulusPhonetic}>{s.phonetic}</Text> : null}
+          {s.category ? <Text style={styles.contentSubtitle}>{s.category}</Text> : null}
         </View>
       );
     }

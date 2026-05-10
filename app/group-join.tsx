@@ -89,13 +89,13 @@ export default function GroupJoinScreen() {
       log('[GroupJoin] Looking up session:', sessionCode);
       const { data: session, error: sessionErr } = await supabase
         .from('group_sessions')
-        .select('id, status, session_name, host_user_id')
+        .select('id, status, session_name, host_clinician_id')
         .eq('session_code', sessionCode)
         .in('status', ['waiting', 'active'])
         .maybeSingle();
 
       if (sessionErr || !session) {
-        log('[GroupJoin] Session lookup error:', sessionErr);
+        log('[GroupJoin] Session lookup error:', sessionErr?.message, 'code:', sessionCode);
         setError(isZh ? '找不到或已過期' : 'Session not found or expired');
         setSubmitting(false);
         return;

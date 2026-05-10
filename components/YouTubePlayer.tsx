@@ -1,6 +1,7 @@
 import React, { useCallback, useRef } from 'react';
 import { View, Text, StyleSheet, Platform } from 'react-native';
 import { log } from '@/lib/logger';
+import { extractYouTubeId } from '@/utils/videoId';
 import { FULLSCREEN_PREVENTION_CSS, INJECTED_JS_BEFORE_LOAD } from '@/lib/fullscreenPrevention';
 
 interface YouTubePlayerProps {
@@ -110,7 +111,8 @@ function onYouTubeIframeAPIReady(){
 </body></html>`;
 }
 
-function YouTubePlayerInner({ videoId, height, onEnd }: YouTubePlayerProps) {
+function YouTubePlayerInner({ videoId: rawVideoId, height, onEnd }: YouTubePlayerProps) {
+  const videoId = extractYouTubeId(rawVideoId);
   const webViewRef = useRef<any>(null);
 
   const handleMessage = useCallback((event: { nativeEvent: { data: string } }) => {

@@ -4,6 +4,7 @@ import { VideoOff } from 'lucide-react-native';
 import { ScaledText } from '@/components/ScaledText';
 import Colors from '@/constants/colors';
 import { log } from '@/lib/logger';
+import { extractVimeoId } from '@/utils/videoId';
 import { FULLSCREEN_PREVENTION_CSS, INJECTED_JS_BEFORE_LOAD } from '@/lib/fullscreenPrevention';
 
 interface VimeoPlayerProps {
@@ -13,7 +14,8 @@ interface VimeoPlayerProps {
   lowQuality?: boolean;
 }
 
-function VimeoPlayerInner({ videoId, height, onEnd, lowQuality }: VimeoPlayerProps) {
+function VimeoPlayerInner({ videoId: rawVideoId, height, onEnd, lowQuality }: VimeoPlayerProps) {
+  const videoId = extractVimeoId(rawVideoId);
   const [loading, setLoading] = useState(true);
   const webViewRef = useRef<any>(null);
 

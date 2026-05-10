@@ -45,6 +45,7 @@ import Colors from '@/constants/colors';
 import { TherapistImage } from '@/components/TherapistImage';
 import { Exercise, ExerciseLog, Language, ExerciseReviewRequirement } from '@/types';
 import { log } from '@/lib/logger';
+import { extractVimeoId, extractYouTubeId } from '@/utils/videoId';
 import { FULLSCREEN_PREVENTION_CSS, FULLSCREEN_PREVENTION_JS, INJECTED_JS_BEFORE_LOAD } from '@/lib/fullscreenPrevention';
 import {
   fetchReviewRequirement,
@@ -94,13 +95,13 @@ function formatElapsed(seconds: number): string {
 }
 
 function getVimeoId(exercise: Exercise): string | null {
-  const id = exercise.vimeo_video_id;
-  return (id && typeof id === 'string' && id.trim().length > 0) ? id.trim() : null;
+  const extracted = extractVimeoId(exercise.vimeo_video_id);
+  return extracted.length > 0 ? extracted : null;
 }
 
 function getYouTubeId(exercise: Exercise): string | null {
-  const id = exercise.youtube_video_id;
-  return (id && typeof id === 'string' && id.trim().length > 0) ? id.trim() : null;
+  const extracted = extractYouTubeId(exercise.youtube_video_id);
+  return extracted.length > 0 ? extracted : null;
 }
 
 const LiveCamera = forwardRef<CameraView, { onCameraReady?: () => void; cameraMode?: 'picture' | 'video' }>(

@@ -34,6 +34,7 @@ import { FacePositionGuide } from '@/components/FacePositionGuide';
 import Colors from '@/constants/colors';
 import { FeedingSkillAssignment, FeedingSkillReviewRequirement, Language } from '@/types';
 import { log } from '@/lib/logger';
+import { extractVimeoId, extractYouTubeId } from '@/utils/videoId';
 import { burnWatermarkIntoVideo } from '@/lib/videoProcessing';
 import {
   fetchFeedingSkillReviewRequirement,
@@ -292,8 +293,14 @@ export default function FeedingSkillPlayerScreen() {
   const title = useMemo(() => video ? getFeedingTitle(video, language) : '', [video, language]);
   const description = useMemo(() => video ? getFeedingDescription(video, language) : null, [video, language]);
 
-  const vimeoId = video?.vimeo_video_id || null;
-  const youtubeId = video?.youtube_video_id || null;
+  const vimeoId = useMemo(() => {
+    const v = extractVimeoId(video?.vimeo_video_id);
+    return v.length > 0 ? v : null;
+  }, [video?.vimeo_video_id]);
+  const youtubeId = useMemo(() => {
+    const y = extractYouTubeId(video?.youtube_video_id);
+    return y.length > 0 ? y : null;
+  }, [video?.youtube_video_id]);
 
   const isInMirror = mediaMode !== 'video';
 

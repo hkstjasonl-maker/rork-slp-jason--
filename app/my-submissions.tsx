@@ -10,7 +10,7 @@ import {
 } from 'react-native';
 import { useRouter, useFocusEffect } from 'expo-router';
 import { useQuery } from '@tanstack/react-query';
-import { ArrowLeft, Video, Clock, Star, AlertTriangle, CheckCircle2, MessageSquare, Utensils } from 'lucide-react-native';
+import { ArrowLeft, Video, VideoOff, Clock, Star, AlertTriangle, CheckCircle2, MessageSquare, Utensils } from 'lucide-react-native';
 import { useApp } from '@/contexts/AppContext';
 import { ScaledText } from '@/components/ScaledText';
 import { CopyrightFooter } from '@/components/CopyrightFooter';
@@ -31,6 +31,8 @@ type UnifiedSubmission = {
   submission_date: string;
   created_at?: string;
   source: 'exercise' | 'feeding';
+  video_url: string | null;
+  is_archived: boolean;
 };
 
 function getStatusColor(status: ReviewStatus): string {
@@ -166,6 +168,8 @@ export default function MySubmissionsScreen() {
       submission_date: s.submission_date,
       created_at: s.created_at,
       source: 'exercise' as const,
+      video_url: (s as { video_url: string | null }).video_url ?? null,
+      is_archived: Boolean((s as { is_archived?: boolean }).is_archived),
     }));
     const feedingSubs: UnifiedSubmission[] = (feedingSubmissionsQuery.data || []).map((s) => ({
       id: s.id,
@@ -177,6 +181,8 @@ export default function MySubmissionsScreen() {
       submission_date: s.submission_date,
       created_at: s.created_at,
       source: 'feeding' as const,
+      video_url: (s as { video_url: string | null }).video_url ?? null,
+      is_archived: Boolean((s as { is_archived?: boolean }).is_archived),
     }));
     const all = [...exerciseSubs, ...feedingSubs];
     all.sort((a, b) => {
@@ -347,6 +353,8 @@ function SubmissionCard({
 
   const isRedo = submission.review_status === 'redo_requested';
   const isFeeding = submission.source === 'feeding';
+  const isZh = language === 'zh_hant' || language === 'zh_hans';
+  const isVideoRemoved = submission.video_url === null && submission.is_archived === true;
 
   return (
     <View style={[styles.card, isRedo && styles.cardRedo]}>
@@ -405,6 +413,22 @@ function SubmissionCard({
           <View style={styles.starsRow}>
             {renderStars(submission.rating)}
           </View>
+        </View>
+      )}
+
+      {isVideoRemoved && (
+        <View style={styles.removedWrap}>
+          <View style={styles.removedBadge}>
+            <VideoOff size={12} color="#6B7280" />
+            <ScaledText size={11} weight="600" color="#6B7280">
+              {isZh ? '影片已刪除' : 'Video removed'}
+            </ScaledText>
+          </View>
+          <ScaledText size={11} color="#9CA3AF" style={styles.removedNote}>
+            {isZh
+              ? '影片檔案已刪除。回饋已保留供參考。'
+              : 'Video file was removed. Feedback is kept for your reference.'}
+          </ScaledText>
         </View>
       )}
 
@@ -565,6 +589,26 @@ const styles = StyleSheet.create({
   },
   notesText: {
     lineHeight: 20,
+  },
+  removedWrap: {
+    marginTop: 10,
+    gap: 4,
+  },
+  removedBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    alignSelf: 'flex-start',
+    backgroundColor: '#F3F4F6',
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 999,
+  },
+  removedNote: {
+    fontStyle: 'italic',
+    lineHeight: 16,
   },
   sourceBadge: {
     backgroundColor: '#FEF3E2',

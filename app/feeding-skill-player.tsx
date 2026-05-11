@@ -37,7 +37,7 @@ import { log } from '@/lib/logger';
 import { extractVimeoId, extractYouTubeId } from '@/utils/videoId';
 import { burnWatermarkIntoVideo } from '@/lib/videoProcessing';
 import {
-  fetchFeedingSkillReviewRequirement,
+  fetchFeedingReviewRequirement,
   countTodayFeedingSubmissions,
   uploadAndSubmitFeedingVideo,
   isTodayAllowed,
@@ -277,7 +277,7 @@ export default function FeedingSkillPlayerScreen() {
     if (!patientId || !assignmentQuery.data?.feeding_skill_videos) return;
     const checkReviewReq = async () => {
       const videoId = assignmentQuery.data!.video_id;
-      const req = await fetchFeedingSkillReviewRequirement(patientId, videoId);
+      const req = await fetchFeedingReviewRequirement(patientId, videoId);
       setReviewRequirement(req);
       if (req) {
         const count = await countTodayFeedingSubmissions(req.id);

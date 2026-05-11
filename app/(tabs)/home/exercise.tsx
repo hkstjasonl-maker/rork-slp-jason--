@@ -1824,7 +1824,7 @@ export default function ExerciseScreen() {
               </View>
 
               <View style={styles.titleSection}>
-                <ScaledText size={22} weight="bold" color={Colors.textPrimary}>
+                <ScaledText size={22} weight="bold" color={Colors.textPrimary} style={styles.titleText}>
                   {getExerciseTitle(exercise, language)}
                 </ScaledText>
                 {exercise.category && (
@@ -1853,19 +1853,46 @@ export default function ExerciseScreen() {
 
 
 
-              <TouchableOpacity
-                style={styles.mirrorButton}
-                onPress={handleOpenMirror}
-                activeOpacity={0.8}
-                testID="open-mirror-button"
-                accessibilityLabel={t('openMirror')}
-                accessibilityRole="button"
-              >
-                <Camera size={20} color={Colors.white} />
-                <ScaledText size={15} weight="600" color={Colors.white}>
-                  {t('openMirror')}
-                </ScaledText>
-              </TouchableOpacity>
+              <View style={styles.actionButtonsContainer}>
+                <TouchableOpacity
+                  style={styles.mirrorButton}
+                  onPress={handleOpenMirror}
+                  activeOpacity={0.8}
+                  testID="open-mirror-button"
+                  accessibilityLabel={t('openMirror')}
+                  accessibilityRole="button"
+                >
+                  <Camera size={20} color={Colors.white} />
+                  <ScaledText size={15} weight="600" color={Colors.white}>
+                    {t('openMirror')}
+                  </ScaledText>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  style={[
+                    styles.completeButton,
+                    completeMutation.isPending && styles.completeButtonLoading,
+                    isCompletedThisSession && !completeMutation.isPending && styles.completeButtonDone,
+                  ]}
+                  onPress={handleMarkComplete}
+                  disabled={completeMutation.isPending}
+                  activeOpacity={0.8}
+                  testID="mark-complete-button"
+                  accessibilityLabel={t('markComplete')}
+                  accessibilityRole="button"
+                >
+                  {completeMutation.isPending ? (
+                    <ActivityIndicator color={Colors.white} />
+                  ) : (
+                    <>
+                      <CheckCircle size={22} color={Colors.white} />
+                      <ScaledText size={18} weight="bold" color={Colors.white} style={styles.completeText}>
+                        {isCompletedThisSession ? t('markCompleteAgain') : t('markComplete')}
+                      </ScaledText>
+                    </>
+                  )}
+                </TouchableOpacity>
+              </View>
 
               {exercise.modifications && (
                 <View style={styles.modificationsCard}>
@@ -1880,31 +1907,6 @@ export default function ExerciseScreen() {
                   </ScaledText>
                 </View>
               )}
-
-              <TouchableOpacity
-                style={[
-                  styles.completeButton,
-                  completeMutation.isPending && styles.completeButtonLoading,
-                  isCompletedThisSession && !completeMutation.isPending && styles.completeButtonDone,
-                ]}
-                onPress={handleMarkComplete}
-                disabled={completeMutation.isPending}
-                activeOpacity={0.8}
-                testID="mark-complete-button"
-                accessibilityLabel={t('markComplete')}
-                accessibilityRole="button"
-              >
-                {completeMutation.isPending ? (
-                  <ActivityIndicator color={Colors.white} />
-                ) : (
-                  <>
-                    <CheckCircle size={22} color={Colors.white} />
-                    <ScaledText size={18} weight="bold" color={Colors.white} style={styles.completeText}>
-                      {isCompletedThisSession ? t('markCompleteAgain') : t('markComplete')}
-                    </ScaledText>
-                  </>
-                )}
-              </TouchableOpacity>
 
               {isCompletedThisSession && (
                 <ScaledText size={13} color={Colors.success} style={styles.completedHint}>
@@ -2418,7 +2420,17 @@ const styles = StyleSheet.create({
   },
   titleSection: {
     paddingHorizontal: 20,
+    marginTop: 16,
     marginBottom: 16,
+  },
+  titleText: {
+    flexShrink: 1,
+  },
+  actionButtonsContainer: {
+    paddingHorizontal: 20,
+    marginTop: 16,
+    marginBottom: 16,
+    gap: 12,
   },
   metaRow: {
     flexDirection: 'row',
@@ -2451,8 +2463,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     gap: 8,
-    marginHorizontal: 20,
-    marginBottom: 16,
     paddingVertical: 14,
     borderRadius: 14,
     backgroundColor: Colors.primaryDark,
@@ -2476,7 +2486,6 @@ const styles = StyleSheet.create({
     lineHeight: 22,
   },
   completeButton: {
-    marginHorizontal: 20,
     backgroundColor: Colors.success,
     flexDirection: 'row',
     alignItems: 'center',

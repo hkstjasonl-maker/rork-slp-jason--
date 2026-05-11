@@ -600,7 +600,7 @@ export default function ExerciseScreen() {
   const [cameraMode, setCameraMode] = useState<'picture' | 'video'>('picture');
   const { width: screenWidth, height: screenHeight } = useWindowDimensions();
   const isTablet = screenWidth >= 768;
-  const videoHeight = isTablet ? Math.round(screenHeight * 0.45) : 220;
+  const videoHeight = isTablet ? Math.round(screenHeight * 0.4) : Math.round(screenHeight * 0.3);
   const splitVideoHeight = isTablet ? Math.round(screenHeight * 0.35) : 200;
   const [videoZoom, setVideoZoom] = useState<number>(isTablet ? 1.5 : 1);
 
@@ -1784,44 +1784,47 @@ export default function ExerciseScreen() {
               contentContainerStyle={styles.scrollContent}
               showsVerticalScrollIndicator={false}
             >
-              <View style={[styles.videoSection, isTablet && { height: videoHeight * videoZoom, overflow: 'hidden' }]}>
-                <View style={isTablet ? { transform: [{ scale: videoZoom }], width: '100%', height: '100%' } : { width: '100%', height: '100%' }}>
-                  <VideoProtectionOverlay patientName={patientName ?? ''} height={videoHeight}>
-                    <ExerciseVideoPlayer exercise={exercise} height={videoHeight} />
-                  </VideoProtectionOverlay>
+              {(vimeoId || youtubeId) && (
+                <View style={[styles.videoSection, { height: isTablet ? videoHeight * videoZoom : videoHeight, overflow: 'hidden' }]}>
+                  <View style={isTablet ? { transform: [{ scale: videoZoom }], width: '100%', height: '100%' } : { width: '100%', height: '100%' }}>
+                    <VideoProtectionOverlay patientName={patientName ?? ''} height={videoHeight}>
+                      <ExerciseVideoPlayer exercise={exercise} height={videoHeight} />
+                    </VideoProtectionOverlay>
+                  </View>
+                  {isTablet && (
+                    <View style={styles.zoomControls} pointerEvents="box-none">
+                      {[1.5, 2].map((level) => (
+                        <TouchableOpacity
+                          key={level}
+                          style={[styles.zoomButton, videoZoom === level && styles.zoomButtonActive]}
+                          onPress={() => setVideoZoom(level)}
+                          activeOpacity={0.7}
+                          testID={`main-zoom-${level}`}
+                        >
+                          <ScaledText size={14} weight="700" color={videoZoom === level ? '#FFFFFF' : 'rgba(255,255,255,0.5)'}>
+                            {`${level}x`}
+                          </ScaledText>
+                        </TouchableOpacity>
+                      ))}
+                    </View>
+                  )}
                 </View>
-                {isTablet && (
-                  <View style={styles.zoomControls} pointerEvents="box-none">
-                    {[1.5, 2].map((level) => (
-                      <TouchableOpacity
-                        key={level}
-                        style={[styles.zoomButton, videoZoom === level && styles.zoomButtonActive]}
-                        onPress={() => setVideoZoom(level)}
-                        activeOpacity={0.7}
-                        testID={`main-zoom-${level}`}
-                      >
-                        <ScaledText size={14} weight="700" color={videoZoom === level ? '#FFFFFF' : 'rgba(255,255,255,0.5)'}>
-                          {`${level}x`}
-                        </ScaledText>
-                      </TouchableOpacity>
-                    ))}
-                  </View>
-                )}
-                <Animated.View
-                  style={[
-                    styles.slpBubbleRow,
-                    { opacity: bubbleFade, transform: [{ translateY: bubbleSlide }] },
-                  ]}
-                >
-                  <TherapistImage type="cartoon" style={styles.slpAvatar} />
-                  <View style={styles.speechBubble}>
-                    <View style={styles.speechBubbleArrow} />
-                    <ScaledText size={13} color={Colors.textPrimary} style={styles.speechBubbleText}>
-                      {t('askSlpHint')}
-                    </ScaledText>
-                  </View>
-                </Animated.View>
-              </View>
+              )}
+
+              <Animated.View
+                style={[
+                  styles.slpBubbleRow,
+                  { opacity: bubbleFade, transform: [{ translateY: bubbleSlide }] },
+                ]}
+              >
+                <TherapistImage type="cartoon" style={styles.slpAvatar} />
+                <View style={styles.speechBubble}>
+                  <View style={styles.speechBubbleArrow} />
+                  <ScaledText size={13} color={Colors.textPrimary} style={styles.speechBubbleText}>
+                    {t('askSlpHint')}
+                  </ScaledText>
+                </View>
+              </Animated.View>
 
               <View style={styles.titleSection}>
                 <ScaledText size={22} weight="bold" color={Colors.textPrimary} style={styles.titleText}>
@@ -2371,11 +2374,14 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   scrollContent: {
-    paddingBottom: 24,
+    paddingBottom: 100,
   },
   videoSection: {
-    paddingHorizontal: 16,
-    marginBottom: 20,
+    marginHorizontal: 16,
+    marginBottom: 8,
+    borderRadius: 12,
+    overflow: 'hidden' as const,
+    backgroundColor: '#000',
   },
   videoPlayerWrapper: {
     position: 'relative' as const,
@@ -2384,6 +2390,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'flex-start',
     marginTop: 12,
+    marginHorizontal: 16,
     paddingHorizontal: 4,
   },
   slpAvatar: {

@@ -334,9 +334,10 @@ export default function HomeScreen() {
       const today = new Date().toISOString().split('T')[0];
       const { data, error } = await supabase
         .from('exercise_programs')
-        .select('*, exercises(*)')
+        .select('*, exercises(*, exercise_library!inner(media_status))')
         .eq('patient_id', patientId!)
         .eq('is_active', true)
+        .eq('exercises.exercise_library.media_status', 'active')
         .lte('issue_date', today)
         .gte('expiry_date', today)
         .order('sort_order', { ascending: true });

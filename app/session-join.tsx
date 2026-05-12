@@ -371,7 +371,7 @@ export default function SessionJoinScreen() {
 
       const { data: existing } = await supabase
         .from('lecture_attendees')
-        .select('id, attendee_token')
+        .select('id, participant_token')
         .eq('event_id', lectureEvent.id)
         .eq('patient_id', patientId || '')
         .maybeSingle();
@@ -381,7 +381,7 @@ export default function SessionJoinScreen() {
 
       if (existing) {
         attendeeId = existing.id;
-        attendeeToken = existing.attendee_token || token;
+        attendeeToken = existing.participant_token || token;
         await supabase
           .from('lecture_attendees')
           .update({
@@ -399,9 +399,9 @@ export default function SessionJoinScreen() {
             auth_user_id: authUser?.id || null,
             display_name: name,
             email: email.trim() || null,
-            attendee_token: token,
+            participant_token: token,
             status: 'joined',
-            joined_at: new Date().toISOString(),
+            first_join_at: new Date().toISOString(),
             last_seen_at: new Date().toISOString(),
             ...(registrationId ? { registration_id: registrationId, auto_approved: true } : {}),
           })

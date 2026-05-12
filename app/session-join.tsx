@@ -409,8 +409,9 @@ export default function SessionJoinScreen() {
           .single();
 
         if (insertErr || !inserted) {
+          console.log('[SessionJoin] insert attendee error:', JSON.stringify(insertErr));
           log('[SessionJoin] insert attendee failed:', insertErr);
-          setError(isZh ? '加入失敗，請再試' : 'Failed to join, please try again');
+          setError(insertErr?.message || (isZh ? '加入失敗，請再試' : 'Failed to join, please try again'));
           setSubmitting(false);
           return;
         }
@@ -433,8 +434,10 @@ export default function SessionJoinScreen() {
         },
       } as never);
     } catch (e) {
+      console.log('[SessionJoin] submit lecture exception:', JSON.stringify(e instanceof Error ? { message: e.message, stack: e.stack } : e));
       log('[SessionJoin] submit lecture error:', e);
-      setError(isZh ? '網絡錯誤' : 'Network error');
+      const msg = e instanceof Error ? e.message : null;
+      setError(msg || (isZh ? '網絡錯誤' : 'Network error'));
     } finally {
       setSubmitting(false);
     }

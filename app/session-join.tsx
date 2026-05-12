@@ -17,7 +17,8 @@ import {
 import { useRouter } from 'expo-router';
 import { CameraView, useCameraPermissions } from 'expo-camera';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { QrCode, Keyboard, X, ScanLine, ArrowLeft, GraduationCap, User, Mail, Calendar, Mic } from 'lucide-react-native';
+import { QrCode, Keyboard, X, ScanLine, ArrowLeft, GraduationCap, User, Mail, Calendar, Mic, AlertTriangle, Ticket } from 'lucide-react-native';
+import { Linking } from 'react-native';
 import { useApp } from '@/contexts/AppContext';
 import { supabase } from '@/lib/supabase';
 import { log } from '@/lib/logger';
@@ -44,6 +45,14 @@ type LectureEvent = {
   speaker_name?: string | null;
   scheduled_at?: string | null;
   session_code?: string | null;
+  requires_registration?: boolean | null;
+  requires_payment?: boolean | null;
+  ticket_price?: number | null;
+  ticket_currency?: string | null;
+  title_en?: string | null;
+  title_zh?: string | null;
+  speaker_name_en?: string | null;
+  speaker_name_zh?: string | null;
 };
 
 function generateToken(): string {
@@ -232,7 +241,7 @@ export default function SessionJoinScreen() {
       // 3. Try lecture_events
       const { data: lectureRow } = await supabase
         .from('lecture_events')
-        .select('id, status, title, speaker_name, scheduled_at, session_code')
+        .select('id, status, title, speaker_name, scheduled_at, session_code, requires_registration, requires_payment, ticket_price, ticket_currency, title_en, title_zh, speaker_name_en, speaker_name_zh')
         .eq('session_code', sessionCode)
         .in('status', ['scheduled', 'live'])
         .maybeSingle();
@@ -316,6 +325,50 @@ export default function SessionJoinScreen() {
     setSubmitting(true);
     try {
       const { data: { user: authUser } } = await supabase.auth.getUser();
+
+      // Registration check for paid/registered events
+      let registrationId: string | null = null;
+      try {
+        const { data: regResult, error: regErr } = await supabase.rpc('check_lecture_registration', {
+          p_event_id: lectureEvent.id,
+          p_auth_user_id: authUser?.id || null,
+        });
+        if (regErr) {
+          log('[SessionJoin] check_lecture_registration error:', regErr);
+        }
+        const result = (Array.isArray(regResult) ? regResult[0] : regResult) as { status?: string; registration_id?: string | null } | null;
+        const status = result?.status;
+        if (status === 'not_registered') {
+          setSubmitting(false);
+          const title = isZh ? '需要登記 Registration Required' : 'Registration Required 需要登記';
+          const msg = isZh
+            ? '您必須先登記此活動才可加入。請前往我們的網站登記。\nYou need to register for this event before joining. Please visit our website to register.'
+            : 'You need to register for this event before joining. Please visit our website to register.\n您必須先登記此活動才可加入。請前往我們的網站登記。';
+          if (Platform.OS === 'web') window.alert(`${title}\n\n${msg}`);
+          else Alert.alert(title, msg);
+          return;
+        }
+        if (status === 'payment_pending') {
+          setSubmitting(false);
+          const title = isZh ? '付款待確認 Payment Pending' : 'Payment Pending 付款待確認';
+          const msg = isZh
+            ? '已找到您的登記，但付款尚未確認。請聯絡主辦方。\nYour registration was found but payment has not been confirmed yet. Please contact the organizer.'
+            : 'Your registration was found but payment has not been confirmed yet. Please contact the organizer.\n已找到您的登記，但付款尚未確認。請聯絡主辦方。';
+          if (Platform.OS === 'web') {
+            window.alert(`${title}\n\n${msg}`);
+          } else {
+            Alert.alert(title, msg, [
+              { text: isZh ? '聯絡 Contact' : 'Contact 聯絡', onPress: () => { void Linking.openURL('mailto:info@dravive.com'); } },
+              { text: isZh ? '取消 Cancel' : 'Cancel 取消', style: 'cancel' },
+            ]);
+          }
+          return;
+        }
+        registrationId = result?.registration_id || null;
+      } catch (regCatchErr) {
+        log('[SessionJoin] registration check threw:', regCatchErr);
+      }
+
       const token = generateToken();
 
       const { data: existing } = await supabase
@@ -352,6 +405,7 @@ export default function SessionJoinScreen() {
             status: 'joined',
             joined_at: new Date().toISOString(),
             last_seen_at: new Date().toISOString(),
+            ...(registrationId ? { registration_id: registrationId, auto_approved: true } : {}),
           })
           .select('id')
           .single();
@@ -543,7 +597,26 @@ export default function SessionJoinScreen() {
                       : (isZh ? '即將開始' : 'Scheduled')}
                   </Text>
                 </View>
+                {lectureEvent.requires_payment && typeof lectureEvent.ticket_price === 'number' && lectureEvent.ticket_price > 0 ? (
+                  <View style={styles.ticketRow}>
+                    <Ticket size={14} color="#92400E" />
+                    <Text style={styles.ticketText}>
+                      {(isZh ? '門票' : 'Ticket')}: {(lectureEvent.ticket_currency || 'HKD')} {lectureEvent.ticket_price}
+                    </Text>
+                  </View>
+                ) : null}
               </View>
+
+              {lectureEvent.requires_registration ? (
+                <View style={styles.regBanner}>
+                  <AlertTriangle size={18} color="#92400E" />
+                  <Text style={styles.regBannerText}>
+                    {isZh
+                      ? '此活動需要登記。您必須先登記並付款才能加入。\nThis event requires registration. You must register and pay before joining.'
+                      : 'This event requires registration. You must register and pay before joining.\n此活動需要登記。您必須先登記並付款才能加入。'}
+                  </Text>
+                </View>
+              ) : null}
 
               <Text style={styles.sectionLabel}>
                 {isZh ? '輸入您希望顯示在證書上的名稱' : 'Enter your name as you want it on the certificate'}
@@ -849,5 +922,34 @@ const styles = StyleSheet.create({
     fontSize: 15,
     color: '#1F2937',
     fontWeight: '500',
+  },
+  ticketRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    marginTop: 8,
+  },
+  ticketText: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#92400E',
+  },
+  regBanner: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 10,
+    backgroundColor: '#FEF3C7',
+    borderWidth: 1,
+    borderColor: '#FDE68A',
+    borderRadius: 12,
+    padding: 12,
+    marginBottom: 4,
+  },
+  regBannerText: {
+    flex: 1,
+    fontSize: 12,
+    lineHeight: 17,
+    color: '#78350F',
+    fontWeight: '600',
   },
 });

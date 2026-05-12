@@ -37,6 +37,7 @@ import {
   Captions,
   MessageSquare,
   Users,
+  Film,
 } from 'lucide-react-native';
 import { AppTutorial } from '@/components/AppTutorial';
 import MiniMahjongGame from '@/components/MiniMahjongGame';
@@ -187,8 +188,30 @@ export default function SettingsScreen() {
 
           <View style={styles.section}>
             <TouchableOpacity
+              style={[styles.actionCard, styles.freeVideosCard]}
+              onPress={() => router.push('/free-videos' as any)}
+              activeOpacity={0.85}
+              testID="free-videos-button"
+            >
+              <View style={styles.freeVideosIcon}>
+                <Film size={22} color="#FFFFFF" />
+              </View>
+              <View style={styles.actionContent}>
+                <ScaledText size={15} weight="700" color={Colors.textPrimary}>
+                  {language === 'zh_hant' || language === 'zh_hans' ? '免費影片' : 'Free Videos'}
+                </ScaledText>
+                <ScaledText size={13} color={Colors.textSecondary}>
+                  {language === 'zh_hant' || language === 'zh_hans' ? '觀看教育及介紹影片' : 'Watch educational content'}
+                </ScaledText>
+              </View>
+              <ChevronRight size={18} color={Colors.disabled} />
+            </TouchableOpacity>
+          </View>
+
+          <View style={styles.section}>
+            <TouchableOpacity
               style={[styles.actionCard, styles.groupJoinCard]}
-              onPress={() => router.push('/session-join' as any)}
+              onPress={() => router.push('/session-join' as any)
               activeOpacity={0.85}
               testID="join-session-button"
             >
@@ -797,6 +820,18 @@ const styles = StyleSheet.create({
   groupJoinCard: {
     borderColor: '#C7D2FE',
     backgroundColor: '#EEF2FF',
+  },
+  freeVideosCard: {
+    borderColor: '#FECACA',
+    backgroundColor: '#FEF2F2',
+  },
+  freeVideosIcon: {
+    width: 40,
+    height: 40,
+    borderRadius: 12,
+    backgroundColor: '#EF4444',
+    alignItems: 'center' as const,
+    justifyContent: 'center' as const,
   },
   groupJoinIcon: {
     width: 40,

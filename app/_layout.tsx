@@ -42,6 +42,8 @@ function RootLayoutNav() {
       <Stack.Screen name="quiz-take" options={{ headerShown: false, presentation: 'fullScreenModal', gestureEnabled: false }} />
       <Stack.Screen name="lecture-join" options={{ headerShown: false, presentation: 'card' }} />
       <Stack.Screen name="lecture-viewer" options={{ headerShown: false, presentation: 'fullScreenModal', gestureEnabled: false }} />
+      <Stack.Screen name="free-videos" options={{ headerShown: false, presentation: 'card' }} />
+      <Stack.Screen name="video-player" options={{ headerShown: false, presentation: 'card' }} />
     </Stack>
   );
 }

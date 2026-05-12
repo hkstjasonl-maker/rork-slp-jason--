@@ -334,10 +334,9 @@ export default function HomeScreen() {
       const today = new Date().toISOString().split('T')[0];
       const { data, error } = await supabase
         .from('exercise_programs')
-        .select('*, exercises(*, exercise_library!inner(media_status))')
+        .select('*, exercises(*, exercise_library(media_status))')
         .eq('patient_id', patientId!)
         .eq('is_active', true)
-        .eq('exercises.exercise_library.media_status', 'active')
         .lte('issue_date', today)
         .gte('expiry_date', today)
         .order('sort_order', { ascending: true });
@@ -350,6 +349,11 @@ export default function HomeScreen() {
       if (data) {
         for (const p of data) {
           if (p.exercises) {
+            p.exercises = p.exercises.filter((ex: any) => {
+              if (!ex.exercise_library) return true;
+              const status = ex.exercise_library.media_status;
+              return !status || status === 'active';
+            });
             p.exercises.sort((a: Exercise, b: Exercise) => a.sort_order - b.sort_order);
           }
         }

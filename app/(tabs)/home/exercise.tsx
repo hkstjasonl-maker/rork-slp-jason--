@@ -733,14 +733,20 @@ export default function ExerciseScreen() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from('exercise_programs')
-        .select('*, exercises(*, exercise_library!inner(media_status))')
+        .select('*, exercises(*, exercise_library(media_status))')
         .eq('patient_id', patientId!)
         .eq('is_active', true)
-        .eq('exercises.exercise_library.media_status', 'active')
         .order('created_at', { ascending: false })
         .limit(1)
         .single();
       if (error) throw error;
+      if (data && Array.isArray((data as any).exercises)) {
+        (data as any).exercises = (data as any).exercises.filter((ex: any) => {
+          if (!ex.exercise_library) return true;
+          const status = ex.exercise_library.media_status;
+          return !status || status === 'active';
+        });
+      }
       return data;
     },
     enabled: !!patientId,

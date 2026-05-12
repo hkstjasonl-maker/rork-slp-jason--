@@ -15,10 +15,12 @@ import {
   ScrollView,
   Dimensions,
   KeyboardAvoidingView,
+  Image,
+  Linking,
 } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { LogOut, Users, Wifi, ChevronDown, Check, Award, Clock, ClipboardList, GraduationCap } from 'lucide-react-native';
+import { LogOut, Users, Wifi, ChevronDown, Check, Award, Clock, ClipboardList, GraduationCap, Calendar, User as UserIcon } from 'lucide-react-native';
 import { useApp } from '@/contexts/AppContext';
 import { supabase } from '@/lib/supabase';
 import { log } from '@/lib/logger';
@@ -39,11 +41,19 @@ const STORAGE_KEYS = {
 
 type SubtitleMap = Record<string, string>;
 
+type SponsorBanner = {
+  image_url?: string;
+  link_url?: string;
+  name?: string;
+};
+
 type LectureEvent = {
   id: string;
   status: 'scheduled' | 'live' | 'ended' | 'cancelled' | string;
   title?: string | null;
+  title_zh?: string | null;
   speaker_name?: string | null;
+  speaker_name_zh?: string | null;
   video_provider?: 'vimeo' | 'youtube' | null;
   video_id?: string | null;
   video_url?: string | null;
@@ -55,6 +65,10 @@ type LectureEvent = {
   ended_at?: string | null;
   agora_channel_name?: string | null;
   event_type?: 'live' | 'hybrid' | 'pre_recorded' | string | null;
+  scheduled_start?: string | null;
+  pre_event_notes?: string | null;
+  pre_event_notes_zh?: string | null;
+  sponsor_banners?: SponsorBanner[] | null;
 };
 
 type AttentionCheck = {
@@ -176,7 +190,7 @@ export default function LectureViewerScreen() {
       try {
         const { data, error } = await supabase
           .from('lecture_events')
-          .select('id, status, title, speaker_name, video_provider, video_id, video_url, current_position, is_playing, subtitle_urls, certificate_min_minutes, certificate_min_attention_pct, ended_at, agora_channel_name, event_type')
+          .select('id, status, title, title_zh, speaker_name, speaker_name_zh, video_provider, video_id, video_url, current_position, is_playing, subtitle_urls, certificate_min_minutes, certificate_min_attention_pct, ended_at, agora_channel_name, event_type, scheduled_start, pre_event_notes, pre_event_notes_zh, sponsor_banners')
           .eq('id', eventId)
           .maybeSingle();
 
@@ -441,6 +455,27 @@ export default function LectureViewerScreen() {
 
   const videoHeight = Math.min(WIN_W * 9 / 16, 320);
 
+  // Countdown for scheduled lobby
+  const [nowTs, setNowTs] = useState<number>(Date.now());
+  useEffect(() => {
+    if (event?.status !== 'scheduled') return;
+    const id = setInterval(() => setNowTs(Date.now()), 1000);
+    return () => clearInterval(id);
+  }, [event?.status]);
+
+  const countdown = useMemo(() => {
+    if (!event?.scheduled_start) return null;
+    const target = new Date(event.scheduled_start).getTime();
+    if (Number.isNaN(target)) return null;
+    const diff = Math.max(0, target - nowTs);
+    const totalSec = Math.floor(diff / 1000);
+    const h = Math.floor(totalSec / 3600);
+    const m = Math.floor((totalSec % 3600) / 60);
+    const s = totalSec % 60;
+    const pad = (n: number) => n.toString().padStart(2, '0');
+    return { diff, text: `${pad(h)}:${pad(m)}:${pad(s)}` };
+  }, [event?.scheduled_start, nowTs]);
+
   const isLiveStream = !!(
     event?.agora_channel_name &&
     (event?.event_type === 'live' || event?.event_type === 'hybrid') &&
@@ -478,6 +513,8 @@ export default function LectureViewerScreen() {
     })();
     return () => { cancelled = true; };
   }, [isLiveStream, event?.agora_channel_name, agoraAppId, agoraConfigLoading]);
+
+  const isScheduledLobby = event?.status === 'scheduled';
 
   if (loading) {
     return (
@@ -591,9 +628,102 @@ export default function LectureViewerScreen() {
           )}
         </View>
 
+        {isScheduledLobby ? (
+          <ScrollView style={{ flex: 1 }} contentContainerStyle={styles.lobbyContent}>
+            <View style={styles.lobbyHeader}>
+              <Text style={styles.lobbyTitle}>
+                {event?.title || params.eventTitle || (isZh ? '講座' : 'Lecture')}
+              </Text>
+              {event?.title_zh ? (
+                <Text style={styles.lobbyTitleZh}>{event.title_zh}</Text>
+              ) : null}
+              {(event?.speaker_name || event?.speaker_name_zh) ? (
+                <View style={styles.lobbySpeakerRow}>
+                  <UserIcon size={14} color="#94A3B8" />
+                  <Text style={styles.lobbySpeakerText}>
+                    {event?.speaker_name}{event?.speaker_name_zh ? `  ·  ${event.speaker_name_zh}` : ''}
+                  </Text>
+                </View>
+              ) : null}
+            </View>
+
+            {countdown ? (
+              <View style={styles.countdownWrap}>
+                <View style={styles.countdownLabelRow}>
+                  <Calendar size={14} color={ACCENT} />
+                  <Text style={styles.countdownLabel}>
+                    {isZh ? '距離開始' : 'Starts in'}
+                  </Text>
+                </View>
+                {countdown.diff > 0 ? (
+                  <Text style={styles.countdownText}>{countdown.text}</Text>
+                ) : (
+                  <Text style={styles.countdownStarting}>
+                    {isZh ? '即將開始...' : 'Starting any moment...'}
+                  </Text>
+                )}
+              </View>
+            ) : (
+              <View style={styles.countdownWrap}>
+                <Text style={styles.countdownStarting}>
+                  {isZh ? '即將開始...' : 'Starting any moment...'}
+                </Text>
+              </View>
+            )}
+
+            {(event?.pre_event_notes || event?.pre_event_notes_zh) ? (
+              <View style={styles.notesCard}>
+                <Text style={styles.notesTitle}>
+                  {isZh ? '活動須知' : 'Event Notes'}
+                </Text>
+                {event?.pre_event_notes ? (
+                  <Text style={styles.notesText}>{event.pre_event_notes}</Text>
+                ) : null}
+                {event?.pre_event_notes_zh ? (
+                  <Text style={[styles.notesText, { marginTop: event?.pre_event_notes ? 12 : 0 }]}>
+                    {event.pre_event_notes_zh}
+                  </Text>
+                ) : null}
+              </View>
+            ) : null}
+
+            {Array.isArray(event?.sponsor_banners) && event!.sponsor_banners!.length > 0 ? (
+              <View style={styles.sponsorsBlock}>
+                <Text style={styles.sponsorsTitle}>
+                  {isZh ? '贊助商' : 'Sponsors'}
+                </Text>
+                <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.sponsorsRow}>
+                  {event!.sponsor_banners!.map((b, idx) => (
+                    <TouchableOpacity
+                      key={`${b.image_url || idx}`}
+                      activeOpacity={0.85}
+                      style={styles.sponsorCard}
+                      onPress={() => {
+                        if (b.link_url) void Linking.openURL(b.link_url).catch(() => {});
+                      }}
+                      disabled={!b.link_url}
+                    >
+                      {b.image_url ? (
+                        <Image source={{ uri: b.image_url }} style={styles.sponsorImage} resizeMode="cover" />
+                      ) : (
+                        <View style={[styles.sponsorImage, styles.sponsorPlaceholder]}>
+                          <Text style={styles.sponsorPlaceholderText}>{b.name || '—'}</Text>
+                        </View>
+                      )}
+                      {b.name ? (
+                        <Text style={styles.sponsorName} numberOfLines={1}>{b.name}</Text>
+                      ) : null}
+                    </TouchableOpacity>
+                  ))}
+                </ScrollView>
+              </View>
+            ) : null}
+          </ScrollView>
+        ) : (
+        <>
         <View style={styles.videoArea}>
           {renderVideo()}
-          {subtitleUrl && !isLiveStream && (
+          {subtitleUrl && !isLiveStream && !isScheduledLobby && (
             <LiveSubtitleOverlay
               subtitleUrl={subtitleUrl}
               isPlaying={!!event?.is_playing}
@@ -623,8 +753,10 @@ export default function LectureViewerScreen() {
             </Text>
           ) : null}
         </View>
+        </>
+        )}
 
-        <View style={{ flex: 1 }} />
+        {!isScheduledLobby && <View style={{ flex: 1 }} />}
 
         <View style={styles.bottomBar}>
           <Text style={styles.bottomHint}>
@@ -1051,4 +1183,93 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(0,0,0,0.55)',
   },
   liveOverlayText: { color: '#fff', fontSize: 14, fontWeight: '700' },
+
+  lobbyContent: {
+    padding: 20,
+    gap: 20,
+    paddingBottom: 40,
+  },
+  lobbyHeader: { gap: 6, alignItems: 'center', paddingTop: 12 },
+  lobbyTitle: {
+    color: '#fff',
+    fontSize: 24,
+    fontWeight: '800',
+    textAlign: 'center',
+    letterSpacing: -0.3,
+  },
+  lobbyTitleZh: {
+    color: '#CBD5E1',
+    fontSize: 16,
+    fontWeight: '600',
+    textAlign: 'center',
+    marginTop: 2,
+  },
+  lobbySpeakerRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    marginTop: 8,
+  },
+  lobbySpeakerText: { color: '#94A3B8', fontSize: 13, fontWeight: '600' },
+
+  countdownWrap: {
+    alignItems: 'center',
+    paddingVertical: 24,
+    paddingHorizontal: 20,
+    backgroundColor: 'rgba(59,130,246,0.08)',
+    borderRadius: 18,
+    borderWidth: 1,
+    borderColor: 'rgba(59,130,246,0.25)',
+    gap: 10,
+  },
+  countdownLabelRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  countdownLabel: {
+    color: ACCENT,
+    fontSize: 12,
+    fontWeight: '700',
+    letterSpacing: 1,
+    textTransform: 'uppercase',
+  },
+  countdownText: {
+    color: '#fff',
+    fontSize: 52,
+    fontWeight: '800',
+    letterSpacing: 2,
+    fontVariant: ['tabular-nums'],
+  },
+  countdownStarting: {
+    color: '#fff',
+    fontSize: 20,
+    fontWeight: '700',
+    textAlign: 'center',
+  },
+
+  notesCard: {
+    backgroundColor: '#F8FAFC',
+    borderRadius: 16,
+    padding: 18,
+    gap: 8,
+  },
+  notesTitle: { color: '#0F172A', fontSize: 14, fontWeight: '800', letterSpacing: 0.3 },
+  notesText: { color: '#334155', fontSize: 14, lineHeight: 21, fontWeight: '500' },
+
+  sponsorsBlock: { gap: 10 },
+  sponsorsTitle: {
+    color: '#94A3B8',
+    fontSize: 12,
+    fontWeight: '700',
+    letterSpacing: 1,
+    textTransform: 'uppercase',
+  },
+  sponsorsRow: { gap: 12, paddingRight: 8 },
+  sponsorCard: { width: 280, gap: 6 },
+  sponsorImage: {
+    width: 280,
+    height: 140,
+    borderRadius: 12,
+    backgroundColor: '#1E293B',
+  },
+  sponsorPlaceholder: { alignItems: 'center', justifyContent: 'center' },
+  sponsorPlaceholderText: { color: '#64748B', fontSize: 14, fontWeight: '700' },
+  sponsorName: { color: '#94A3B8', fontSize: 12, fontWeight: '600' },
 });

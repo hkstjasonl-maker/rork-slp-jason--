@@ -334,7 +334,7 @@ export default function HomeScreen() {
       const today = new Date().toISOString().split('T')[0];
       const { data, error } = await supabase
         .from('exercise_programs')
-        .select('*, exercises(*, exercise_library(media_status))')
+        .select('*, exercises(*)')
         .eq('patient_id', patientId!)
         .eq('is_active', true)
         .lte('issue_date', today)
@@ -349,11 +349,6 @@ export default function HomeScreen() {
       if (data) {
         for (const p of data) {
           if (p.exercises) {
-            p.exercises = p.exercises.filter((ex: any) => {
-              if (!ex.exercise_library) return true;
-              const status = ex.exercise_library.media_status;
-              return !status || status === 'active';
-            });
             p.exercises.sort((a: Exercise, b: Exercise) => a.sort_order - b.sort_order);
           }
         }
@@ -478,7 +473,14 @@ export default function HomeScreen() {
     const groupMap = new Map<string, Exercise[]>();
     const orderMap = new Map<string, number>();
 
-    programExercises.forEach((exercise) => {
+    const visibleExercises = programExercises.filter((ex: any) => {
+      if (!ex.exercise_library_id) return true;
+      if (!ex.exercise_library) return true;
+      const s = ex.exercise_library?.media_status;
+      return !s || s === 'active';
+    });
+
+    visibleExercises.forEach((exercise) => {
       const cat = exercise.category || t('uncategorized');
       if (!groupMap.has(cat)) {
         groupMap.set(cat, []);

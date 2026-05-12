@@ -41,18 +41,16 @@ const STORAGE_KEYS = {
 type LectureEvent = {
   id: string;
   status: string;
-  title?: string | null;
-  speaker_name?: string | null;
-  scheduled_at?: string | null;
+  title_en?: string | null;
+  title_zh?: string | null;
+  speaker_name_en?: string | null;
+  speaker_name_zh?: string | null;
+  scheduled_start?: string | null;
   session_code?: string | null;
   requires_registration?: boolean | null;
   requires_payment?: boolean | null;
   ticket_price?: number | null;
   ticket_currency?: string | null;
-  title_en?: string | null;
-  title_zh?: string | null;
-  speaker_name_en?: string | null;
-  speaker_name_zh?: string | null;
 };
 
 function generateToken(): string {
@@ -241,7 +239,7 @@ export default function SessionJoinScreen() {
       // 3. Try lecture_events
       const { data: lectureRow } = await supabase
         .from('lecture_events')
-        .select('id, status, title, speaker_name, scheduled_at, session_code, requires_registration, requires_payment, ticket_price, ticket_currency, title_en, title_zh, speaker_name_en, speaker_name_zh')
+        .select('id, status, title_en, title_zh, speaker_name_en, speaker_name_zh, scheduled_start, session_code, requires_registration, requires_payment, ticket_price, ticket_currency')
         .eq('session_code', sessionCode)
         .in('status', ['scheduled', 'live'])
         .maybeSingle();
@@ -431,7 +429,7 @@ export default function SessionJoinScreen() {
         params: {
           eventId: lectureEvent.id,
           attendeeId,
-          eventTitle: lectureEvent.title || '',
+          eventTitle: lectureEvent.title_en || '',
         },
       } as never);
     } catch (e) {
@@ -577,17 +575,23 @@ export default function SessionJoinScreen() {
                 <View style={styles.eventIconWrap}>
                   <GraduationCap size={28} color="#fff" />
                 </View>
-                <Text style={styles.eventTitle}>{lectureEvent.title || (isZh ? '講座' : 'Lecture')}</Text>
-                {lectureEvent.speaker_name ? (
+                <Text style={styles.eventTitle}>{lectureEvent.title_en || (isZh ? '講座' : 'Lecture')}</Text>
+                {lectureEvent.title_zh ? (
+                  <Text style={[styles.eventTitle, { fontSize: 16, marginTop: 2, opacity: 0.85 }]}>{lectureEvent.title_zh}</Text>
+                ) : null}
+                {lectureEvent.speaker_name_en ? (
                   <View style={styles.eventRow}>
                     <Mic size={14} color="#6B7280" />
-                    <Text style={styles.eventMeta}>{lectureEvent.speaker_name}</Text>
+                    <Text style={styles.eventMeta}>
+                      {lectureEvent.speaker_name_en}
+                      {lectureEvent.speaker_name_zh ? ` / ${lectureEvent.speaker_name_zh}` : ''}
+                    </Text>
                   </View>
                 ) : null}
-                {lectureEvent.scheduled_at ? (
+                {lectureEvent.scheduled_start ? (
                   <View style={styles.eventRow}>
                     <Calendar size={14} color="#6B7280" />
-                    <Text style={styles.eventMeta}>{formatScheduled(lectureEvent.scheduled_at)}</Text>
+                    <Text style={styles.eventMeta}>{formatScheduled(lectureEvent.scheduled_start)}</Text>
                   </View>
                 ) : null}
                 <View style={[styles.statusPill, lectureEvent.status === 'live' ? styles.statusLive : styles.statusScheduled]}>

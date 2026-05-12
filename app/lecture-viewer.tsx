@@ -26,6 +26,7 @@ import { VimeoPlayer } from '@/components/VimeoPlayer';
 import { YouTubePlayer } from '@/components/YouTubePlayer';
 import { VideoProtectionOverlay } from '@/components/VideoProtectionOverlay';
 import LiveSubtitleOverlay from '@/components/LiveSubtitleOverlay';
+import { AgoraAudienceView } from '@/components/AgoraAudienceView';
 
 const ACCENT = '#3B82F6';
 const ACCENT_DARK = '#2563EB';
@@ -52,6 +53,8 @@ type LectureEvent = {
   certificate_min_minutes?: number | null;
   certificate_min_attention_pct?: number | null;
   ended_at?: string | null;
+  agora_channel_name?: string | null;
+  event_type?: 'live' | 'hybrid' | 'pre_recorded' | string | null;
 };
 
 type AttentionCheck = {
@@ -101,6 +104,13 @@ export default function LectureViewerScreen() {
 
   const [selectedSubLang, setSelectedSubLang] = useState<string | null>(null);
   const [showLangPicker, setShowLangPicker] = useState<boolean>(false);
+
+  const [agoraAppId, setAgoraAppId] = useState<string | null>(null);
+  const [agoraConfigLoading, setAgoraConfigLoading] = useState<boolean>(false);
+  const [agoraConfigError, setAgoraConfigError] = useState<string | null>(null);
+  const [liveStreamActive, setLiveStreamActive] = useState<boolean>(false);
+  const [liveStreamEnded, setLiveStreamEnded] = useState<boolean>(false);
+  const [liveStreamError, setLiveStreamError] = useState<string | null>(null);
 
   const lastDisconnectRef = useRef<number | null>(null);
   const dotPulse = useRef(new Animated.Value(0)).current;
@@ -166,7 +176,7 @@ export default function LectureViewerScreen() {
       try {
         const { data, error } = await supabase
           .from('lecture_events')
-          .select('id, status, title, speaker_name, video_provider, video_id, video_url, current_position, is_playing, subtitle_urls, certificate_min_minutes, certificate_min_attention_pct, ended_at')
+          .select('id, status, title, speaker_name, video_provider, video_id, video_url, current_position, is_playing, subtitle_urls, certificate_min_minutes, certificate_min_attention_pct, ended_at, agora_channel_name, event_type')
           .eq('id', eventId)
           .maybeSingle();
 
@@ -431,6 +441,44 @@ export default function LectureViewerScreen() {
 
   const videoHeight = Math.min(WIN_W * 9 / 16, 320);
 
+  const isLiveStream = !!(
+    event?.agora_channel_name &&
+    (event?.event_type === 'live' || event?.event_type === 'hybrid') &&
+    event?.status === 'live'
+  );
+
+  // Fetch Agora config once when we determine this is a live stream
+  useEffect(() => {
+    if (!isLiveStream || !event?.agora_channel_name) return;
+    if (agoraAppId || agoraConfigLoading) return;
+    let cancelled = false;
+    setAgoraConfigLoading(true);
+    setAgoraConfigError(null);
+    void (async () => {
+      try {
+        const { data, error } = await supabase.rpc('get_agora_config', { p_channel_name: event.agora_channel_name });
+        if (cancelled) return;
+        if (error) {
+          setAgoraConfigError(error.message);
+          log('[LectureViewer] get_agora_config error:', error);
+          return;
+        }
+        const cfg = Array.isArray(data) ? data[0] : data;
+        const appId = (cfg && (cfg.app_id || cfg.appId)) as string | undefined;
+        if (appId) setAgoraAppId(appId);
+        else setAgoraConfigError('Missing Agora app_id');
+      } catch (e) {
+        if (!cancelled) {
+          setAgoraConfigError(e instanceof Error ? e.message : String(e));
+          log('[LectureViewer] agora config exception:', e);
+        }
+      } finally {
+        if (!cancelled) setAgoraConfigLoading(false);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [isLiveStream, event?.agora_channel_name, agoraAppId, agoraConfigLoading]);
+
   if (loading) {
     return (
       <View style={styles.root}>
@@ -443,6 +491,51 @@ export default function LectureViewerScreen() {
   }
 
   const renderVideo = () => {
+    if (isLiveStream) {
+      if (!agoraAppId) {
+        return (
+          <View style={[styles.videoPlaceholder, { height: videoHeight }]}>
+            <ActivityIndicator color={ACCENT} />
+            <Text style={styles.placeholderText}>
+              {agoraConfigError
+                ? (isZh ? '直播設定載入失敗' : 'Live config failed')
+                : (isZh ? '正在連接直播...' : 'Connecting to live stream...')}
+            </Text>
+          </View>
+        );
+      }
+      return (
+        <VideoProtectionOverlay patientName={patientName || ''} height={videoHeight}>
+          <AgoraAudienceView
+            appId={agoraAppId}
+            channel={event!.agora_channel_name as string}
+            height={videoHeight}
+            onStreamStarted={() => { setLiveStreamActive(true); setLiveStreamEnded(false); setLiveStreamError(null); }}
+            onStreamEnded={() => { setLiveStreamActive(false); setLiveStreamEnded(true); }}
+            onError={(msg) => { setLiveStreamError(msg); log('[LectureViewer] agora error:', msg); }}
+          />
+          {liveStreamActive && (
+            <View style={styles.liveBadge} pointerEvents="none">
+              <View style={styles.liveBadgeDot} />
+              <Text style={styles.liveBadgeText}>LIVE</Text>
+            </View>
+          )}
+          {liveStreamEnded && !liveStreamActive && (
+            <View style={styles.liveOverlay} pointerEvents="none">
+              <Text style={styles.liveOverlayText}>{isZh ? '直播已結束' : 'Stream ended'}</Text>
+            </View>
+          )}
+          {liveStreamError && !liveStreamActive && (
+            <View style={styles.liveOverlay} pointerEvents="none">
+              <Text style={styles.liveOverlayText}>
+                {isZh ? '直播錯誤' : 'Stream error'}
+              </Text>
+            </View>
+          )}
+        </VideoProtectionOverlay>
+      );
+    }
+
     if (!event?.video_id && !event?.video_url) {
       return (
         <View style={[styles.videoPlaceholder, { height: videoHeight }]}>
@@ -500,7 +593,7 @@ export default function LectureViewerScreen() {
 
         <View style={styles.videoArea}>
           {renderVideo()}
-          {subtitleUrl && (
+          {subtitleUrl && !isLiveStream && (
             <LiveSubtitleOverlay
               subtitleUrl={subtitleUrl}
               isPlaying={!!event?.is_playing}
@@ -934,4 +1027,28 @@ const styles = StyleSheet.create({
     paddingVertical: 14, borderRadius: 12, alignItems: 'center',
   },
   summaryBtnText: { color: '#fff', fontSize: 15, fontWeight: '800' },
+
+  liveBadge: {
+    position: 'absolute',
+    top: 10,
+    left: 10,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    backgroundColor: 'rgba(239,68,68,0.92)',
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 6,
+    zIndex: 5,
+  },
+  liveBadgeDot: { width: 6, height: 6, borderRadius: 3, backgroundColor: '#fff' },
+  liveBadgeText: { color: '#fff', fontSize: 10, fontWeight: '800', letterSpacing: 0.8 },
+  liveOverlay: {
+    position: 'absolute',
+    top: 0, left: 0, right: 0, bottom: 0,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'rgba(0,0,0,0.55)',
+  },
+  liveOverlayText: { color: '#fff', fontSize: 14, fontWeight: '700' },
 });

@@ -388,6 +388,7 @@ export default function SessionJoinScreen() {
             display_name: name,
             email: email.trim() || null,
             last_seen_at: new Date().toISOString(),
+            user_type: 'patient',
           })
           .eq('id', existing.id);
       } else {
@@ -403,6 +404,7 @@ export default function SessionJoinScreen() {
             status: 'joined',
             first_join_at: new Date().toISOString(),
             last_seen_at: new Date().toISOString(),
+            user_type: 'patient',
             ...(registrationId ? { registration_id: registrationId, auto_approved: true } : {}),
           })
           .select('id')

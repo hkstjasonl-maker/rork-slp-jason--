@@ -8,6 +8,7 @@ import { setupSessionTracking } from '@/lib/analytics';
 import { checkAndQueueCampaigns, QueuedCampaign } from '@/lib/marketingDraw';
 import { supabase } from '@/lib/supabase';
 import { log } from '@/lib/logger';
+import { getDeviceId } from '@/lib/deviceId';
 
 const STORAGE_KEYS = {
   LANGUAGE: 'app_language',
@@ -189,6 +190,12 @@ export const [AppProvider, useApp] = createContextHook(() => {
   }, []);
 
   const clearPatient = useCallback(async () => {
+    try {
+      const deviceId = await getDeviceId();
+      await supabase.rpc('device_logout', { p_device_id: deviceId });
+    } catch (e) {
+      log('[AppContext] device_logout failed:', e);
+    }
     try {
       await supabase.auth.signOut();
     } catch (e) {

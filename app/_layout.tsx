@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { Stack } from "expo-router";
+import { Stack, useRouter } from "expo-router";
 import * as SplashScreen from "expo-splash-screen";
 import * as ScreenOrientation from 'expo-screen-orientation';
 import React, { useEffect } from "react";
@@ -10,6 +10,9 @@ import { ScreenProtection } from "@/components/ScreenProtection";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { NetworkErrorBanner } from "@/components/NetworkErrorBanner";
 import { NotificationPopup } from "@/components/NotificationPopup";
+import { useDeviceSession } from "@/hooks/useDeviceSession";
+import DeviceLimitScreen from "@/components/DeviceLimitScreen";
+import SessionExpiredScreen from "@/components/SessionExpiredScreen";
 
 void SplashScreen.preventAutoHideAsync();
 
@@ -53,6 +56,42 @@ function NotificationLayer({ children }: { children: React.ReactNode }) {
   );
 }
 
+function DeviceGate({ children }: { children: React.ReactNode }) {
+  const { patientId, clearPatient } = useApp();
+  const router = useRouter();
+  const { status, otherDevice, useThisDevice } = useDeviceSession({
+    userId: patientId,
+    enabled: !!patientId,
+  });
+
+  if (patientId && status === 'limit_reached') {
+    return (
+      <DeviceLimitScreen
+        otherDevice={otherDevice}
+        onUseThisDevice={() => void useThisDevice()}
+        onSignOut={async () => {
+          await clearPatient();
+          router.replace('/code-entry');
+        }}
+        busy={false}
+      />
+    );
+  }
+
+  if (patientId && status === 'evicted') {
+    return (
+      <SessionExpiredScreen
+        onSignInAgain={async () => {
+          await clearPatient();
+          router.replace('/code-entry');
+        }}
+      />
+    );
+  }
+
+  return <>{children}</>;
+}
+
 export default function RootLayout() {
   useEffect(() => {
     void SplashScreen.hideAsync();
@@ -68,7 +107,9 @@ export default function RootLayout() {
           <ScreenProtection>
             <ErrorBoundary>
               <NotificationLayer>
-                <RootLayoutNav />
+                <DeviceGate>
+                  <RootLayoutNav />
+                </DeviceGate>
               </NotificationLayer>
             </ErrorBoundary>
           </ScreenProtection>

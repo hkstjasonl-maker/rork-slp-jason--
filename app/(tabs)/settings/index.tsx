@@ -211,7 +211,7 @@ export default function SettingsScreen() {
           <View style={styles.section}>
             <TouchableOpacity
               style={[styles.actionCard, styles.groupJoinCard]}
-              onPress={() => router.push('/session-join' as any)
+              onPress={() => router.push('/session-join' as any)}
               activeOpacity={0.85}
               testID="join-session-button"
             >

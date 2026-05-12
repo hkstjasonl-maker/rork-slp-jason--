@@ -69,6 +69,13 @@ type LectureEvent = {
   pre_event_notes?: string | null;
   pre_event_notes_zh?: string | null;
   sponsor_banners?: SponsorBanner[] | null;
+  enable_live_subtitles?: boolean | null;
+};
+
+type LiveCaption = {
+  text_content: string;
+  language?: string | null;
+  created_at: string;
 };
 
 type AttentionCheck = {
@@ -125,6 +132,10 @@ export default function LectureViewerScreen() {
   const [liveStreamActive, setLiveStreamActive] = useState<boolean>(false);
   const [liveStreamEnded, setLiveStreamEnded] = useState<boolean>(false);
   const [liveStreamError, setLiveStreamError] = useState<string | null>(null);
+
+  const [liveCaptions, setLiveCaptions] = useState<LiveCaption[]>([]);
+  const [liveCcEnabled, setLiveCcEnabled] = useState<boolean>(true);
+  const [captionTick, setCaptionTick] = useState<number>(0);
 
   const lastDisconnectRef = useRef<number | null>(null);
   const dotPulse = useRef(new Animated.Value(0)).current;
@@ -190,7 +201,7 @@ export default function LectureViewerScreen() {
       try {
         const { data, error } = await supabase
           .from('lecture_events')
-          .select('id, status, title, title_zh, speaker_name, speaker_name_zh, video_provider, video_id, video_url, current_position, is_playing, subtitle_urls, certificate_min_minutes, certificate_min_attention_pct, ended_at, agora_channel_name, event_type, scheduled_start, pre_event_notes, pre_event_notes_zh, sponsor_banners')
+          .select('id, status, title, title_zh, speaker_name, speaker_name_zh, video_provider, video_id, video_url, current_position, is_playing, subtitle_urls, certificate_min_minutes, certificate_min_attention_pct, ended_at, agora_channel_name, event_type, scheduled_start, pre_event_notes, pre_event_notes_zh, sponsor_banners, enable_live_subtitles')
           .eq('id', eventId)
           .maybeSingle();
 
@@ -476,6 +487,55 @@ export default function LectureViewerScreen() {
     return { diff, text: `${pad(h)}:${pad(m)}:${pad(s)}` };
   }, [event?.scheduled_start, nowTs]);
 
+  // Poll live_captions every 3s when enabled and event is live
+  useEffect(() => {
+    if (!eventId) return;
+    if (!event?.enable_live_subtitles) return;
+    if (event?.status !== 'live') return;
+    let cancelled = false;
+    const tick = async () => {
+      try {
+        const { data } = await supabase
+          .from('live_captions')
+          .select('text_content, language, created_at')
+          .eq('event_id', eventId)
+          .order('created_at', { ascending: false })
+          .limit(3);
+        if (cancelled) return;
+        if (Array.isArray(data)) {
+          setLiveCaptions(data as LiveCaption[]);
+        }
+      } catch (e) {
+        log('[LectureViewer] live_captions poll error:', e);
+      }
+    };
+    void tick();
+    const interval = setInterval(tick, 3000);
+    return () => { cancelled = true; clearInterval(interval); };
+  }, [eventId, event?.enable_live_subtitles, event?.status]);
+
+  // Re-render every second so captions can fade out based on age
+  useEffect(() => {
+    if (!event?.enable_live_subtitles || event?.status !== 'live') return;
+    if (!liveCcEnabled) return;
+    const id = setInterval(() => setCaptionTick((n) => n + 1), 1000);
+    return () => clearInterval(id);
+  }, [event?.enable_live_subtitles, event?.status, liveCcEnabled]);
+
+  const visibleCaptions = useMemo<LiveCaption[]>(() => {
+    if (!liveCcEnabled) return [];
+    if (!event?.enable_live_subtitles) return [];
+    const now = Date.now();
+    void captionTick;
+    return liveCaptions
+      .filter((c) => {
+        const t = new Date(c.created_at).getTime();
+        if (Number.isNaN(t)) return false;
+        return now - t < 8000;
+      })
+      .slice(0, 2);
+  }, [liveCaptions, liveCcEnabled, event?.enable_live_subtitles, captionTick]);
+
   const isLiveStream = !!(
     event?.agora_channel_name &&
     (event?.event_type === 'live' || event?.event_type === 'hybrid') &&
@@ -732,9 +792,27 @@ export default function LectureViewerScreen() {
               forceOverlay={false}
             />
           )}
+          {event?.enable_live_subtitles && event?.status === 'live' && liveCcEnabled && visibleCaptions.length > 0 && (
+            <View style={styles.liveCaptionsContainer} pointerEvents="none">
+              {visibleCaptions.slice().reverse().map((c, idx) => (
+                <View key={`${c.created_at}-${idx}`} style={styles.liveCaptionBubble}>
+                  <Text style={styles.liveCaptionText}>{c.text_content}</Text>
+                </View>
+              ))}
+            </View>
+          )}
         </View>
 
         <View style={styles.metaBar}>
+          {event?.enable_live_subtitles ? (
+            <TouchableOpacity
+              style={[styles.liveCcToggle, !liveCcEnabled && styles.liveCcToggleOff]}
+              onPress={() => setLiveCcEnabled((v) => !v)}
+              activeOpacity={0.7}
+            >
+              <Text style={[styles.liveCcToggleText, !liveCcEnabled && styles.liveCcToggleTextOff]}>LIVE CC</Text>
+            </TouchableOpacity>
+          ) : null}
           {subtitleLanguages.length > 0 ? (
             <TouchableOpacity
               style={styles.langPicker}
@@ -1272,4 +1350,48 @@ const styles = StyleSheet.create({
   sponsorPlaceholder: { alignItems: 'center', justifyContent: 'center' },
   sponsorPlaceholderText: { color: '#64748B', fontSize: 14, fontWeight: '700' },
   sponsorName: { color: '#94A3B8', fontSize: 12, fontWeight: '600' },
+
+  liveCaptionsContainer: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    bottom: 8,
+    alignItems: 'center',
+    gap: 4,
+    paddingHorizontal: 12,
+    zIndex: 3,
+  },
+  liveCaptionBubble: {
+    maxWidth: '90%',
+    backgroundColor: 'rgba(0,0,0,0.7)',
+    paddingHorizontal: 6,
+    paddingVertical: 4,
+    borderRadius: 8,
+  },
+  liveCaptionText: {
+    color: '#fff',
+    fontSize: 15,
+    fontWeight: '600',
+    textAlign: 'center',
+  },
+  liveCcToggle: {
+    flexDirection: 'row', alignItems: 'center',
+    backgroundColor: 'rgba(59,130,246,0.2)',
+    borderRadius: 8,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    marginRight: 8,
+  },
+  liveCcToggleOff: {
+    backgroundColor: 'rgba(148,163,184,0.15)',
+  },
+  liveCcToggleText: {
+    color: ACCENT,
+    fontSize: 12,
+    fontWeight: '800',
+    letterSpacing: 0.5,
+  },
+  liveCcToggleTextOff: {
+    color: '#64748B',
+  },
 });

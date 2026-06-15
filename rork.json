@@ -1,8 +1,9 @@
 {
+  "$schema": "https://rork.com/schema/rork.json",
   "apps": [
     {
       "name": "Expo",
-      "path": ".",
+      "path": "expo",
       "framework": "react-native"
     }
   ]
